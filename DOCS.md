@@ -9,7 +9,6 @@ If you want to see a modpack example go [here](https://github.com/Wynncraft-Over
 The Header section contains metadata about the modpack, such as the name and the Minecraft version it targets.
 
 - `manifest_version`: This field represents the manifest version the modpack was created for and should be automatically generated upon the creation of a new modpack.
-- `minecraft_version`: This field specifies the target Minecraft version. Make sure that the loader supports it.
 - `name`: This field specifies the modpack name. This can be any string.
 - `uuid`: This field is generated upon the creation of a new modpack and should be the same across all modpack versions. **Do not change this field**.
 
@@ -19,6 +18,7 @@ The `loader` section specifies the target mod loader for the modpack.
 
 - `type`: This field specifies the target mod loader. Currently supported values are: `fabric`.
 - `version`: This field specifies the target mod loader version. Make sure this is compatible with your target Minecraft version.
+- `minecraft_version`: This field specifies the target Minecraft version. Make sure that the loader version supports it.
 
 ## Mods
 
