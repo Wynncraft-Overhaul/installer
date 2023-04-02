@@ -47,6 +47,7 @@ struct Manifest {
     modpack_version: String,
     name: String,
     uuid: String,
+    loader: Loader,
     mods: Vec<Mod>,
     shaderpacks: Vec<Shaderpack>,
     resourcepacks: Vec<Resourcepack>,
