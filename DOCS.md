@@ -11,6 +11,7 @@ The Header section contains metadata about the modpack, such as the name and the
 - `manifest_version`: This field represents the manifest version the modpack was created for and should be automatically generated upon the creation of a new modpack.
 - `name`: This field specifies the modpack name. This can be any string.
 - `uuid`: This field is generated upon the creation of a new modpack and should be the same across all modpack versions. **Do not change this field**.
+- `icon`: If this field is set to `true` the installer will look for an `icon.png` in the modpack root.
 
 ## Loader
 
