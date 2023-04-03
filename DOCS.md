@@ -9,6 +9,7 @@ If you want to see a modpack example go [here](https://github.com/Wynncraft-Over
 The Header section contains metadata about the modpack, such as the name and the Minecraft version it targets.
 
 - `manifest_version`: This field represents the manifest version the modpack was created for and should be automatically generated upon the creation of a new modpack.
+- `modpack_version`: This field is a [semver](https://semver.org/) for your modpack.
 - `name`: This field specifies the modpack name. This can be any string.
 - `uuid`: This field is generated upon the creation of a new modpack and should be the same across all modpack versions. **Do not change this field**.
 - `icon`: If this field is set to `true` the installer will look for an `icon.png` in the modpack root.
