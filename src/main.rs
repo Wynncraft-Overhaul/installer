@@ -14,7 +14,12 @@ use std::{
 const CURRENT_MANIFEST_VERSION: i32 = 1;
 
 trait Downloadable {
-    fn download(&self, modpack_root: &PathBuf);
+    fn download(&self, modpack_root: &PathBuf, loader_type: &String);
+}
+trait DownloadableGetters {
+    fn get_name(&self) -> &String;
+    fn get_location(&self) -> &String;
+    fn get_version(&self) -> &String;
 }
 #[derive(Debug, Deserialize, Serialize)]
 struct Mod {
@@ -23,12 +28,52 @@ struct Mod {
     location: String,
     version: String,
 }
+impl DownloadableGetters for Mod {
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_location(&self) -> &String {
+        &self.location
+    }
+    fn get_version(&self) -> &String {
+        &self.version
+    }
+}
+impl Downloadable for Mod {
+    fn download(&self, modpack_root: &PathBuf, loader_type: &String) {
+        match self.source.as_str() {
+            "modrinth" => download_from_modrinth(self, modpack_root, loader_type, "mod"),
+            "ddl" => download_from_ddl(self, modpack_root, "mod"),
+            _ => panic!("Unsupported source '{}'!", self.source.as_str()),
+        }
+    }
+}
 #[derive(Debug, Deserialize, Serialize)]
 struct Shaderpack {
     name: String,
     source: String,
     location: String,
     version: String,
+}
+impl DownloadableGetters for Shaderpack {
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_location(&self) -> &String {
+        &self.location
+    }
+    fn get_version(&self) -> &String {
+        &self.version
+    }
+}
+impl Downloadable for Shaderpack {
+    fn download(&self, modpack_root: &PathBuf, loader_type: &String) {
+        match self.source.as_str() {
+            "modrinth" => download_from_modrinth(self, modpack_root, loader_type, "shaderpack"),
+            "ddl" => download_from_ddl(self, modpack_root, "shaderpack"),
+            _ => panic!("Unsupported source '{}'!", self.source.as_str()),
+        }
+    }
 }
 #[derive(Debug, Deserialize, Serialize)]
 struct Resourcepack {
@@ -37,6 +82,26 @@ struct Resourcepack {
     location: String,
     version: String,
 }
+impl DownloadableGetters for Resourcepack {
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_location(&self) -> &String {
+        &self.location
+    }
+    fn get_version(&self) -> &String {
+        &self.version
+    }
+}
+impl Downloadable for Resourcepack {
+    fn download(&self, modpack_root: &PathBuf, loader_type: &String) {
+        match self.source.as_str() {
+            "modrinth" => download_from_modrinth(self, modpack_root, loader_type, "resourcepack"),
+            "ddl" => download_from_ddl(self, modpack_root, "resourcepack"),
+            _ => panic!("Unsupported source '{}'!", self.source.as_str()),
+        }
+    }
+}
 #[derive(Debug, Deserialize, Serialize)]
 struct Loader {
     r#type: String,
@@ -44,7 +109,7 @@ struct Loader {
     minecraft_version: String,
 }
 impl Downloadable for Loader {
-    fn download(&self, modpack_root: &PathBuf) {
+    fn download(&self, modpack_root: &PathBuf, _: &String) {
         match self.r#type.as_str() {
             "fabric" => download_fabric(&self, modpack_root),
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
@@ -73,7 +138,12 @@ struct LauncherProfile {
     name: String,
     icon: String,
     r#type: String,
-    gamedir: Option<String>,
+    gameDir: Option<String>,
+    javaDir: Option<String>,
+    javaArgs: Option<String>,
+    logConfig: Option<String>,
+    logConfigIsXML: Option<bool>,
+    resolution: Option<HashMap<String, i32>>,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -95,6 +165,17 @@ struct LauncherProfiles {
     settings: LauncherProfilesSettings,
     profiles: HashMap<String, LauncherProfile>,
     version: i32,
+}
+#[derive(Debug, Deserialize, Serialize)]
+struct ModrinthFile {
+    url: String,
+    filename: String,
+}
+#[derive(Debug, Deserialize, Serialize)]
+struct ModrinthObject {
+    version_number: String,
+    files: Vec<ModrinthFile>,
+    loaders: Vec<String>,
 }
 
 fn download_fabric(loader: &Loader, modpack_root: &PathBuf) {
@@ -122,6 +203,77 @@ fn download_fabric(loader: &Loader, modpack_root: &PathBuf) {
         "",
     )
     .expect("Failed to write fabric dummy jar");
+}
+
+fn download_from_ddl(item: &impl DownloadableGetters, modpack_root: &PathBuf, r#type: &str) {
+    let content = reqwest::blocking::get(item.get_location())
+        .expect(&format!("Failed to download '{}'!", item.get_name()))
+        .bytes()
+        .unwrap();
+    let dist: PathBuf;
+    match r#type {
+        "mod" => dist = modpack_root.join(Path::new("mods")),
+        "resourcepack" => dist = modpack_root.join(Path::new("resourcepacks")),
+        "shaderpack" => dist = modpack_root.join(Path::new("shaderpacks")),
+        _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
+    };
+    fs::create_dir_all(&dist).expect(&format!(
+        "Failed to create '{}' directory",
+        &dist.to_str().unwrap()
+    ));
+    fs::write(
+        dist.join(Path::new(item.get_location().split("/").last().expect(
+            &format!(
+                "Could not determine file name for ddl: '{}'!",
+                item.get_location()
+            ),
+        ))),
+        &content,
+    )
+    .expect("Failed to write ddl item!");
+}
+
+fn download_from_modrinth(
+    item: &impl DownloadableGetters,
+    modpack_root: &PathBuf,
+    loader_type: &String,
+    r#type: &str,
+) {
+    let resp = reqwest::blocking::get(format!(
+        "https://api.modrinth.com/v2/project/{}/version",
+        item.get_location()
+    ))
+    .expect(&format!("Failed to download '{}'!", item.get_name()))
+    .text()
+    .unwrap();
+    let resp_obj: Vec<ModrinthObject> =
+        serde_json::from_str(&resp).expect("Failed to parse modrinth response!");
+    let dist: PathBuf;
+    match r#type {
+        "mod" => dist = modpack_root.join(Path::new("mods")),
+        "resourcepack" => dist = modpack_root.join(Path::new("resourcepacks")),
+        "shaderpack" => dist = modpack_root.join(Path::new("shaderpacks")),
+        _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
+    };
+    fs::create_dir_all(&dist).expect(&format!(
+        "Failed to create '{}' directory",
+        &dist.to_str().unwrap()
+    ));
+    for _mod in resp_obj {
+        if &_mod.version_number == item.get_version() {
+            if _mod.loaders.contains(&String::from("minecraft"))
+                || _mod.loaders.contains(&String::from(loader_type))
+                || r#type == "shaderpack"
+            {
+                let content = reqwest::blocking::get(&_mod.files[0].url)
+                    .expect(&format!("Failed to download '{}'!", item.get_name()))
+                    .bytes()
+                    .unwrap();
+                fs::write(dist.join(Path::new(&_mod.files[0].filename)), &content)
+                    .expect("Failed to write modrinth item!");
+            }
+        }
+    }
 }
 
 fn get_minecraft_folder() -> PathBuf {
@@ -179,7 +331,12 @@ fn create_launcher_profile(manifest: &Manifest, modpack_root: &PathBuf) {
         name: manifest.name.clone(),
         icon: icon,
         r#type: String::from("custom"),
-        gamedir: Some(modpack_root.to_str().unwrap().to_string()),
+        gameDir: Some(modpack_root.to_str().unwrap().to_string()),
+        javaDir: None,
+        javaArgs: None,
+        logConfig: None,
+        logConfigIsXML: None,
+        resolution: None,
     };
     let lp_file_path = get_minecraft_folder().join(Path::new("launcher_profiles.json"));
     let mut lp_obj: LauncherProfiles = serde_json::from_str(
@@ -208,6 +365,22 @@ fn main() {
     );
 
     let modpack_root = get_modpack_root(&manifest.uuid);
-    manifest.loader.download(&modpack_root);
-    create_launcher_profile(&manifest, &modpack_root)
+    fs::write(
+        get_modpack_root(&manifest.uuid).join(Path::new("manifest.json")),
+        serde_json::to_string(&manifest).expect("Failed to parse 'manifest.json'!"),
+    )
+    .expect("Failed to save a local copy of 'manifest.json'!");
+    manifest
+        .loader
+        .download(&modpack_root, &manifest.loader.r#type);
+    for _mod in &manifest.mods {
+        _mod.download(&modpack_root, &manifest.loader.r#type);
+    }
+    for resourcepack in &manifest.resourcepacks {
+        resourcepack.download(&modpack_root, &manifest.loader.r#type);
+    }
+    for shaderpack in &manifest.shaderpacks {
+        shaderpack.download(&modpack_root, &manifest.loader.r#type)
+    }
+    create_launcher_profile(&manifest, &modpack_root);
 }
