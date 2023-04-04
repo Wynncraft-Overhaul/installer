@@ -14,20 +14,30 @@ use std::{
 };
 
 const CURRENT_MANIFEST_VERSION: i32 = 1;
+const GH_API: &str = "https://api.github.com/repos/";
+const GH_RAW: &str = "https://raw.githubusercontent.com/";
+const MODPACK_SOURCE: &str = "Commander07/modpack-test/";
+const MODPACK_BRANCH: &str = "main";
 trait Downloadable {
-    fn download(&self, modpack_root: &PathBuf, loader_type: &String, http_client: &Client);
+    fn download(
+        &self,
+        modpack_root: &PathBuf,
+        loader_type: &String,
+        http_client: &Client,
+    ) -> PathBuf;
 }
 trait DownloadableGetters {
     fn get_name(&self) -> &String;
     fn get_location(&self) -> &String;
     fn get_version(&self) -> &String;
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Mod {
     name: String,
     source: String,
     location: String,
     version: String,
+    path: Option<PathBuf>,
 }
 impl DownloadableGetters for Mod {
     fn get_name(&self) -> &String {
@@ -41,7 +51,12 @@ impl DownloadableGetters for Mod {
     }
 }
 impl Downloadable for Mod {
-    fn download(&self, modpack_root: &PathBuf, loader_type: &String, http_client: &Client) {
+    fn download(
+        &self,
+        modpack_root: &PathBuf,
+        loader_type: &String,
+        http_client: &Client,
+    ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
                 download_from_modrinth(self, modpack_root, loader_type, "mod", http_client)
@@ -51,12 +66,13 @@ impl Downloadable for Mod {
         }
     }
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Shaderpack {
     name: String,
     source: String,
     location: String,
     version: String,
+    path: Option<PathBuf>,
 }
 impl DownloadableGetters for Shaderpack {
     fn get_name(&self) -> &String {
@@ -70,7 +86,12 @@ impl DownloadableGetters for Shaderpack {
     }
 }
 impl Downloadable for Shaderpack {
-    fn download(&self, modpack_root: &PathBuf, loader_type: &String, http_client: &Client) {
+    fn download(
+        &self,
+        modpack_root: &PathBuf,
+        loader_type: &String,
+        http_client: &Client,
+    ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
                 download_from_modrinth(self, modpack_root, loader_type, "shaderpack", http_client)
@@ -80,12 +101,13 @@ impl Downloadable for Shaderpack {
         }
     }
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Resourcepack {
     name: String,
     source: String,
     location: String,
     version: String,
+    path: Option<PathBuf>,
 }
 impl DownloadableGetters for Resourcepack {
     fn get_name(&self) -> &String {
@@ -99,7 +121,12 @@ impl DownloadableGetters for Resourcepack {
     }
 }
 impl Downloadable for Resourcepack {
-    fn download(&self, modpack_root: &PathBuf, loader_type: &String, http_client: &Client) {
+    fn download(
+        &self,
+        modpack_root: &PathBuf,
+        loader_type: &String,
+        http_client: &Client,
+    ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
                 download_from_modrinth(self, modpack_root, loader_type, "resourcepack", http_client)
@@ -109,14 +136,14 @@ impl Downloadable for Resourcepack {
         }
     }
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Loader {
     r#type: String,
     version: String,
     minecraft_version: String,
 }
 impl Downloadable for Loader {
-    fn download(&self, modpack_root: &PathBuf, _: &String, http_client: &Client) {
+    fn download(&self, modpack_root: &PathBuf, _: &String, http_client: &Client) -> PathBuf {
         match self.r#type.as_str() {
             "fabric" => download_fabric(&self, modpack_root, http_client),
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
@@ -198,7 +225,7 @@ struct ReadFile {
     content: Bytes,
 }
 
-fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client) {
+fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client) -> PathBuf {
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
         loader.minecraft_version, loader.version
@@ -207,13 +234,19 @@ fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client
         "fabric-loader-{}-{}",
         &loader.version, &loader.minecraft_version
     );
+    let fabric_path = modpack_root.join(&Path::new(&format!("versions/{}", &loader_name)));
+    if fabric_path
+        .join(Path::new(&format!("{}.json", &loader_name)))
+        .exists()
+    {
+        return PathBuf::new();
+    }
     let resp = http_client
         .get(url.as_str())
         .send()
         .expect("Failed to download fabric loader!")
         .text()
         .unwrap();
-    let fabric_path = modpack_root.join(&Path::new(&format!("versions/{}", &loader_name)));
     fs::create_dir_all(&fabric_path).expect("Failed to create fabric directory");
     fs::write(
         &fabric_path.join(Path::new(&format!("{}.json", &loader_name))),
@@ -225,6 +258,7 @@ fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client
         "",
     )
     .expect("Failed to write fabric dummy jar");
+    return fabric_path;
 }
 
 fn download_from_ddl<T: Downloadable + DownloadableGetters>(
@@ -232,7 +266,7 @@ fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     modpack_root: &PathBuf,
     r#type: &str,
     http_client: &Client,
-) {
+) -> PathBuf {
     let content = http_client
         .get(item.get_location())
         .send()
@@ -250,16 +284,14 @@ fn download_from_ddl<T: Downloadable + DownloadableGetters>(
         "Failed to create '{}' directory",
         &dist.to_str().unwrap()
     ));
-    fs::write(
-        dist.join(Path::new(item.get_location().split("/").last().expect(
-            &format!(
-                "Could not determine file name for ddl: '{}'!",
-                item.get_location()
-            ),
-        ))),
-        &content,
-    )
-    .expect("Failed to write ddl item!");
+    let final_dist = dist.join(Path::new(item.get_location().split("/").last().expect(
+        &format!(
+            "Could not determine file name for ddl: '{}'!",
+            item.get_location()
+        ),
+    )));
+    fs::write(&final_dist, &content).expect("Failed to write ddl item!");
+    final_dist
 }
 
 fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
@@ -268,7 +300,7 @@ fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
     loader_type: &String,
     r#type: &str,
     http_client: &Client,
-) {
+) -> PathBuf {
     let resp = http_client
         .get(format!(
             "https://api.modrinth.com/v2/project/{}/version",
@@ -303,11 +335,13 @@ fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
                     .expect(&format!("Failed to download '{}'!", item.get_name()))
                     .bytes()
                     .unwrap();
-                fs::write(dist.join(Path::new(&_mod.files[0].filename)), &content)
-                    .expect("Failed to write modrinth item!");
+                let final_dist = dist.join(Path::new(&_mod.files[0].filename));
+                fs::write(&final_dist, &content).expect("Failed to write modrinth item!");
+                return final_dist;
             }
         }
     }
+    panic!("No items returned from modrinth!")
 }
 
 fn get_minecraft_folder() -> PathBuf {
@@ -440,50 +474,52 @@ fn build_http_client() -> Client {
         .unwrap()
 }
 
-fn main() {
-    let gh_api = String::from("https://api.github.com/repos/");
-    let gh_raw = String::from("https://raw.githubusercontent.com/");
-    let modpack_source = "Commander07/modpack-test/";
-    let modpack_branch = "main";
-    let http_client = build_http_client();
-    let manifest: Manifest = serde_json::from_str(
-        http_client
-            .get(gh_raw.clone() + &modpack_source + &modpack_branch + "/manifest.json")
-            .send()
-            .expect("Failed to retrieve manifest!")
-            .text()
-            .unwrap()
-            .as_str(),
-    )
-    .expect("Failed to parse json!");
-    // TODO(Figure out a way to support older manifest versions)
-    assert!(
-        CURRENT_MANIFEST_VERSION == manifest.manifest_version,
-        "Unsupported manifest version '{}'!",
-        manifest.manifest_version
-    );
-
-    let modpack_root = get_modpack_root(&manifest.uuid);
-    fs::write(
-        get_modpack_root(&manifest.uuid).join(Path::new("manifest.json")),
-        serde_json::to_string(&manifest).expect("Failed to parse 'manifest.json'!"),
-    )
-    .expect("Failed to save a local copy of 'manifest.json'!");
+fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
     manifest
         .loader
         .download(&modpack_root, &manifest.loader.r#type, &http_client);
-    for _mod in &manifest.mods {
-        _mod.download(&modpack_root, &manifest.loader.r#type, &http_client);
+    let mut mods_w_path = vec![];
+    let mut resourcepacks_w_path = vec![];
+    let mut shaderpacks_w_path = vec![];
+    for r#mod in &manifest.mods {
+        if r#mod.path.is_some() {
+            continue;
+        }
+        mods_w_path.push(Mod {
+            name: r#mod.name.clone(),
+            source: r#mod.source.clone(),
+            location: r#mod.location.clone(),
+            version: r#mod.version.clone(),
+            path: Some(r#mod.download(&modpack_root, &manifest.loader.r#type, &http_client)),
+        });
     }
     for resourcepack in &manifest.resourcepacks {
-        resourcepack.download(&modpack_root, &manifest.loader.r#type, &http_client);
+        if resourcepack.path.is_some() {
+            continue;
+        }
+        resourcepacks_w_path.push(Resourcepack {
+            name: resourcepack.name.clone(),
+            source: resourcepack.source.clone(),
+            location: resourcepack.location.clone(),
+            version: resourcepack.version.clone(),
+            path: Some(resourcepack.download(&modpack_root, &manifest.loader.r#type, &http_client)),
+        });
     }
     for shaderpack in &manifest.shaderpacks {
-        shaderpack.download(&modpack_root, &manifest.loader.r#type, &http_client)
+        if shaderpack.path.is_some() {
+            continue;
+        }
+        shaderpacks_w_path.push(Shaderpack {
+            name: shaderpack.name.clone(),
+            source: shaderpack.source.clone(),
+            location: shaderpack.location.clone(),
+            version: shaderpack.version.clone(),
+            path: Some(shaderpack.download(&modpack_root, &manifest.loader.r#type, &http_client)),
+        });
     }
     for include in &manifest.include {
         let resp = http_client
-            .get(gh_api.clone() + &modpack_source + "contents/" + include)
+            .get(GH_API.to_owned() + MODPACK_SOURCE + "contents/" + include)
             .send()
             .expect(&format!("Failed to get include item '{}!'", include))
             .text()
@@ -501,12 +537,29 @@ fn main() {
             }
         }
     }
+    let local_manifest = Manifest {
+        manifest_version: manifest.manifest_version,
+        modpack_version: manifest.modpack_version.clone(),
+        name: manifest.name.clone(),
+        icon: manifest.icon,
+        uuid: manifest.uuid.clone(),
+        loader: manifest.loader.clone(),
+        mods: mods_w_path,
+        shaderpacks: shaderpacks_w_path,
+        resourcepacks: resourcepacks_w_path,
+        include: manifest.include.clone(),
+    };
+    fs::write(
+        get_modpack_root(&manifest.uuid).join(Path::new("manifest.json")),
+        serde_json::to_string(&local_manifest).expect("Failed to parse 'manifest.json'!"),
+    )
+    .expect("Failed to save a local copy of 'manifest.json'!");
     let icon_img: Option<DynamicImage>;
     if manifest.icon {
         icon_img = Some(
             ImageReader::new(Cursor::new(
                 http_client
-                    .get(gh_raw.clone() + &modpack_source + &modpack_branch + "/icon.png")
+                    .get(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/icon.png")
                     .send()
                     .expect("Failed to download icon")
                     .bytes()
@@ -521,4 +574,148 @@ fn main() {
         icon_img = None
     }
     create_launcher_profile(&manifest, &modpack_root, icon_img);
+}
+
+macro_rules! remove_items {
+    ($items:expr, $predicate:expr) => {
+        $items.iter().filter($predicate).for_each(|x| {
+            fs::remove_file(x.path.as_ref().expect(&format!(
+                "Missing 'path' field on installed {} '{}'!",
+                stringify!($items),
+                x.name
+            )))
+            .expect(&format!(
+                "Failed to delete outdated {} '{}'!",
+                stringify!($items),
+                x.name
+            ));
+        });
+    };
+}
+
+fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
+    // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
+    // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
+    let local_manifest: Manifest =
+        match fs::read_to_string(modpack_root.join(Path::new("manifest.json"))) {
+            Ok(contents) => match serde_json::from_str(&contents) {
+                Ok(parsed) => parsed,
+                Err(err) => panic!("Failed to parse local manifest: {}", err),
+            },
+            Err(err) => panic!("Failed to read local manifest: {}", err),
+        };
+
+    let new_mods: Vec<Mod> = manifest
+        .mods
+        .iter()
+        .filter_map(|r#mod| {
+            local_manifest
+                .mods
+                .iter()
+                .find(|installed_mod| installed_mod.name == r#mod.name)
+                .map_or_else(
+                    || Some(r#mod.clone()),
+                    |installed_mod| Some(installed_mod.clone()),
+                )
+        })
+        .collect();
+    remove_items!(local_manifest.mods, |x| { !new_mods.contains(x) });
+    let new_shaderpacks: Vec<Shaderpack> = manifest
+        .shaderpacks
+        .iter()
+        .filter_map(|shaderpack| {
+            local_manifest
+                .shaderpacks
+                .iter()
+                .find(|installed_sp| installed_sp.name == shaderpack.name)
+                .map_or_else(
+                    || Some(shaderpack.clone()),
+                    |installed_sp| Some(installed_sp.clone()),
+                )
+        })
+        .collect();
+    remove_items!(local_manifest.shaderpacks, |x| {
+        !new_shaderpacks.contains(x)
+    });
+    let new_resourcepacks: Vec<Resourcepack> = manifest
+        .resourcepacks
+        .iter()
+        .filter_map(|resourcepack| {
+            local_manifest
+                .resourcepacks
+                .iter()
+                .find(|installed_rp| installed_rp.name == resourcepack.name)
+                .map_or_else(
+                    || Some(resourcepack.clone()),
+                    |installed_rp| Some(installed_rp.clone()),
+                )
+        })
+        .collect();
+    remove_items!(local_manifest.resourcepacks, |x| {
+        !new_resourcepacks.contains(x)
+    });
+    if manifest.loader != local_manifest.loader {
+        fs::remove_dir_all(modpack_root.join(&Path::new(&format!(
+            "versions/{}",
+            format!(
+                "fabric-loader-{}-{}",
+                &local_manifest.loader.version, &local_manifest.loader.minecraft_version
+            )
+        ))))
+        .expect("Could not delete old fabric version!");
+    }
+    install(
+        modpack_root,
+        &Manifest {
+            manifest_version: manifest.manifest_version,
+            modpack_version: manifest.modpack_version.clone(),
+            name: manifest.name.clone(),
+            icon: manifest.icon,
+            uuid: manifest.uuid.clone(),
+            loader: manifest.loader.clone(),
+            mods: new_mods,
+            shaderpacks: new_shaderpacks,
+            resourcepacks: new_resourcepacks,
+            include: manifest.include.clone(),
+        },
+        http_client,
+    )
+}
+
+fn main() {
+    let http_client = build_http_client();
+    let manifest: Manifest = serde_json::from_str(
+        http_client
+            .get(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/manifest.json")
+            .send()
+            .expect("Failed to retrieve manifest!")
+            .text()
+            .unwrap()
+            .as_str(),
+    )
+    .expect("Failed to parse json!");
+    // TODO(Figure out a way to support older manifest versions)
+    assert!(
+        CURRENT_MANIFEST_VERSION == manifest.manifest_version,
+        "Unsupported manifest version '{}'!",
+        manifest.manifest_version
+    );
+    let modpack_root = get_modpack_root(&manifest.uuid);
+    let installed = modpack_root.join(Path::new("manifest.json")).exists();
+    let mut update_available = false;
+    if installed {
+        let local_manifest: Manifest = serde_json::from_str(
+            &fs::read_to_string(modpack_root.join(Path::new("manifest.json")))
+                .expect("Failed to read local manifest!"),
+        )
+        .expect("Failed to parse local manifest!");
+        if &manifest.modpack_version != &local_manifest.modpack_version {
+            update_available = true
+        }
+    }
+    if update_available {
+        update(&modpack_root, &manifest, &http_client);
+    } else if !installed {
+        install(&modpack_root, &manifest, &http_client);
+    }
 }
