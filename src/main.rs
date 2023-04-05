@@ -1,9 +1,12 @@
+use async_recursion::async_recursion;
+use async_trait::async_trait;
 use base64::{engine, Engine};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use futures::StreamExt;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{
@@ -18,8 +21,10 @@ const GH_API: &str = "https://api.github.com/repos/";
 const GH_RAW: &str = "https://raw.githubusercontent.com/";
 const MODPACK_SOURCE: &str = "Commander07/modpack-test/";
 const MODPACK_BRANCH: &str = "main";
+const CONCURRENCY: usize = 14;
+#[async_trait]
 trait Downloadable {
-    fn download(
+    async fn download(
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
@@ -50,8 +55,9 @@ impl DownloadableGetters for Mod {
         &self.version
     }
 }
+#[async_trait]
 impl Downloadable for Mod {
-    fn download(
+    async fn download(
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
@@ -59,9 +65,9 @@ impl Downloadable for Mod {
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
-                download_from_modrinth(self, modpack_root, loader_type, "mod", http_client)
+                download_from_modrinth(self, modpack_root, loader_type, "mod", http_client).await
             }
-            "ddl" => download_from_ddl(self, modpack_root, "mod", http_client),
+            "ddl" => download_from_ddl(self, modpack_root, "mod", http_client).await,
             _ => panic!("Unsupported source '{}'!", self.source.as_str()),
         }
     }
@@ -85,8 +91,9 @@ impl DownloadableGetters for Shaderpack {
         &self.version
     }
 }
+#[async_trait]
 impl Downloadable for Shaderpack {
-    fn download(
+    async fn download(
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
@@ -95,8 +102,9 @@ impl Downloadable for Shaderpack {
         match self.source.as_str() {
             "modrinth" => {
                 download_from_modrinth(self, modpack_root, loader_type, "shaderpack", http_client)
+                    .await
             }
-            "ddl" => download_from_ddl(self, modpack_root, "shaderpack", http_client),
+            "ddl" => download_from_ddl(self, modpack_root, "shaderpack", http_client).await,
             _ => panic!("Unsupported source '{}'!", self.source.as_str()),
         }
     }
@@ -120,8 +128,9 @@ impl DownloadableGetters for Resourcepack {
         &self.version
     }
 }
+#[async_trait]
 impl Downloadable for Resourcepack {
-    fn download(
+    async fn download(
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
@@ -130,8 +139,9 @@ impl Downloadable for Resourcepack {
         match self.source.as_str() {
             "modrinth" => {
                 download_from_modrinth(self, modpack_root, loader_type, "resourcepack", http_client)
+                    .await
             }
-            "ddl" => download_from_ddl(self, modpack_root, "resourcepack", http_client),
+            "ddl" => download_from_ddl(self, modpack_root, "resourcepack", http_client).await,
             _ => panic!("Unsupported source '{}'!", self.source.as_str()),
         }
     }
@@ -142,10 +152,11 @@ struct Loader {
     version: String,
     minecraft_version: String,
 }
+#[async_trait]
 impl Downloadable for Loader {
-    fn download(&self, modpack_root: &PathBuf, _: &String, http_client: &Client) -> PathBuf {
+    async fn download(&self, modpack_root: &PathBuf, _: &String, http_client: &Client) -> PathBuf {
         match self.r#type.as_str() {
-            "fabric" => download_fabric(&self, modpack_root, http_client),
+            "fabric" => download_fabric(&self, modpack_root, http_client).await,
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
         }
     }
@@ -225,7 +236,7 @@ struct ReadFile {
     content: Bytes,
 }
 
-fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client) -> PathBuf {
+async fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client) -> PathBuf {
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
         loader.minecraft_version, loader.version
@@ -244,8 +255,10 @@ fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client
     let resp = http_client
         .get(url.as_str())
         .send()
+        .await
         .expect("Failed to download fabric loader!")
         .text()
+        .await
         .unwrap();
     fs::create_dir_all(&fabric_path).expect("Failed to create fabric directory");
     fs::write(
@@ -261,7 +274,7 @@ fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client
     return fabric_path;
 }
 
-fn download_from_ddl<T: Downloadable + DownloadableGetters>(
+async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     item: &T,
     modpack_root: &PathBuf,
     r#type: &str,
@@ -270,8 +283,10 @@ fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     let content = http_client
         .get(item.get_location())
         .send()
+        .await
         .expect(&format!("Failed to download '{}'!", item.get_name()))
         .bytes()
+        .await
         .unwrap();
     let dist: PathBuf;
     match r#type {
@@ -294,7 +309,7 @@ fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     final_dist
 }
 
-fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
+async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
     item: &T,
     modpack_root: &PathBuf,
     loader_type: &String,
@@ -307,8 +322,10 @@ fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
             item.get_location()
         ))
         .send()
+        .await
         .expect(&format!("Failed to download '{}'!", item.get_name()))
         .text()
+        .await
         .unwrap();
     let resp_obj: Vec<ModrinthObject> =
         serde_json::from_str(&resp).expect("Failed to parse modrinth response!");
@@ -332,8 +349,10 @@ fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
                 let content = http_client
                     .get(&_mod.files[0].url)
                     .send()
+                    .await
                     .expect(&format!("Failed to download '{}'!", item.get_name()))
                     .bytes()
+                    .await
                     .unwrap();
                 let final_dist = dist.join(Path::new(&_mod.files[0].filename));
                 fs::write(&final_dist, &content).expect("Failed to write modrinth item!");
@@ -418,38 +437,43 @@ fn create_launcher_profile(
     .expect("Failed to write to 'launcher_profiles.json'");
 }
 
-fn read_gh(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
+#[async_recursion]
+async fn read_gh(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
     match file.r#type.as_str() {
-        "file" => vec![read_gh_file(file, http_client)],
-        "dir" => read_gh_dir(file, http_client),
+        "file" => vec![read_gh_file(file, http_client).await],
+        "dir" => read_gh_dir(file, http_client).await,
         _ => panic!("Unsupported GiHub type '{}'", file.r#type),
     }
 }
 
-fn read_gh_dir(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
+async fn read_gh_dir(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
     let resp = http_client
         .get(&file.url)
         .send()
+        .await
         .expect(&format!("Failed to get include item '{}!'", file.path))
         .text()
+        .await
         .unwrap();
     let mut files: Vec<ReadFile> = vec![];
     for new_file in read_gh_init(resp) {
-        files.append(&mut read_gh(new_file, http_client));
+        files.append(&mut read_gh(new_file, http_client).await);
     }
     return files;
 }
 
-fn read_gh_file(file: GitHubFile, http_client: &Client) -> ReadFile {
+async fn read_gh_file(file: GitHubFile, http_client: &Client) -> ReadFile {
     ReadFile {
         content: http_client
             .get(file.download_url.as_ref().unwrap())
             .send()
+            .await
             .expect(&format!(
                 "Failed to download include file '{}'",
                 file.download_url.as_ref().unwrap()
             ))
             .bytes()
+            .await
             .unwrap(),
         path: Path::new(&file.path).to_path_buf(),
     }
@@ -474,58 +498,96 @@ fn build_http_client() -> Client {
         .unwrap()
 }
 
-fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
-    manifest
-        .loader
-        .download(&modpack_root, &manifest.loader.r#type, &http_client);
-    let mut mods_w_path = vec![];
-    let mut resourcepacks_w_path = vec![];
-    let mut shaderpacks_w_path = vec![];
-    for r#mod in &manifest.mods {
-        if r#mod.path.is_some() {
-            continue;
-        }
-        mods_w_path.push(Mod {
-            name: r#mod.name.clone(),
-            source: r#mod.source.clone(),
-            location: r#mod.location.clone(),
-            version: r#mod.version.clone(),
-            path: Some(r#mod.download(&modpack_root, &manifest.loader.r#type, &http_client)),
-        });
-    }
-    for resourcepack in &manifest.resourcepacks {
-        if resourcepack.path.is_some() {
-            continue;
-        }
-        resourcepacks_w_path.push(Resourcepack {
-            name: resourcepack.name.clone(),
-            source: resourcepack.source.clone(),
-            location: resourcepack.location.clone(),
-            version: resourcepack.version.clone(),
-            path: Some(resourcepack.download(&modpack_root, &manifest.loader.r#type, &http_client)),
-        });
-    }
-    for shaderpack in &manifest.shaderpacks {
-        if shaderpack.path.is_some() {
-            continue;
-        }
-        shaderpacks_w_path.push(Shaderpack {
-            name: shaderpack.name.clone(),
-            source: shaderpack.source.clone(),
-            location: shaderpack.location.clone(),
-            version: shaderpack.version.clone(),
-            path: Some(shaderpack.download(&modpack_root, &manifest.loader.r#type, &http_client)),
-        });
-    }
+async fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
+    let loader_future =
+        manifest
+            .loader
+            .download(&modpack_root, &manifest.loader.r#type, &http_client);
+    let mods_w_path =
+        futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async move {
+            if !r#mod.path.is_some() {
+                Mod {
+                    path: Some(
+                        r#mod
+                            .download(&modpack_root, &manifest.loader.r#type, &http_client)
+                            .await,
+                    ),
+                    name: r#mod.name,
+                    source: r#mod.source,
+                    location: r#mod.location,
+                    version: r#mod.version,
+                }
+            } else {
+                r#mod
+            }
+        }))
+        .buffer_unordered(CONCURRENCY)
+        .collect::<Vec<Mod>>()
+        .await;
+    let shaderpacks_w_path = futures::stream::iter(manifest.shaderpacks.clone().into_iter().map(
+        |shaderpack| async move {
+            if !shaderpack.path.is_some() {
+                Shaderpack {
+                    path: Some(
+                        shaderpack
+                            .download(&modpack_root, &manifest.loader.r#type, &http_client)
+                            .await,
+                    ),
+                    name: shaderpack.name,
+                    source: shaderpack.source,
+                    location: shaderpack.location,
+                    version: shaderpack.version,
+                }
+            } else {
+                shaderpack
+            }
+        },
+    ))
+    .buffer_unordered(CONCURRENCY)
+    .collect::<Vec<Shaderpack>>()
+    .await;
+    let resourcepacks_w_path =
+        futures::stream::iter(manifest.resourcepacks.clone().into_iter().map(
+            |resourcepack| async move {
+                if !resourcepack.path.is_some() {
+                    Resourcepack {
+                        path: Some(
+                            resourcepack
+                                .download(&modpack_root, &manifest.loader.r#type, &http_client)
+                                .await,
+                        ),
+                        name: resourcepack.name,
+                        source: resourcepack.source,
+                        location: resourcepack.location,
+                        version: resourcepack.version,
+                    }
+                } else {
+                    resourcepack
+                }
+            },
+        ))
+        .buffer_unordered(CONCURRENCY)
+        .collect::<Vec<Resourcepack>>()
+        .await;
+    // TODO(figure out how to handle asynchronous include downloads)
     for include in &manifest.include {
         let resp = http_client
-            .get(GH_API.to_owned() + MODPACK_SOURCE + "contents/" + include)
+            .get(
+                GH_API.to_owned()
+                    + MODPACK_SOURCE
+                    + "contents/"
+                    + include
+                    + "?ref="
+                    + MODPACK_BRANCH,
+            )
             .send()
+            .await
             .expect(&format!("Failed to get include item '{}!'", include))
             .text()
+            .await
             .unwrap();
         for file in read_gh_init(resp) {
-            for read_file in read_gh(file, &http_client) {
+            for read_file in read_gh(file, &http_client).await {
                 if let Some(p) = read_file.path.parent() {
                     fs::create_dir_all(modpack_root.join(p))
                         .expect("Failed to create include directory!")
@@ -561,8 +623,10 @@ fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
                 http_client
                     .get(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/icon.png")
                     .send()
+                    .await
                     .expect("Failed to download icon")
                     .bytes()
+                    .await
                     .unwrap(),
             ))
             .with_guessed_format()
@@ -574,6 +638,7 @@ fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
         icon_img = None
     }
     create_launcher_profile(&manifest, &modpack_root, icon_img);
+    loader_future.await;
 }
 
 macro_rules! remove_items {
@@ -593,7 +658,7 @@ macro_rules! remove_items {
     };
 }
 
-fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
+async fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
     // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest =
@@ -680,16 +745,20 @@ fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
         },
         http_client,
     )
+    .await;
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let http_client = build_http_client();
     let manifest: Manifest = serde_json::from_str(
         http_client
             .get(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/manifest.json")
             .send()
+            .await
             .expect("Failed to retrieve manifest!")
             .text()
+            .await
             .unwrap()
             .as_str(),
     )
@@ -714,8 +783,9 @@ fn main() {
         }
     }
     if update_available {
-        update(&modpack_root, &manifest, &http_client);
+        update(&modpack_root, &manifest, &http_client).await;
     } else if !installed {
-        install(&modpack_root, &manifest, &http_client);
+        install(&modpack_root, &manifest, &http_client).await;
     }
+    println!("Success!")
 }
