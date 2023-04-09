@@ -2,13 +2,14 @@ use async_recursion::async_recursion;
 use async_trait::async_trait;
 use base64::{engine, Engine};
 use chrono::{DateTime, Utc};
+use clap::Parser;
 use futures::StreamExt;
 use iced::{Application, Command};
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
 use isahc::config::RedirectPolicy;
 use isahc::prelude::Configurable;
-use isahc::{AsyncReadResponseExt, HttpClient};
+use isahc::{AsyncReadResponseExt, HttpClient, ReadResponseExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{
@@ -21,8 +22,6 @@ use std::{
 const CURRENT_MANIFEST_VERSION: i32 = 1;
 const GH_API: &str = "https://api.github.com/repos/";
 const GH_RAW: &str = "https://raw.githubusercontent.com/";
-const MODPACK_SOURCE: &str = "Commander07/modpack-test/";
-const MODPACK_BRANCH: &str = "main";
 const CONCURRENCY: usize = 14;
 #[async_trait]
 trait Downloadable {
@@ -236,6 +235,13 @@ struct GitHubFile {
     download_url: Option<String>,
     r#type: String,
     url: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GithubRepo {
+    // Theres a lot more fields but we only care about default_branch
+    // https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
+    default_branch: String,
 }
 
 struct ReadFile {
@@ -507,9 +513,15 @@ fn build_http_client() -> HttpClient {
         .unwrap()
 }
 
-async fn install(modpack_root: PathBuf, manifest: Manifest, http_client: HttpClient) {
+async fn install(
+    modpack_root: PathBuf,
+    manifest: Manifest,
+    http_client: HttpClient,
+    modpack_source: String,
+    modpack_branch: String,
+) {
     // Yes this is needed and no i wont change it
-    // This might not be needed with now to we use isahc
+    // This might not be needed now to we use isahc
     // TODO(Remove unnecessary clone usage)
     let modpack_root = &modpack_root;
     let manifest = &manifest;
@@ -589,11 +601,11 @@ async fn install(modpack_root: PathBuf, manifest: Manifest, http_client: HttpCli
         let resp = http_client
             .get_async(
                 GH_API.to_owned()
-                    + MODPACK_SOURCE
+                    + modpack_source.as_str()
                     + "contents/"
                     + include
                     + "?ref="
-                    + MODPACK_BRANCH,
+                    + modpack_branch.as_str(),
             )
             .await
             .expect(&format!("Failed to get include item '{}!'", include))
@@ -635,7 +647,12 @@ async fn install(modpack_root: PathBuf, manifest: Manifest, http_client: HttpCli
         icon_img = Some(
             ImageReader::new(Cursor::new(
                 http_client
-                    .get_async(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/icon.png")
+                    .get_async(
+                        GH_RAW.to_owned()
+                            + modpack_source.as_str()
+                            + modpack_branch.as_str()
+                            + "/icon.png",
+                    )
                     .await
                     .expect("Failed to download icon")
                     .bytes()
@@ -671,7 +688,14 @@ macro_rules! remove_items {
     };
 }
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
-async fn update(modpack_root: PathBuf, manifest: Manifest, http_client: HttpClient) {
+// TODO(Split project into multiple files to improve maintainability)
+async fn update(
+    modpack_root: PathBuf,
+    manifest: Manifest,
+    http_client: HttpClient,
+    modpack_source: String,
+    modpack_branch: String,
+) {
     // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest =
@@ -757,12 +781,66 @@ async fn update(modpack_root: PathBuf, manifest: Manifest, http_client: HttpClie
             include: manifest.include.clone(),
         },
         http_client,
+        modpack_source,
+        modpack_branch,
     )
     .await;
 }
 
 fn main() {
-    InstallerGUI::run(iced::Settings::default()).expect("Failed to create GUI!");
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 {
+        // Multiple arguments detected entering CLI mode
+        let args = CLIArgs::parse();
+        let branch: String;
+        if args.branch.is_none() {
+            let repo: GithubRepo = serde_json::from_str(
+                isahc::get(GH_API.to_owned() + &args.modpack)
+                    .expect("Failed to gather modpack repo info!")
+                    .text()
+                    .unwrap()
+                    .as_str(),
+            )
+            .expect("Could not retrieve default branch try specifying it using '--branch'!");
+            branch = repo.default_branch;
+        } else {
+            branch = args.branch.unwrap();
+        }
+        let installer_profile = futures::executor::block_on(init(&args.modpack, &branch));
+        match args.action.as_str() {
+            "install" => futures::executor::block_on(install(
+                installer_profile.modpack_root,
+                installer_profile.manifest,
+                installer_profile.http_client,
+                installer_profile.modpack_source,
+                installer_profile.modpack_branch,
+            )),
+            "update" => futures::executor::block_on(update(
+                installer_profile.modpack_root,
+                installer_profile.manifest,
+                installer_profile.http_client,
+                installer_profile.modpack_source,
+                installer_profile.modpack_branch,
+            )),
+            "play" => (),
+            _ => (),
+        };
+        println!("Success!");
+    } else {
+        // Only the executable was present in arguments entering GUI mode
+        InstallerGUI::run(iced::Settings::default()).expect("Failed to create GUI!");
+    }
+}
+
+#[derive(Debug, Clone)]
+struct InstallerProfile {
+    manifest: Manifest,
+    modpack_root: PathBuf,
+    http_client: HttpClient,
+    installed: bool,
+    update_available: bool,
+    modpack_source: String,
+    modpack_branch: String,
 }
 
 #[derive(Debug, Clone)]
@@ -774,6 +852,8 @@ enum InstallerGUI {
         http_client: HttpClient,
         installed: bool,
         update_available: bool,
+        modpack_source: String,
+        modpack_branch: String,
     },
 }
 #[derive(Debug, Clone)]
@@ -783,14 +863,30 @@ enum Message {
     Play,
     Updated(()),
     Installed(()),
-    Init(InstallerGUI),
+    Init(InstallerProfile),
 }
 
-async fn init() -> InstallerGUI {
+#[derive(Parser)]
+struct CLIArgs {
+    #[arg(short, long, verbatim_doc_comment)]
+    /// Available actions:
+    ///     - install: Install modpack if it does not already exist
+    ///     - update: Updates modpack if it is installed
+    ///     - play: Launches the modpack
+    action: String,
+    #[arg(short, long)]
+    /// Github user and repo for modpack formmated like "<user>/<repo>/"
+    modpack: String,
+    #[arg(short, long)]
+    /// Github branch defaults to default branch as specified on github
+    branch: Option<String>,
+}
+
+async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
     let http_client = build_http_client();
     let manifest: Manifest = serde_json::from_str(
         http_client
-            .get_async(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/manifest.json")
+            .get_async(GH_RAW.to_owned() + modpack_source + modpack_branch + "/manifest.json")
             .await
             .expect("Failed to retrieve manifest!")
             .text()
@@ -822,12 +918,14 @@ async fn init() -> InstallerGUI {
     } else {
         update_available = false;
     }
-    InstallerGUI::Loaded {
+    InstallerProfile {
         manifest,
         modpack_root,
         http_client,
         installed,
         update_available,
+        modpack_source: modpack_source.to_owned(),
+        modpack_branch: modpack_branch.to_owned(),
     }
 }
 
@@ -838,9 +936,10 @@ impl Application for InstallerGUI {
     type Flags = ();
 
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+        // TODO(Ability to change 'modpack_source' and 'modpack_branch')
         (
             InstallerGUI::Loading,
-            Command::perform(init(), Message::Init),
+            Command::perform(init("Commander07/modpack-test/", "main"), Message::Init),
         )
     }
 
@@ -856,8 +955,16 @@ impl Application for InstallerGUI {
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
         match self {
             InstallerGUI::Loading => match message {
-                Message::Init(gui) => {
-                    *self = gui;
+                Message::Init(profile) => {
+                    *self = InstallerGUI::Loaded {
+                        manifest: profile.manifest,
+                        modpack_root: profile.modpack_root,
+                        http_client: profile.http_client,
+                        installed: profile.installed,
+                        update_available: profile.update_available,
+                        modpack_source: profile.modpack_source,
+                        modpack_branch: profile.modpack_branch,
+                    };
                     Command::none()
                 }
                 _ => Command::none(),
@@ -868,11 +975,19 @@ impl Application for InstallerGUI {
                 http_client,
                 installed,
                 update_available,
+                modpack_source,
+                modpack_branch,
             } => match message {
                 Message::Install => {
                     if !*installed {
                         return Command::perform(
-                            install(modpack_root.clone(), manifest.clone(), http_client.clone()),
+                            install(
+                                modpack_root.clone(),
+                                manifest.clone(),
+                                http_client.clone(),
+                                modpack_source.clone(),
+                                modpack_branch.clone(),
+                            ),
                             Message::Installed,
                         );
                     }
@@ -882,7 +997,13 @@ impl Application for InstallerGUI {
                 Message::Update => {
                     if *update_available {
                         return Command::perform(
-                            update(modpack_root.clone(), manifest.clone(), http_client.clone()),
+                            update(
+                                modpack_root.clone(),
+                                manifest.clone(),
+                                http_client.clone(),
+                                modpack_source.clone(),
+                                modpack_branch.clone(),
+                            ),
                             Message::Updated,
                         );
                     }
@@ -909,6 +1030,8 @@ impl Application for InstallerGUI {
                 http_client,
                 installed,
                 update_available,
+                modpack_source,
+                modpack_branch,
             } => iced::widget::column![
                 iced::widget::text(&manifest.name).size(40),
                 iced::widget::button("Install").on_press(Message::Install),
