@@ -1,12 +1,14 @@
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use base64::{engine, Engine};
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+use iced::{Application, Command};
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
-use reqwest::Client;
+use isahc::config::RedirectPolicy;
+use isahc::prelude::Configurable;
+use isahc::{AsyncReadResponseExt, HttpClient};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{
@@ -28,7 +30,7 @@ trait Downloadable {
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
-        http_client: &Client,
+        http_client: &HttpClient,
     ) -> PathBuf;
 }
 trait DownloadableGetters {
@@ -61,7 +63,7 @@ impl Downloadable for Mod {
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
-        http_client: &Client,
+        http_client: &HttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
@@ -97,7 +99,7 @@ impl Downloadable for Shaderpack {
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
-        http_client: &Client,
+        http_client: &HttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
@@ -134,7 +136,7 @@ impl Downloadable for Resourcepack {
         &self,
         modpack_root: &PathBuf,
         loader_type: &String,
-        http_client: &Client,
+        http_client: &HttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
@@ -154,14 +156,19 @@ struct Loader {
 }
 #[async_trait]
 impl Downloadable for Loader {
-    async fn download(&self, modpack_root: &PathBuf, _: &String, http_client: &Client) -> PathBuf {
+    async fn download(
+        &self,
+        modpack_root: &PathBuf,
+        _: &String,
+        http_client: &HttpClient,
+    ) -> PathBuf {
         match self.r#type.as_str() {
             "fabric" => download_fabric(&self, modpack_root, http_client).await,
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
         }
     }
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct Manifest {
     manifest_version: i32,
     modpack_version: String,
@@ -233,10 +240,14 @@ struct GitHubFile {
 
 struct ReadFile {
     path: PathBuf,
-    content: Bytes,
+    content: Vec<u8>,
 }
 
-async fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &Client) -> PathBuf {
+async fn download_fabric(
+    loader: &Loader,
+    modpack_root: &PathBuf,
+    http_client: &HttpClient,
+) -> PathBuf {
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
         loader.minecraft_version, loader.version
@@ -253,8 +264,7 @@ async fn download_fabric(loader: &Loader, modpack_root: &PathBuf, http_client: &
         return PathBuf::new();
     }
     let resp = http_client
-        .get(url.as_str())
-        .send()
+        .get_async(url.as_str())
         .await
         .expect("Failed to download fabric loader!")
         .text()
@@ -278,11 +288,10 @@ async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     item: &T,
     modpack_root: &PathBuf,
     r#type: &str,
-    http_client: &Client,
+    http_client: &HttpClient,
 ) -> PathBuf {
     let content = http_client
-        .get(item.get_location())
-        .send()
+        .get_async(item.get_location())
         .await
         .expect(&format!("Failed to download '{}'!", item.get_name()))
         .bytes()
@@ -314,14 +323,13 @@ async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
     modpack_root: &PathBuf,
     loader_type: &String,
     r#type: &str,
-    http_client: &Client,
+    http_client: &HttpClient,
 ) -> PathBuf {
     let resp = http_client
-        .get(format!(
+        .get_async(format!(
             "https://api.modrinth.com/v2/project/{}/version",
             item.get_location()
         ))
-        .send()
         .await
         .expect(&format!("Failed to download '{}'!", item.get_name()))
         .text()
@@ -347,8 +355,7 @@ async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
                 || r#type == "shaderpack"
             {
                 let content = http_client
-                    .get(&_mod.files[0].url)
-                    .send()
+                    .get_async(&_mod.files[0].url)
                     .await
                     .expect(&format!("Failed to download '{}'!", item.get_name()))
                     .bytes()
@@ -438,7 +445,7 @@ fn create_launcher_profile(
 }
 
 #[async_recursion]
-async fn read_gh(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
+async fn read_gh(file: GitHubFile, http_client: &HttpClient) -> Vec<ReadFile> {
     match file.r#type.as_str() {
         "file" => vec![read_gh_file(file, http_client).await],
         "dir" => read_gh_dir(file, http_client).await,
@@ -446,10 +453,9 @@ async fn read_gh(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
     }
 }
 
-async fn read_gh_dir(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
+async fn read_gh_dir(file: GitHubFile, http_client: &HttpClient) -> Vec<ReadFile> {
     let resp = http_client
-        .get(&file.url)
-        .send()
+        .get_async(&file.url)
         .await
         .expect(&format!("Failed to get include item '{}!'", file.path))
         .text()
@@ -462,11 +468,10 @@ async fn read_gh_dir(file: GitHubFile, http_client: &Client) -> Vec<ReadFile> {
     return files;
 }
 
-async fn read_gh_file(file: GitHubFile, http_client: &Client) -> ReadFile {
+async fn read_gh_file(file: GitHubFile, http_client: &HttpClient) -> ReadFile {
     ReadFile {
         content: http_client
-            .get(file.download_url.as_ref().unwrap())
-            .send()
+            .get_async(file.download_url.as_ref().unwrap())
             .await
             .expect(&format!(
                 "Failed to download include file '{}'",
@@ -491,14 +496,24 @@ fn read_gh_init(resp: String) -> Vec<GitHubFile> {
     }
 }
 
-fn build_http_client() -> Client {
-    Client::builder()
-        .user_agent("wynncraft-overhaul/installer/0.1.0 (commander#4392)")
+fn build_http_client() -> HttpClient {
+    HttpClient::builder()
+        .redirect_policy(RedirectPolicy::Limit(5))
+        .default_headers(&[(
+            "User-Agent",
+            "wynncraft-overhaul/installer/0.1.0 (commander#4392)",
+        )])
         .build()
         .unwrap()
 }
 
-async fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
+async fn install(modpack_root: PathBuf, manifest: Manifest, http_client: HttpClient) {
+    // Yes this is needed and no i wont change it
+    // This might not be needed with now to we use isahc
+    // TODO(Remove unnecessary clone usage)
+    let modpack_root = &modpack_root;
+    let manifest = &manifest;
+    let http_client = &http_client;
     let loader_future =
         manifest
             .loader
@@ -572,7 +587,7 @@ async fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Clie
     // TODO(figure out how to handle asynchronous include downloads)
     for include in &manifest.include {
         let resp = http_client
-            .get(
+            .get_async(
                 GH_API.to_owned()
                     + MODPACK_SOURCE
                     + "contents/"
@@ -580,7 +595,6 @@ async fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Clie
                     + "?ref="
                     + MODPACK_BRANCH,
             )
-            .send()
             .await
             .expect(&format!("Failed to get include item '{}!'", include))
             .text()
@@ -621,8 +635,7 @@ async fn install(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Clie
         icon_img = Some(
             ImageReader::new(Cursor::new(
                 http_client
-                    .get(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/icon.png")
-                    .send()
+                    .get_async(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/icon.png")
                     .await
                     .expect("Failed to download icon")
                     .bytes()
@@ -657,8 +670,8 @@ macro_rules! remove_items {
         });
     };
 }
-
-async fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Client) {
+// Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
+async fn update(modpack_root: PathBuf, manifest: Manifest, http_client: HttpClient) {
     // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest =
@@ -731,7 +744,7 @@ async fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Clien
     }
     install(
         modpack_root,
-        &Manifest {
+        Manifest {
             manifest_version: manifest.manifest_version,
             modpack_version: manifest.modpack_version.clone(),
             name: manifest.name.clone(),
@@ -748,13 +761,36 @@ async fn update(modpack_root: &PathBuf, manifest: &Manifest, http_client: &Clien
     .await;
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    InstallerGUI::run(iced::Settings::default()).expect("Failed to create GUI!");
+}
+
+#[derive(Debug, Clone)]
+enum InstallerGUI {
+    Loading,
+    Loaded {
+        manifest: Manifest,
+        modpack_root: PathBuf,
+        http_client: HttpClient,
+        installed: bool,
+        update_available: bool,
+    },
+}
+#[derive(Debug, Clone)]
+enum Message {
+    Install,
+    Update,
+    Play,
+    Updated(()),
+    Installed(()),
+    Init(InstallerGUI),
+}
+
+async fn init() -> InstallerGUI {
     let http_client = build_http_client();
     let manifest: Manifest = serde_json::from_str(
         http_client
-            .get(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/manifest.json")
-            .send()
+            .get_async(GH_RAW.to_owned() + MODPACK_SOURCE + MODPACK_BRANCH + "/manifest.json")
             .await
             .expect("Failed to retrieve manifest!")
             .text()
@@ -771,7 +807,7 @@ async fn main() {
     );
     let modpack_root = get_modpack_root(&manifest.uuid);
     let installed = modpack_root.join(Path::new("manifest.json")).exists();
-    let mut update_available = false;
+    let update_available: bool;
     if installed {
         let local_manifest: Manifest = serde_json::from_str(
             &fs::read_to_string(modpack_root.join(Path::new("manifest.json")))
@@ -779,13 +815,113 @@ async fn main() {
         )
         .expect("Failed to parse local manifest!");
         if &manifest.modpack_version != &local_manifest.modpack_version {
-            update_available = true
+            update_available = true;
+        } else {
+            update_available = false;
+        }
+    } else {
+        update_available = false;
+    }
+    InstallerGUI::Loaded {
+        manifest,
+        modpack_root,
+        http_client,
+        installed,
+        update_available,
+    }
+}
+
+impl Application for InstallerGUI {
+    type Executor = iced::executor::Default;
+    type Message = Message;
+    type Theme = iced::Theme;
+    type Flags = ();
+
+    fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+        (
+            InstallerGUI::Loading,
+            Command::perform(init(), Message::Init),
+        )
+    }
+
+    fn title(&self) -> String {
+        let subtitle = match self {
+            InstallerGUI::Loading => "Loading",
+            InstallerGUI::Loaded { manifest, .. } => manifest.name.as_str(),
+        };
+
+        format!("{} | Wynncraft Overhaul Installer", subtitle)
+    }
+
+    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+        match self {
+            InstallerGUI::Loading => match message {
+                Message::Init(gui) => {
+                    *self = gui;
+                    Command::none()
+                }
+                _ => Command::none(),
+            },
+            InstallerGUI::Loaded {
+                manifest,
+                modpack_root,
+                http_client,
+                installed,
+                update_available,
+            } => match message {
+                Message::Install => {
+                    if !*installed {
+                        return Command::perform(
+                            install(modpack_root.clone(), manifest.clone(), http_client.clone()),
+                            Message::Installed,
+                        );
+                    }
+                    Command::none()
+                }
+                Message::Play => Command::none(),
+                Message::Update => {
+                    if *update_available {
+                        return Command::perform(
+                            update(modpack_root.clone(), manifest.clone(), http_client.clone()),
+                            Message::Updated,
+                        );
+                    }
+                    Command::none()
+                }
+                Message::Installed(()) => {
+                    *installed = true;
+                    Command::none()
+                }
+                _ => Command::none(),
+            },
         }
     }
-    if update_available {
-        update(&modpack_root, &manifest, &http_client).await;
-    } else if !installed {
-        install(&modpack_root, &manifest, &http_client).await;
+
+    fn view(&self) -> iced::Element<Message> {
+        let content = match self {
+            InstallerGUI::Loading => {
+                iced::widget::column![iced::widget::text("Loading...").size(40),]
+                    .width(iced::Length::Shrink)
+            }
+            InstallerGUI::Loaded {
+                manifest,
+                modpack_root,
+                http_client,
+                installed,
+                update_available,
+            } => iced::widget::column![
+                iced::widget::text(&manifest.name).size(40),
+                iced::widget::button("Install").on_press(Message::Install),
+                iced::widget::button("Update").on_press(Message::Update)
+            ]
+            .width(iced::Length::Shrink),
+        };
+
+        iced::widget::container(content)
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .center_x()
+            .center_y()
+            .into()
     }
-    println!("Success!")
 }
