@@ -1,4 +1,3 @@
-use async_recursion::async_recursion;
 use async_trait::async_trait;
 use base64::{engine, Engine};
 use chrono::{DateTime, Utc};
@@ -230,23 +229,21 @@ struct ModrinthObject {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct GitHubFile {
-    path: String,
-    download_url: Option<String>,
-    r#type: String,
-    url: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 struct GithubRepo {
     // Theres a lot more fields but we only care about default_branch
     // https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
     default_branch: String,
 }
 
-struct ReadFile {
-    path: PathBuf,
-    content: Vec<u8>,
+#[derive(Debug, Deserialize, Serialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GithubRelease {
+    assets: Vec<GithubAsset>,
 }
 
 async fn download_fabric(
@@ -303,11 +300,10 @@ async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
         .bytes()
         .await
         .unwrap();
-    let dist: PathBuf;
-    match r#type {
-        "mod" => dist = modpack_root.join(Path::new("mods")),
-        "resourcepack" => dist = modpack_root.join(Path::new("resourcepacks")),
-        "shaderpack" => dist = modpack_root.join(Path::new("shaderpacks")),
+    let dist = match r#type {
+        "mod" => modpack_root.join(Path::new("mods")),
+        "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
+        "shaderpack" => modpack_root.join(Path::new("shaderpacks")),
         _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
     };
     fs::create_dir_all(&dist).expect(&format!(
@@ -343,11 +339,10 @@ async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
         .unwrap();
     let resp_obj: Vec<ModrinthObject> =
         serde_json::from_str(&resp).expect("Failed to parse modrinth response!");
-    let dist: PathBuf;
-    match r#type {
-        "mod" => dist = modpack_root.join(Path::new("mods")),
-        "resourcepack" => dist = modpack_root.join(Path::new("resourcepacks")),
-        "shaderpack" => dist = modpack_root.join(Path::new("shaderpacks")),
+    let dist = match r#type {
+        "mod" => modpack_root.join(Path::new("mods")),
+        "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
+        "shaderpack" => modpack_root.join(Path::new("shaderpacks")),
         _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
     };
     fs::create_dir_all(&dist).expect(&format!(
@@ -417,12 +412,11 @@ fn create_launcher_profile(
         "fabric-loader-{}-{}",
         &manifest.loader.version, &manifest.loader.minecraft_version
     );
-    let icon: String;
-    if manifest.icon {
-        icon = image_to_base64(&icon_img.expect("manifest.icon was true but no icon was supplied!"))
+    let icon = if manifest.icon {
+        image_to_base64(&icon_img.expect("manifest.icon was true but no icon was supplied!"))
     } else {
-        icon = String::from("Furnace");
-    }
+        String::from("Furnace")
+    };
     let profile = LauncherProfile {
         lastUsed: now.to_string(),
         lastVersionId: version_id,
@@ -448,58 +442,6 @@ fn create_launcher_profile(
         serde_json::to_string(&lp_obj).expect("Failed to create new 'launcher_profiles.json'!"),
     )
     .expect("Failed to write to 'launcher_profiles.json'");
-}
-
-#[async_recursion]
-async fn read_gh(file: GitHubFile, http_client: &HttpClient) -> Vec<ReadFile> {
-    match file.r#type.as_str() {
-        "file" => vec![read_gh_file(file, http_client).await],
-        "dir" => read_gh_dir(file, http_client).await,
-        _ => panic!("Unsupported GiHub type '{}'", file.r#type),
-    }
-}
-
-async fn read_gh_dir(file: GitHubFile, http_client: &HttpClient) -> Vec<ReadFile> {
-    let resp = http_client
-        .get_async(&file.url)
-        .await
-        .expect(&format!("Failed to get include item '{}!'", file.path))
-        .text()
-        .await
-        .unwrap();
-    let mut files: Vec<ReadFile> = vec![];
-    for new_file in read_gh_init(resp) {
-        files.append(&mut read_gh(new_file, http_client).await);
-    }
-    return files;
-}
-
-async fn read_gh_file(file: GitHubFile, http_client: &HttpClient) -> ReadFile {
-    ReadFile {
-        content: http_client
-            .get_async(file.download_url.as_ref().unwrap())
-            .await
-            .expect(&format!(
-                "Failed to download include file '{}'",
-                file.download_url.as_ref().unwrap()
-            ))
-            .bytes()
-            .await
-            .unwrap(),
-        path: Path::new(&file.path).to_path_buf(),
-    }
-}
-
-fn read_gh_init(resp: String) -> Vec<GitHubFile> {
-    if resp.starts_with("[") {
-        let dir: Vec<GitHubFile> =
-            serde_json::from_str(&resp).expect("Failed to parse github directory api results!");
-        dir
-    } else {
-        let file: GitHubFile =
-            serde_json::from_str(&resp).expect("Failed to parse github file api results!");
-        vec![file]
-    }
 }
 
 fn build_http_client() -> HttpClient {
@@ -596,32 +538,54 @@ async fn install(
         .buffer_unordered(CONCURRENCY)
         .collect::<Vec<Resourcepack>>()
         .await;
-    // TODO(figure out how to handle asynchronous include downloads)
-    for include in &manifest.include {
-        let resp = http_client
-            .get_async(
-                GH_API.to_owned()
-                    + modpack_source.as_str()
-                    + "contents/"
-                    + include
-                    + "?ref="
-                    + modpack_branch.as_str(),
-            )
-            .await
-            .expect(&format!("Failed to get include item '{}!'", include))
-            .text()
-            .await
-            .unwrap();
-        for file in read_gh_init(resp) {
-            for read_file in read_gh(file, &http_client).await {
-                if let Some(p) = read_file.path.parent() {
-                    fs::create_dir_all(modpack_root.join(p))
-                        .expect("Failed to create include directory!")
-                };
-                fs::write(modpack_root.join(&read_file.path), read_file.content).expect(&format!(
-                    "Failed to write to '{}'",
-                    &read_file.path.to_str().unwrap()
-                ));
+    if manifest.include.len() > 0 {
+        // Include files exist
+        let release: GithubRelease = serde_json::from_str(
+            http_client
+                .get_async(GH_API.to_owned() + modpack_source.as_str() + "releases/latest")
+                .await
+                .expect("Failed to retrieve 'include' release from tag 'latest'!")
+                .text()
+                .await
+                .unwrap()
+                .as_str(),
+        )
+        .expect("Failed to parse release response!");
+        for asset in release.assets {
+            if asset.name == *"include.zip" {
+                // download and unzip in modpack root
+                let content = http_client
+                    .get_async(asset.browser_download_url)
+                    .await
+                    .expect("Failed to download 'include.zip'")
+                    .bytes()
+                    .await
+                    .unwrap();
+                let zipfile_path = modpack_root.join(Path::new("include.zip"));
+                fs::write(&zipfile_path, content).expect("Failed to write 'include.zip'!");
+                let zipfile = fs::File::open(&zipfile_path).unwrap();
+                let mut archive = zip::ZipArchive::new(zipfile).unwrap();
+                // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
+                for i in 0..archive.len() {
+                    let mut file = archive.by_index(i).unwrap();
+                    let outpath = match file.enclosed_name() {
+                        Some(path) => modpack_root.join(path),
+                        None => continue,
+                    };
+                    if (*file.name()).ends_with('/') {
+                        fs::create_dir_all(&outpath).unwrap();
+                    } else {
+                        if let Some(p) = outpath.parent() {
+                            if !p.exists() {
+                                fs::create_dir_all(p).unwrap();
+                            }
+                        }
+                        let mut outfile = fs::File::create(&outpath).unwrap();
+                        std::io::copy(&mut file, &mut outfile).unwrap();
+                    }
+                }
+                fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'include.zip'!");
+                break;
             }
         }
     }
