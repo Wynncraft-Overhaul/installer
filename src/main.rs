@@ -26,8 +26,8 @@ const CONCURRENCY: usize = 14;
 trait Downloadable {
     async fn download(
         &self,
-        modpack_root: &PathBuf,
-        loader_type: &String,
+        modpack_root: &Path,
+        loader_type: &str,
         http_client: &HttpClient,
     ) -> PathBuf;
 }
@@ -59,8 +59,8 @@ impl DownloadableGetters for Mod {
 impl Downloadable for Mod {
     async fn download(
         &self,
-        modpack_root: &PathBuf,
-        loader_type: &String,
+        modpack_root: &Path,
+        loader_type: &str,
         http_client: &HttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
@@ -95,8 +95,8 @@ impl DownloadableGetters for Shaderpack {
 impl Downloadable for Shaderpack {
     async fn download(
         &self,
-        modpack_root: &PathBuf,
-        loader_type: &String,
+        modpack_root: &Path,
+        loader_type: &str,
         http_client: &HttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
@@ -132,8 +132,8 @@ impl DownloadableGetters for Resourcepack {
 impl Downloadable for Resourcepack {
     async fn download(
         &self,
-        modpack_root: &PathBuf,
-        loader_type: &String,
+        modpack_root: &Path,
+        loader_type: &str,
         http_client: &HttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
@@ -154,14 +154,9 @@ struct Loader {
 }
 #[async_trait]
 impl Downloadable for Loader {
-    async fn download(
-        &self,
-        modpack_root: &PathBuf,
-        _: &String,
-        http_client: &HttpClient,
-    ) -> PathBuf {
+    async fn download(&self, modpack_root: &Path, _: &str, http_client: &HttpClient) -> PathBuf {
         match self.r#type.as_str() {
-            "fabric" => download_fabric(&self, modpack_root, http_client).await,
+            "fabric" => download_fabric(self, modpack_root, http_client).await,
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
         }
     }
@@ -235,20 +230,21 @@ struct GithubRepo {
     default_branch: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct GithubAsset {
     name: String,
     browser_download_url: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct GithubRelease {
+    tag_name: String,
     assets: Vec<GithubAsset>,
 }
 
 async fn download_fabric(
     loader: &Loader,
-    modpack_root: &PathBuf,
+    modpack_root: &Path,
     http_client: &HttpClient,
 ) -> PathBuf {
     let url = format!(
@@ -259,7 +255,7 @@ async fn download_fabric(
         "fabric-loader-{}-{}",
         &loader.version, &loader.minecraft_version
     );
-    let fabric_path = modpack_root.join(&Path::new(&format!("versions/{}", &loader_name)));
+    let fabric_path = modpack_root.join(Path::new(&format!("versions/{}", &loader_name)));
     if fabric_path
         .join(Path::new(&format!("{}.json", &loader_name)))
         .exists()
@@ -275,21 +271,21 @@ async fn download_fabric(
         .unwrap();
     fs::create_dir_all(&fabric_path).expect("Failed to create fabric directory");
     fs::write(
-        &fabric_path.join(Path::new(&format!("{}.json", &loader_name))),
+        fabric_path.join(Path::new(&format!("{}.json", &loader_name))),
         resp,
     )
     .expect("Failed to write fabric json");
     fs::write(
-        &fabric_path.join(Path::new(&format!("{}.jar", &loader_name))),
+        fabric_path.join(Path::new(&format!("{}.jar", &loader_name))),
         "",
     )
     .expect("Failed to write fabric dummy jar");
-    return fabric_path;
+    fabric_path
 }
 
 async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     item: &T,
-    modpack_root: &PathBuf,
+    modpack_root: &Path,
     r#type: &str,
     http_client: &HttpClient,
 ) -> PathBuf {
@@ -310,20 +306,20 @@ async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
         "Failed to create '{}' directory",
         &dist.to_str().unwrap()
     ));
-    let final_dist = dist.join(Path::new(item.get_location().split("/").last().expect(
+    let final_dist = dist.join(Path::new(item.get_location().split('/').last().expect(
         &format!(
             "Could not determine file name for ddl: '{}'!",
             item.get_location()
         ),
     )));
-    fs::write(&final_dist, &content).expect("Failed to write ddl item!");
+    fs::write(&final_dist, content).expect("Failed to write ddl item!");
     final_dist
 }
 
 async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
     item: &T,
-    modpack_root: &PathBuf,
-    loader_type: &String,
+    modpack_root: &Path,
+    loader_type: &str,
     r#type: &str,
     http_client: &HttpClient,
 ) -> PathBuf {
@@ -350,22 +346,21 @@ async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
         &dist.to_str().unwrap()
     ));
     for _mod in resp_obj {
-        if &_mod.version_number == item.get_version() {
-            if _mod.loaders.contains(&String::from("minecraft"))
+        if &_mod.version_number == item.get_version()
+            && (_mod.loaders.contains(&String::from("minecraft"))
                 || _mod.loaders.contains(&String::from(loader_type))
-                || r#type == "shaderpack"
-            {
-                let content = http_client
-                    .get_async(&_mod.files[0].url)
-                    .await
-                    .expect(&format!("Failed to download '{}'!", item.get_name()))
-                    .bytes()
-                    .await
-                    .unwrap();
-                let final_dist = dist.join(Path::new(&_mod.files[0].filename));
-                fs::write(&final_dist, &content).expect("Failed to write modrinth item!");
-                return final_dist;
-            }
+                || r#type == "shaderpack")
+        {
+            let content = http_client
+                .get_async(&_mod.files[0].url)
+                .await
+                .expect(&format!("Failed to download '{}'!", item.get_name()))
+                .bytes()
+                .await
+                .unwrap();
+            let final_dist = dist.join(Path::new(&_mod.files[0].filename));
+            fs::write(&final_dist, content).expect("Failed to write modrinth item!");
+            return final_dist;
         }
     }
     panic!("No items returned from modrinth!")
@@ -389,7 +384,7 @@ fn get_minecraft_folder() -> PathBuf {
 fn get_modpack_root(modpack_uuid: &str) -> PathBuf {
     let root = get_minecraft_folder().join(Path::new(&format!(".WC_OVHL/{}", modpack_uuid)));
     fs::create_dir_all(&root).expect("Failed to create modpack folder");
-    return root;
+    root
 }
 
 fn image_to_base64(img: &DynamicImage) -> String {
@@ -402,7 +397,7 @@ fn image_to_base64(img: &DynamicImage) -> String {
 
 fn create_launcher_profile(
     manifest: &Manifest,
-    modpack_root: &PathBuf,
+    modpack_root: &Path,
     icon_img: Option<DynamicImage>,
 ) {
     let now = SystemTime::now();
@@ -422,7 +417,7 @@ fn create_launcher_profile(
         lastVersionId: version_id,
         created: now,
         name: manifest.name.clone(),
-        icon: icon,
+        icon,
         r#type: String::from("custom"),
         gameDir: Some(modpack_root.to_str().unwrap().to_string()),
         javaDir: None,
@@ -471,14 +466,14 @@ async fn install(
     let loader_future =
         manifest
             .loader
-            .download(&modpack_root, &manifest.loader.r#type, &http_client);
+            .download(modpack_root, &manifest.loader.r#type, http_client);
     let mods_w_path =
         futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async move {
-            if !r#mod.path.is_some() {
+            if r#mod.path.is_none() {
                 Mod {
                     path: Some(
                         r#mod
-                            .download(&modpack_root, &manifest.loader.r#type, &http_client)
+                            .download(modpack_root, &manifest.loader.r#type, http_client)
                             .await,
                     ),
                     name: r#mod.name,
@@ -495,11 +490,11 @@ async fn install(
         .await;
     let shaderpacks_w_path = futures::stream::iter(manifest.shaderpacks.clone().into_iter().map(
         |shaderpack| async move {
-            if !shaderpack.path.is_some() {
+            if shaderpack.path.is_none() {
                 Shaderpack {
                     path: Some(
                         shaderpack
-                            .download(&modpack_root, &manifest.loader.r#type, &http_client)
+                            .download(modpack_root, &manifest.loader.r#type, http_client)
                             .await,
                     ),
                     name: shaderpack.name,
@@ -518,11 +513,11 @@ async fn install(
     let resourcepacks_w_path =
         futures::stream::iter(manifest.resourcepacks.clone().into_iter().map(
             |resourcepack| async move {
-                if !resourcepack.path.is_some() {
+                if resourcepack.path.is_none() {
                     Resourcepack {
                         path: Some(
                             resourcepack
-                                .download(&modpack_root, &manifest.loader.r#type, &http_client)
+                                .download(modpack_root, &manifest.loader.r#type, http_client)
                                 .await,
                         ),
                         name: resourcepack.name,
@@ -538,24 +533,32 @@ async fn install(
         .buffer_unordered(CONCURRENCY)
         .collect::<Vec<Resourcepack>>()
         .await;
-    if manifest.include.len() > 0 {
+    if !manifest.include.is_empty() {
         // Include files exist
-        let release: GithubRelease = serde_json::from_str(
+        let release: Vec<GithubRelease> = serde_json::from_str(
             http_client
-                .get_async(GH_API.to_owned() + modpack_source.as_str() + "releases/latest")
+                .get_async(GH_API.to_owned() + modpack_source.as_str() + "releases")
                 .await
-                .expect("Failed to retrieve 'include' release from tag 'latest'!")
+                .expect("Failed to retrieve releases!")
                 .text()
                 .await
                 .unwrap()
                 .as_str(),
         )
         .expect("Failed to parse release response!");
-        for asset in release.assets {
+
+        let selected_rel = release
+            .iter()
+            .filter(|rel| rel.tag_name == modpack_branch)
+            .collect::<Vec<&GithubRelease>>()
+            .first()
+            .cloned()
+            .expect("Failed to retrieve release for selected branch!");
+        for asset in &selected_rel.assets {
             if asset.name == *"include.zip" {
                 // download and unzip in modpack root
                 let content = http_client
-                    .get_async(asset.browser_download_url)
+                    .get_async(&asset.browser_download_url)
                     .await
                     .expect("Failed to download 'include.zip'")
                     .bytes()
@@ -606,9 +609,8 @@ async fn install(
         serde_json::to_string(&local_manifest).expect("Failed to parse 'manifest.json'!"),
     )
     .expect("Failed to save a local copy of 'manifest.json'!");
-    let icon_img: Option<DynamicImage>;
-    if manifest.icon {
-        icon_img = Some(
+    let icon_img = if manifest.icon {
+        Some(
             ImageReader::new(Cursor::new(
                 http_client
                     .get_async(
@@ -627,11 +629,11 @@ async fn install(
             .expect("Could not guess icon.png format????????")
             .decode()
             .expect("Failed to decode icon!"),
-        );
+        )
     } else {
-        icon_img = None
-    }
-    create_launcher_profile(&manifest, &modpack_root, icon_img);
+        None
+    };
+    create_launcher_profile(manifest, modpack_root, icon_img);
     loader_future.await;
 }
 
@@ -721,12 +723,9 @@ async fn update(
         !new_resourcepacks.contains(x)
     });
     if manifest.loader != local_manifest.loader {
-        fs::remove_dir_all(modpack_root.join(&Path::new(&format!(
-            "versions/{}",
-            format!(
-                "fabric-loader-{}-{}",
-                &local_manifest.loader.version, &local_manifest.loader.minecraft_version
-            )
+        fs::remove_dir_all(modpack_root.join(Path::new(&format!(
+            "versions/fabric-loader-{}-{}",
+            &local_manifest.loader.version, &local_manifest.loader.minecraft_version
         ))))
         .expect("Could not delete old fabric version!");
     }
@@ -756,8 +755,7 @@ fn main() {
     if args.len() > 1 {
         // Multiple arguments detected entering CLI mode
         let args = CLIArgs::parse();
-        let branch: String;
-        if args.branch.is_none() {
+        let branch = if args.branch.is_none() {
             let repo: GithubRepo = serde_json::from_str(
                 isahc::get(GH_API.to_owned() + &args.modpack)
                     .expect("Failed to gather modpack repo info!")
@@ -766,10 +764,10 @@ fn main() {
                     .as_str(),
             )
             .expect("Could not retrieve default branch try specifying it using '--branch'!");
-            branch = repo.default_branch;
+            repo.default_branch
         } else {
-            branch = args.branch.unwrap();
-        }
+            args.branch.unwrap()
+        };
         let installer_profile = futures::executor::block_on(init(&args.modpack, &branch));
         match args.action.as_str() {
             "install" => futures::executor::block_on(install(
@@ -874,7 +872,7 @@ async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
                 .expect("Failed to read local manifest!"),
         )
         .expect("Failed to parse local manifest!");
-        if &manifest.modpack_version != &local_manifest.modpack_version {
+        if manifest.modpack_version != local_manifest.modpack_version {
             update_available = true;
         } else {
             update_available = false;
