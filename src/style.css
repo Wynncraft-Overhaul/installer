@@ -1,0 +1,74 @@
+@font-face {
+    font-family: "minecraft";
+    src: url("assets/MinecraftRegular-Bmg3.otf");
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "minecraft";
+    background-color: #4d3d62;
+    height: 99vh;
+}
+
+.fake-body {
+    display: flex;
+    justify-content: center;
+    height: 50%;
+}
+
+.header {
+    display: flex;
+    justify-content: center;
+    margin-top: 1vh;
+}
+
+.header-inner {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 4%;
+    background-color: #7edaf7;
+    border: 2px solid black;
+    width: 80%;
+}
+
+.container {
+    margin: 0 20px;
+    margin-right: 10%;
+    margin-left: 10%;
+    background-color: #7edaf7;
+    border: 2px solid black;
+    padding: 2%;
+    display: grid;
+    width: 25%;
+}
+
+.install-button {
+    font-family: "minecraft";
+    background-color: #4CAF50;
+    padding: 4%;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 100%;
+    margin-right: 2%;
+    margin-left: 2%;
+    margin-bottom: 2%;
+    cursor: pointer;
+    width: 96%;
+    align-self: flex-end;
+    border: 2px solid black;
+}
+
+.feature-list input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+.feature-list label {
+    display: block;
+    margin-bottom: 10px;
+}

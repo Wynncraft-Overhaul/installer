@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use base64::{engine, Engine};
 use chrono::{DateTime, Utc};
 use clap::Parser;
+use dioxus_desktop::{Config, LogicalSize, WindowBuilder};
 use futures::StreamExt;
-use iced::{Application, Command};
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
 use isahc::config::RedirectPolicy;
@@ -17,6 +17,8 @@ use std::{
     path::{Path, PathBuf},
     time::SystemTime,
 };
+
+mod gui;
 
 const CURRENT_MANIFEST_VERSION: i32 = 1;
 const GH_API: &str = "https://api.github.com/repos/";
@@ -770,27 +772,45 @@ fn main() {
         };
         let installer_profile = futures::executor::block_on(init(&args.modpack, &branch));
         match args.action.as_str() {
-            "install" => futures::executor::block_on(install(
-                installer_profile.modpack_root,
-                installer_profile.manifest,
-                installer_profile.http_client,
-                installer_profile.modpack_source,
-                installer_profile.modpack_branch,
-            )),
-            "update" => futures::executor::block_on(update(
-                installer_profile.modpack_root,
-                installer_profile.manifest,
-                installer_profile.http_client,
-                installer_profile.modpack_source,
-                installer_profile.modpack_branch,
-            )),
+            "install" => {
+                if installer_profile.installed {
+                    return;
+                }
+                futures::executor::block_on(install(
+                    installer_profile.modpack_root,
+                    installer_profile.manifest,
+                    installer_profile.http_client,
+                    installer_profile.modpack_source,
+                    installer_profile.modpack_branch,
+                ))
+            }
+            "update" => {
+                if !installer_profile.installed || !installer_profile.update_available {
+                    return;
+                }
+                futures::executor::block_on(update(
+                    installer_profile.modpack_root,
+                    installer_profile.manifest,
+                    installer_profile.http_client,
+                    installer_profile.modpack_source,
+                    installer_profile.modpack_branch,
+                ))
+            }
             "play" => (),
             _ => (),
         };
         println!("Success!");
     } else {
         // Only the executable was present in arguments entering GUI mode
-        InstallerGUI::run(iced::Settings::default()).expect("Failed to create GUI!");
+        dioxus_desktop::launch_cfg(
+            gui::App,
+            Config::new().with_window(
+                WindowBuilder::new()
+                    .with_resizable(false)
+                    .with_title("Wynncraft Overhaul Installer")
+                    .with_inner_size(LogicalSize::new(1280, 720)),
+            ),
+        );
     }
 }
 
@@ -803,29 +823,6 @@ struct InstallerProfile {
     update_available: bool,
     modpack_source: String,
     modpack_branch: String,
-}
-
-#[derive(Debug, Clone)]
-enum InstallerGUI {
-    Loading,
-    Loaded {
-        manifest: Manifest,
-        modpack_root: PathBuf,
-        http_client: HttpClient,
-        installed: bool,
-        update_available: bool,
-        modpack_source: String,
-        modpack_branch: String,
-    },
-}
-#[derive(Debug, Clone)]
-enum Message {
-    Install,
-    Update,
-    Play,
-    Updated(()),
-    Installed(()),
-    Init(InstallerProfile),
 }
 
 #[derive(Parser)]
@@ -888,125 +885,5 @@ async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
         update_available,
         modpack_source: modpack_source.to_owned(),
         modpack_branch: modpack_branch.to_owned(),
-    }
-}
-
-impl Application for InstallerGUI {
-    type Executor = iced::executor::Default;
-    type Message = Message;
-    type Theme = iced::Theme;
-    type Flags = ();
-
-    fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
-        // TODO(Ability to change 'modpack_source' and 'modpack_branch')
-        (
-            InstallerGUI::Loading,
-            Command::perform(init("Commander07/modpack-test/", "main"), Message::Init),
-        )
-    }
-
-    fn title(&self) -> String {
-        let subtitle = match self {
-            InstallerGUI::Loading => "Loading",
-            InstallerGUI::Loaded { manifest, .. } => manifest.name.as_str(),
-        };
-
-        format!("{} | Wynncraft Overhaul Installer", subtitle)
-    }
-
-    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
-        match self {
-            InstallerGUI::Loading => match message {
-                Message::Init(profile) => {
-                    *self = InstallerGUI::Loaded {
-                        manifest: profile.manifest,
-                        modpack_root: profile.modpack_root,
-                        http_client: profile.http_client,
-                        installed: profile.installed,
-                        update_available: profile.update_available,
-                        modpack_source: profile.modpack_source,
-                        modpack_branch: profile.modpack_branch,
-                    };
-                    Command::none()
-                }
-                _ => Command::none(),
-            },
-            InstallerGUI::Loaded {
-                manifest,
-                modpack_root,
-                http_client,
-                installed,
-                update_available,
-                modpack_source,
-                modpack_branch,
-            } => match message {
-                Message::Install => {
-                    if !*installed {
-                        return Command::perform(
-                            install(
-                                modpack_root.clone(),
-                                manifest.clone(),
-                                http_client.clone(),
-                                modpack_source.clone(),
-                                modpack_branch.clone(),
-                            ),
-                            Message::Installed,
-                        );
-                    }
-                    Command::none()
-                }
-                Message::Play => Command::none(),
-                Message::Update => {
-                    if *update_available {
-                        return Command::perform(
-                            update(
-                                modpack_root.clone(),
-                                manifest.clone(),
-                                http_client.clone(),
-                                modpack_source.clone(),
-                                modpack_branch.clone(),
-                            ),
-                            Message::Updated,
-                        );
-                    }
-                    Command::none()
-                }
-                Message::Installed(()) => {
-                    *installed = true;
-                    Command::none()
-                }
-                _ => Command::none(),
-            },
-        }
-    }
-
-    fn view(&self) -> iced::Element<Message> {
-        let content = match self {
-            InstallerGUI::Loading => {
-                iced::widget::column![iced::widget::text("Loading...").size(40),]
-                    .width(iced::Length::Shrink)
-            }
-            InstallerGUI::Loaded {
-                manifest,
-                modpack_root,
-                http_client,
-                installed,
-                update_available,
-                modpack_source,
-                modpack_branch,
-            } => iced::widget::column![
-                iced::widget::text(&manifest.name).size(40),
-                iced::widget::button("Install").on_press(Message::Install),
-                iced::widget::button("Update").on_press(Message::Update)
-            ]
-            .width(iced::Length::Shrink),
-        };
-
-        iced::widget::container(content)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .center_x()
-            .center_y()
-            .into()
     }
 }
