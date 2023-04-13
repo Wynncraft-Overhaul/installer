@@ -163,6 +163,13 @@ impl Downloadable for Loader {
         }
     }
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct Feature {
+    name: String,
+    default: bool,
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct Manifest {
     manifest_version: i32,
@@ -175,6 +182,8 @@ struct Manifest {
     shaderpacks: Vec<Shaderpack>,
     resourcepacks: Vec<Resourcepack>,
     include: Vec<String>,
+    features: Vec<Feature>,
+    description: String,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -242,6 +251,11 @@ struct GithubAsset {
 struct GithubRelease {
     tag_name: String,
     assets: Vec<GithubAsset>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GithubBranch {
+    name: String,
 }
 
 async fn download_fabric(
@@ -452,19 +466,13 @@ fn build_http_client() -> HttpClient {
         .unwrap()
 }
 
-async fn install(
-    modpack_root: PathBuf,
-    manifest: Manifest,
-    http_client: HttpClient,
-    modpack_source: String,
-    modpack_branch: String,
-) {
+async fn install(installer_profile: InstallerProfile) {
     // Yes this is needed and no i wont change it
     // This might not be needed now to we use isahc
     // TODO(Remove unnecessary clone usage)
-    let modpack_root = &modpack_root;
-    let manifest = &manifest;
-    let http_client = &http_client;
+    let modpack_root = &installer_profile.modpack_root;
+    let manifest = &installer_profile.manifest;
+    let http_client = &installer_profile.http_client;
     let loader_future =
         manifest
             .loader
@@ -539,7 +547,9 @@ async fn install(
         // Include files exist
         let release: Vec<GithubRelease> = serde_json::from_str(
             http_client
-                .get_async(GH_API.to_owned() + modpack_source.as_str() + "releases")
+                .get_async(
+                    GH_API.to_owned() + installer_profile.modpack_source.as_str() + "releases",
+                )
                 .await
                 .expect("Failed to retrieve releases!")
                 .text()
@@ -551,7 +561,7 @@ async fn install(
 
         let selected_rel = release
             .iter()
-            .filter(|rel| rel.tag_name == modpack_branch)
+            .filter(|rel| rel.tag_name == installer_profile.modpack_branch)
             .collect::<Vec<&GithubRelease>>()
             .first()
             .cloned()
@@ -605,6 +615,8 @@ async fn install(
         shaderpacks: shaderpacks_w_path,
         resourcepacks: resourcepacks_w_path,
         include: manifest.include.clone(),
+        features: manifest.features.clone(),
+        description: manifest.description.clone(),
     };
     fs::write(
         get_modpack_root(&manifest.uuid).join(Path::new("manifest.json")),
@@ -617,8 +629,8 @@ async fn install(
                 http_client
                     .get_async(
                         GH_RAW.to_owned()
-                            + modpack_source.as_str()
-                            + modpack_branch.as_str()
+                            + installer_profile.modpack_source.as_str()
+                            + installer_profile.modpack_branch.as_str()
                             + "/icon.png",
                     )
                     .await
@@ -657,25 +669,23 @@ macro_rules! remove_items {
 }
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
-async fn update(
-    modpack_root: PathBuf,
-    manifest: Manifest,
-    http_client: HttpClient,
-    modpack_source: String,
-    modpack_branch: String,
-) {
+async fn update(installer_profile: InstallerProfile) {
     // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
-    let local_manifest: Manifest =
-        match fs::read_to_string(modpack_root.join(Path::new("manifest.json"))) {
-            Ok(contents) => match serde_json::from_str(&contents) {
-                Ok(parsed) => parsed,
-                Err(err) => panic!("Failed to parse local manifest: {}", err),
-            },
-            Err(err) => panic!("Failed to read local manifest: {}", err),
-        };
+    let local_manifest: Manifest = match fs::read_to_string(
+        installer_profile
+            .modpack_root
+            .join(Path::new("manifest.json")),
+    ) {
+        Ok(contents) => match serde_json::from_str(&contents) {
+            Ok(parsed) => parsed,
+            Err(err) => panic!("Failed to parse local manifest: {}", err),
+        },
+        Err(err) => panic!("Failed to read local manifest: {}", err),
+    };
 
-    let new_mods: Vec<Mod> = manifest
+    let new_mods: Vec<Mod> = installer_profile
+        .manifest
         .mods
         .iter()
         .filter_map(|r#mod| {
@@ -690,7 +700,8 @@ async fn update(
         })
         .collect();
     remove_items!(local_manifest.mods, |x| { !new_mods.contains(x) });
-    let new_shaderpacks: Vec<Shaderpack> = manifest
+    let new_shaderpacks: Vec<Shaderpack> = installer_profile
+        .manifest
         .shaderpacks
         .iter()
         .filter_map(|shaderpack| {
@@ -707,7 +718,8 @@ async fn update(
     remove_items!(local_manifest.shaderpacks, |x| {
         !new_shaderpacks.contains(x)
     });
-    let new_resourcepacks: Vec<Resourcepack> = manifest
+    let new_resourcepacks: Vec<Resourcepack> = installer_profile
+        .manifest
         .resourcepacks
         .iter()
         .filter_map(|resourcepack| {
@@ -724,31 +736,35 @@ async fn update(
     remove_items!(local_manifest.resourcepacks, |x| {
         !new_resourcepacks.contains(x)
     });
-    if manifest.loader != local_manifest.loader {
-        fs::remove_dir_all(modpack_root.join(Path::new(&format!(
+    if installer_profile.manifest.loader != local_manifest.loader {
+        fs::remove_dir_all(installer_profile.modpack_root.join(Path::new(&format!(
             "versions/fabric-loader-{}-{}",
             &local_manifest.loader.version, &local_manifest.loader.minecraft_version
         ))))
         .expect("Could not delete old fabric version!");
     }
-    install(
-        modpack_root,
-        Manifest {
-            manifest_version: manifest.manifest_version,
-            modpack_version: manifest.modpack_version.clone(),
-            name: manifest.name.clone(),
-            icon: manifest.icon,
-            uuid: manifest.uuid.clone(),
-            loader: manifest.loader.clone(),
+    install(InstallerProfile {
+        manifest: Manifest {
+            manifest_version: installer_profile.manifest.manifest_version,
+            modpack_version: installer_profile.manifest.modpack_version.clone(),
+            name: installer_profile.manifest.name.clone(),
+            icon: installer_profile.manifest.icon,
+            uuid: installer_profile.manifest.uuid.clone(),
+            loader: installer_profile.manifest.loader.clone(),
             mods: new_mods,
             shaderpacks: new_shaderpacks,
             resourcepacks: new_resourcepacks,
-            include: manifest.include.clone(),
+            include: installer_profile.manifest.include.clone(),
+            features: installer_profile.manifest.features.clone(),
+            description: installer_profile.manifest.description.clone(),
         },
-        http_client,
-        modpack_source,
-        modpack_branch,
-    )
+        modpack_root: installer_profile.modpack_root,
+        http_client: installer_profile.http_client,
+        installed: installer_profile.installed,
+        update_available: installer_profile.update_available,
+        modpack_source: installer_profile.modpack_source,
+        modpack_branch: installer_profile.modpack_branch,
+    })
     .await;
 }
 
@@ -776,25 +792,13 @@ fn main() {
                 if installer_profile.installed {
                     return;
                 }
-                futures::executor::block_on(install(
-                    installer_profile.modpack_root,
-                    installer_profile.manifest,
-                    installer_profile.http_client,
-                    installer_profile.modpack_source,
-                    installer_profile.modpack_branch,
-                ))
+                futures::executor::block_on(install(installer_profile))
             }
             "update" => {
                 if !installer_profile.installed || !installer_profile.update_available {
                     return;
                 }
-                futures::executor::block_on(update(
-                    installer_profile.modpack_root,
-                    installer_profile.manifest,
-                    installer_profile.http_client,
-                    installer_profile.modpack_source,
-                    installer_profile.modpack_branch,
-                ))
+                futures::executor::block_on(update(installer_profile))
             }
             "play" => (),
             _ => (),
@@ -802,6 +806,7 @@ fn main() {
         println!("Success!");
     } else {
         // Only the executable was present in arguments entering GUI mode
+        // TODO(Add support for non hardcoded modpacks)
         dioxus_desktop::launch_cfg(
             gui::App,
             Config::new().with_window(
