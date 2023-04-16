@@ -8,10 +8,12 @@ If you want to see a modpack example go [here](https://github.com/Wynncraft-Over
 
 The Header section contains metadata about the modpack, such as the name and the Minecraft version it targets.
 
-- `manifest_version`: This field represents the manifest version the modpack was created for and should be automatically generated upon the creation of a new modpack.
+- `manifest_version`: This field represents the manifest version the modpack was created for and should be automatically generated upon the creation of a new modpack. (Current version is `2`)
 - `modpack_version`: This field is your modpack version and it should follow [semver](https://semver.org/).
 - `name`: This field specifies the modpack name. This can be any string.
-- `uuid`: This field is generated upon the creation of a new modpack and should be the same across all modpack versions. **Do not change this field**.
+- `subtitle`: Name of modpack version
+- `description`: This field is a html representation of a description show in the installer.
+- `uuid`: This field is a [UUID4](https://www.uuidgenerator.net/) and should be the same across all modpack versions. But different across branches/alt versions.
 - `icon`: If this field is set to `true` the installer will look for an `icon.png` in the modpack root.
 
 ## Loader
@@ -31,6 +33,7 @@ Mods is a list which contains mod objects for which the fields are:
 - `location`: If `source` is set to `modrinth`, then this should be set to the mod's slug (the part after `mod/` in the URL). If `source` is set to `ddl`, then this should be a direct download link. Note that links that redirect are not direct download links.
 - `version`: If `source` is set to `modrinth`, then this must be set to exactly the same as the version number of the mod you want to download. However, if source is set to `ddl`, then this can be anything, but it's best to set it to the actual version to improve clarity.
 - `path`: This field should be left out when creating manifests as it's meant to be a place the installer can store the path of a downloaded mod.
+- `id`: This is an optional field which defaults to `default` it is the id of the feature requried to be true in order to be included. (`default` is always true)
 
 ## Shaderpacks
 
@@ -42,4 +45,15 @@ The `resourcepacks` section works exactly the same as the Mods section.
 
 ## Include
 
-`include` is a list of strings (paths) which contains all the files or folders you want to ship with the modpack. This is most useful for configs.
+Include is a list of include objects for which the fields are:
+
+- `location`: Path of the file or folder you want to include
+- `id`: This is an optional field which defaults to `default` it is the id of the feature requried to be true in order to be included. (`default` is always true)
+
+## Features
+
+Features is a list which contains feature objects for which the fields are:
+
+- `name`: Name of the feature
+- `id`: Id of the feature
+- `default`: This is a bool specifying if it should be on by default

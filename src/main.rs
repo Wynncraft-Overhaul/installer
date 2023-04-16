@@ -20,10 +20,15 @@ use std::{
 
 mod gui;
 
-const CURRENT_MANIFEST_VERSION: i32 = 1;
+const CURRENT_MANIFEST_VERSION: i32 = 2;
 const GH_API: &str = "https://api.github.com/repos/";
 const GH_RAW: &str = "https://raw.githubusercontent.com/";
 const CONCURRENCY: usize = 14;
+
+fn default_id() -> String {
+    String::from("default")
+}
+
 #[async_trait]
 trait Downloadable {
     async fn download(
@@ -45,6 +50,8 @@ struct Mod {
     location: String,
     version: String,
     path: Option<PathBuf>,
+    #[serde(default = "default_id")]
+    id: String,
 }
 impl DownloadableGetters for Mod {
     fn get_name(&self) -> &String {
@@ -81,6 +88,8 @@ struct Shaderpack {
     location: String,
     version: String,
     path: Option<PathBuf>,
+    #[serde(default = "default_id")]
+    id: String,
 }
 impl DownloadableGetters for Shaderpack {
     fn get_name(&self) -> &String {
@@ -118,6 +127,8 @@ struct Resourcepack {
     location: String,
     version: String,
     path: Option<PathBuf>,
+    #[serde(default = "default_id")]
+    id: String,
 }
 impl DownloadableGetters for Resourcepack {
     fn get_name(&self) -> &String {
@@ -166,8 +177,15 @@ impl Downloadable for Loader {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct Feature {
+    id: String,
     name: String,
     default: bool,
+}
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct Include {
+    location: String,
+    #[serde(default = "default_id")]
+    id: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -175,15 +193,16 @@ struct Manifest {
     manifest_version: i32,
     modpack_version: String,
     name: String,
+    subtitle: String,
+    description: String,
     icon: bool,
     uuid: String,
     loader: Loader,
     mods: Vec<Mod>,
     shaderpacks: Vec<Shaderpack>,
     resourcepacks: Vec<Resourcepack>,
-    include: Vec<String>,
+    include: Vec<Include>,
     features: Vec<Feature>,
-    description: String,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -477,30 +496,32 @@ async fn install(installer_profile: InstallerProfile) {
         manifest
             .loader
             .download(modpack_root, &manifest.loader.r#type, http_client);
-    let mods_w_path =
-        futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async move {
-            if r#mod.path.is_none() {
-                Mod {
-                    path: Some(
-                        r#mod
-                            .download(modpack_root, &manifest.loader.r#type, http_client)
-                            .await,
-                    ),
-                    name: r#mod.name,
-                    source: r#mod.source,
-                    location: r#mod.location,
-                    version: r#mod.version,
-                }
-            } else {
-                r#mod
+    let mods_w_path = futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async {
+        if r#mod.path.is_none() && installer_profile.enabled_features.contains(&r#mod.id) {
+            Mod {
+                path: Some(
+                    r#mod
+                        .download(modpack_root, &manifest.loader.r#type, http_client)
+                        .await,
+                ),
+                name: r#mod.name,
+                source: r#mod.source,
+                location: r#mod.location,
+                version: r#mod.version,
+                id: r#mod.id,
             }
-        }))
-        .buffer_unordered(CONCURRENCY)
-        .collect::<Vec<Mod>>()
-        .await;
+        } else {
+            r#mod
+        }
+    }))
+    .buffer_unordered(CONCURRENCY)
+    .collect::<Vec<Mod>>()
+    .await;
     let shaderpacks_w_path = futures::stream::iter(manifest.shaderpacks.clone().into_iter().map(
-        |shaderpack| async move {
-            if shaderpack.path.is_none() {
+        |shaderpack| async {
+            if shaderpack.path.is_none()
+                && installer_profile.enabled_features.contains(&shaderpack.id)
+            {
                 Shaderpack {
                     path: Some(
                         shaderpack
@@ -511,6 +532,7 @@ async fn install(installer_profile: InstallerProfile) {
                     source: shaderpack.source,
                     location: shaderpack.location,
                     version: shaderpack.version,
+                    id: shaderpack.id,
                 }
             } else {
                 shaderpack
@@ -522,8 +544,12 @@ async fn install(installer_profile: InstallerProfile) {
     .await;
     let resourcepacks_w_path =
         futures::stream::iter(manifest.resourcepacks.clone().into_iter().map(
-            |resourcepack| async move {
-                if resourcepack.path.is_none() {
+            |resourcepack| async {
+                if resourcepack.path.is_none()
+                    && installer_profile
+                        .enabled_features
+                        .contains(&resourcepack.id)
+                {
                     Resourcepack {
                         path: Some(
                             resourcepack
@@ -534,6 +560,7 @@ async fn install(installer_profile: InstallerProfile) {
                         source: resourcepack.source,
                         location: resourcepack.location,
                         version: resourcepack.version,
+                        id: resourcepack.id,
                     }
                 } else {
                     resourcepack
@@ -566,41 +593,48 @@ async fn install(installer_profile: InstallerProfile) {
             .first()
             .cloned()
             .expect("Failed to retrieve release for selected branch!");
-        for asset in &selected_rel.assets {
-            if asset.name == *"include.zip" {
-                // download and unzip in modpack root
-                let content = http_client
-                    .get_async(&asset.browser_download_url)
-                    .await
-                    .expect("Failed to download 'include.zip'")
-                    .bytes()
-                    .await
-                    .unwrap();
-                let zipfile_path = modpack_root.join(Path::new("include.zip"));
-                fs::write(&zipfile_path, content).expect("Failed to write 'include.zip'!");
-                let zipfile = fs::File::open(&zipfile_path).unwrap();
-                let mut archive = zip::ZipArchive::new(zipfile).unwrap();
-                // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
-                for i in 0..archive.len() {
-                    let mut file = archive.by_index(i).unwrap();
-                    let outpath = match file.enclosed_name() {
-                        Some(path) => modpack_root.join(path),
-                        None => continue,
-                    };
-                    if (*file.name()).ends_with('/') {
-                        fs::create_dir_all(&outpath).unwrap();
-                    } else {
-                        if let Some(p) = outpath.parent() {
-                            if !p.exists() {
-                                fs::create_dir_all(p).unwrap();
+        for inc in &manifest.include {
+            if !installer_profile.enabled_features.contains(&inc.id) {
+                continue;
+            }
+            for asset in &selected_rel.assets {
+                if (asset.name == default_id() + ".zip")
+                    || (asset.name == inc.location.clone() + ".zip")
+                {
+                    // download and unzip in modpack root
+                    let content = http_client
+                        .get_async(&asset.browser_download_url)
+                        .await
+                        .expect("Failed to download 'include.zip'")
+                        .bytes()
+                        .await
+                        .unwrap();
+                    let zipfile_path = modpack_root.join(Path::new(&asset.name));
+                    fs::write(&zipfile_path, content).expect("Failed to write 'include.zip'!");
+                    let zipfile = fs::File::open(&zipfile_path).unwrap();
+                    let mut archive = zip::ZipArchive::new(zipfile).unwrap();
+                    // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
+                    for i in 0..archive.len() {
+                        let mut file = archive.by_index(i).unwrap();
+                        let outpath = match file.enclosed_name() {
+                            Some(path) => modpack_root.join(path),
+                            None => continue,
+                        };
+                        if (*file.name()).ends_with('/') {
+                            fs::create_dir_all(&outpath).unwrap();
+                        } else {
+                            if let Some(p) = outpath.parent() {
+                                if !p.exists() {
+                                    fs::create_dir_all(p).unwrap();
+                                }
                             }
+                            let mut outfile = fs::File::create(&outpath).unwrap();
+                            std::io::copy(&mut file, &mut outfile).unwrap();
                         }
-                        let mut outfile = fs::File::create(&outpath).unwrap();
-                        std::io::copy(&mut file, &mut outfile).unwrap();
                     }
+                    fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'include.zip'!");
+                    break;
                 }
-                fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'include.zip'!");
-                break;
             }
         }
     }
@@ -608,6 +642,8 @@ async fn install(installer_profile: InstallerProfile) {
         manifest_version: manifest.manifest_version,
         modpack_version: manifest.modpack_version.clone(),
         name: manifest.name.clone(),
+        subtitle: manifest.subtitle.clone(),
+        description: manifest.subtitle.clone(),
         icon: manifest.icon,
         uuid: manifest.uuid.clone(),
         loader: manifest.loader.clone(),
@@ -616,7 +652,6 @@ async fn install(installer_profile: InstallerProfile) {
         resourcepacks: resourcepacks_w_path,
         include: manifest.include.clone(),
         features: manifest.features.clone(),
-        description: manifest.description.clone(),
     };
     fs::write(
         get_modpack_root(&manifest.uuid).join(Path::new("manifest.json")),
@@ -757,6 +792,7 @@ async fn update(installer_profile: InstallerProfile) {
             include: installer_profile.manifest.include.clone(),
             features: installer_profile.manifest.features.clone(),
             description: installer_profile.manifest.description.clone(),
+            subtitle: installer_profile.manifest.subtitle.clone(),
         },
         modpack_root: installer_profile.modpack_root,
         http_client: installer_profile.http_client,
@@ -764,6 +800,7 @@ async fn update(installer_profile: InstallerProfile) {
         update_available: installer_profile.update_available,
         modpack_source: installer_profile.modpack_source,
         modpack_branch: installer_profile.modpack_branch,
+        enabled_features: installer_profile.enabled_features,
     })
     .await;
 }
@@ -806,7 +843,6 @@ fn main() {
         println!("Success!");
     } else {
         // Only the executable was present in arguments entering GUI mode
-        // TODO(Add support for non hardcoded modpacks)
         dioxus_desktop::launch_cfg(
             gui::App,
             Config::new().with_window(
@@ -828,6 +864,7 @@ struct InstallerProfile {
     update_available: bool,
     modpack_source: String,
     modpack_branch: String,
+    enabled_features: Vec<String>,
 }
 
 #[derive(Parser)]
@@ -890,5 +927,6 @@ async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
         update_available,
         modpack_source: modpack_source.to_owned(),
         modpack_branch: modpack_branch.to_owned(),
+        enabled_features: vec!["default".to_string()],
     }
 }
