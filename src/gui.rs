@@ -17,6 +17,18 @@ fn Header(cx: Scope) -> Element {
     })
 }
 
+fn Spinner(cx: Scope) -> Element {
+    cx.render(rsx! {
+        div {
+            class: "lds-ring",
+            div {}
+            div {}
+            div {}
+            div {}
+        }
+    })
+}
+
 #[derive(Props, PartialEq)]
 struct VersionProps {
     modpack_source: String,
@@ -43,68 +55,103 @@ fn Version(cx: Scope<VersionProps>) -> Element {
 
     // states can be turned into an Rc using .current() and can be made into an owned value by using .as_ref().to_owned()
     let installer_profile = use_state(cx, || profile.unwrap().to_owned());
-    cx.render(rsx! {
-            div {
-                class: "container",
-                h1 {
-                    "{installer_profile.manifest.subtitle}"
+    let installing = use_state(cx, || false);
+    let on_submit = move |event: FormEvent| {
+        cx.spawn({
+            let mut installer_profile = profile.unwrap().to_owned();
+            installing.set(true);
+            let installing = installing.clone();
+            async move {
+                for k in event.data.values.keys() {
+                    if event.data.values[k] == "true" {
+                        installer_profile.enabled_features.push(k.to_owned())
+                    }
                 }
-                form {
-                    onsubmit: move |event| {
-                        let installer_profile = installer_profile.clone();
-                        use_future(cx, (), |_| async move {
-                            let mut installer_profile = installer_profile.current().as_ref().to_owned();
-                            for k in event.data.values.keys() {
-                                if event.data.values[k] == "true" {
-                                    installer_profile.enabled_features.push(k.to_owned())
-                                }
-                            }
 
-                            if !installer_profile.installed {
-                                super::install(
-                                    installer_profile
-                                ).await;
-                            } else if installer_profile.update_available {
-                                super::update(
-                                    installer_profile
-                                ).await;
-                            }
-                            println!("Done");
-                        });
-                    },
+                if !installer_profile.installed {
+                    super::install(installer_profile).await;
+                } else if installer_profile.update_available {
+                    super::update(installer_profile).await;
+                }
+                installing.set(false);
+            }
+        });
+    };
+    if **installing {
+        cx.render(rsx! {
+            div {
+                class: "version-container",
+                div {
+                    class: "subtitle-container",
+                    h1 {
+                        "{installer_profile.manifest.subtitle}"
+                    }
+                }
+                div {
+                    class: "version-inner-container",
                     div {
-                        class: "feature-list",
-                        for feat in &installer_profile.manifest.features {
-                            label {
-                                if feat.default {
-                                    rsx!(input {
-                                        name: "{feat.id}",
-                                        r#type: "checkbox",
-                                        checked: "true"
-                                    })
-                                } else {
-                                    rsx!(input {
-                                        name: "{feat.id}",
-                                        r#type: "checkbox"
-                                    })
-                                }
-                                "{feat.name}"
-                            }
+                        class: "container",
+                        style: "justify-items: center;",
+                        Spinner {}
+                        p {
+                            "Installing..."
                         }
-                    }
-                    div {
-                        class: "description",
-                        // Yes this will allow modpacks to include any valid html including script tags
-                        dangerous_inner_html: "{installer_profile.manifest.description}"
-                    }
-                    input {
-                        r#type: "submit",
-                        value: "Install",
-                        class: "install-button"
                     }
                 }
             }
-    })
+        })
+    } else {
+        cx.render(rsx! {
+            div {
+                class: "version-container",
+                form {
+                    onsubmit: on_submit,
+                    div {
+                        class: "subtitle-container",
+                        h1 {
+                            "{installer_profile.manifest.subtitle}"
+                        }
+                    }
+                    div {
+                        class: "version-inner-container",
+                        div {
+                            class: "container",
+                            div {
+                                class: "feature-list",
+                                for feat in &installer_profile.manifest.features {
+                                    label {
+                                        if feat.default {
+                                            rsx!(input {
+                                                name: "{feat.id}",
+                                                r#type: "checkbox",
+                                                checked: "true"
+                                            })
+                                        } else {
+                                            rsx!(input {
+                                                name: "{feat.id}",
+                                                r#type: "checkbox"
+                                            })
+                                        }
+                                        "{feat.name}"
+                                    }
+                                }
+                            }
+                            div {
+                                class: "description",
+                                // Yes this will allow modpacks to include any valid html including script tags
+                                dangerous_inner_html: "{installer_profile.manifest.description}"
+                            }
+                        }
+                        input {
+                            r#type: "submit",
+                            value: "Install",
+                            class: "install-button"
+                        }
+                    }
+                }
+            }
+        })
+    }
 }
 
 pub fn App(cx: Scope) -> Element {

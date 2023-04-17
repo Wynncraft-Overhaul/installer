@@ -1,7 +1,12 @@
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions),),
+    windows_subsystem = "windows"
+)]
 use async_trait::async_trait;
 use base64::{engine, Engine};
 use chrono::{DateTime, Utc};
 use clap::Parser;
+use dioxus_desktop::tao::window::Icon;
 use dioxus_desktop::{Config, LogicalSize, WindowBuilder};
 use futures::StreamExt;
 use image::io::Reader as ImageReader;
@@ -488,6 +493,7 @@ fn build_http_client() -> HttpClient {
 async fn install(installer_profile: InstallerProfile) {
     // Yes this is needed and no i wont change it
     // This might not be needed now to we use isahc
+    // Especially now that we use 'InstallerProfile's
     // TODO(Remove unnecessary clone usage)
     let modpack_root = &installer_profile.modpack_root;
     let manifest = &installer_profile.manifest;
@@ -843,14 +849,19 @@ fn main() {
         println!("Success!");
     } else {
         // Only the executable was present in arguments entering GUI mode
+        let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
         dioxus_desktop::launch_cfg(
             gui::App,
-            Config::new().with_window(
-                WindowBuilder::new()
-                    .with_resizable(false)
-                    .with_title("Wynncraft Overhaul Installer")
-                    .with_inner_size(LogicalSize::new(1280, 720)),
-            ),
+            Config::new()
+                .with_window(
+                    WindowBuilder::new()
+                        .with_resizable(false)
+                        .with_title("Wynncraft Overhaul Installer")
+                        .with_inner_size(LogicalSize::new(1280, 720)),
+                )
+                .with_icon(
+                    Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
+                ),
         );
     }
 }
