@@ -33,13 +33,15 @@ fn Spinner(cx: Scope) -> Element {
 struct VersionProps {
     modpack_source: String,
     modpack_branch: String,
+    launcher: super::Launcher,
 }
 
 fn Version(cx: Scope<VersionProps>) -> Element {
     let modpack_source = (cx.props.modpack_source).to_owned();
     let modpack_branch = (cx.props.modpack_branch).to_owned();
+    let launcher = (cx.props.launcher).to_owned();
     let profile = use_future(cx, (), |_| async move {
-        super::init(&modpack_source, &modpack_branch).await
+        super::init(&modpack_source, &modpack_branch, launcher).await
     })
     .value();
 
@@ -54,6 +56,7 @@ fn Version(cx: Scope<VersionProps>) -> Element {
     };
 
     // states can be turned into an Rc using .current() and can be made into an owned value by using .as_ref().to_owned()
+    // TODO(Clean this up)
     let installer_profile = use_state(cx, || profile.unwrap().to_owned());
     let installing = use_state(cx, || false);
     let on_submit = move |event: FormEvent| {
@@ -77,6 +80,7 @@ fn Version(cx: Scope<VersionProps>) -> Element {
             }
         });
     };
+    // TODO(Split these renders into multiple components)
     if **installing {
         cx.render(rsx! {
             div {
@@ -165,6 +169,7 @@ pub fn App(cx: Scope) -> Element {
             .as_str(),
     )
     .expect("Failed to parse branches!");
+    // TODO(Launcher selection screen)
     cx.render(rsx! {
         style { include_str!("style.css") }
         Header {}
@@ -174,6 +179,7 @@ pub fn App(cx: Scope) -> Element {
                 Version {
                     modpack_source: modpack_source.to_string(),
                     modpack_branch: branches[i].name.clone(),
+                    launcher: super::Launcher::Vanilla(super::get_minecraft_folder())
                 }
             }
         }

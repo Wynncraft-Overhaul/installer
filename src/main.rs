@@ -172,9 +172,9 @@ struct Loader {
 }
 #[async_trait]
 impl Downloadable for Loader {
-    async fn download(&self, modpack_root: &Path, _: &str, http_client: &HttpClient) -> PathBuf {
+    async fn download(&self, root: &Path, _: &str, http_client: &HttpClient) -> PathBuf {
         match self.r#type.as_str() {
-            "fabric" => download_fabric(self, modpack_root, http_client).await,
+            "fabric" => download_fabric(self, root, http_client).await,
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
         }
     }
@@ -282,11 +282,28 @@ struct GithubBranch {
     name: String,
 }
 
-async fn download_fabric(
-    loader: &Loader,
-    modpack_root: &Path,
-    http_client: &HttpClient,
-) -> PathBuf {
+#[allow(non_snake_case)]
+#[derive(Debug, Deserialize, Serialize)]
+struct MMCComponent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cachedVolatile: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dependencyOnly: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    important: Option<bool>,
+    uid: String,
+    version: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Deserialize, Serialize)]
+struct MMCPack {
+    components: Vec<MMCComponent>,
+    formatVersion: i32,
+}
+
+async fn download_fabric(loader: &Loader, root: &Path, http_client: &HttpClient) -> PathBuf {
+    // TODO(download into .minecraft not modpack root)
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
         loader.minecraft_version, loader.version
@@ -295,7 +312,7 @@ async fn download_fabric(
         "fabric-loader-{}-{}",
         &loader.version, &loader.minecraft_version
     );
-    let fabric_path = modpack_root.join(Path::new(&format!("versions/{}", &loader_name)));
+    let fabric_path = root.join(Path::new(&format!("versions/{}", &loader_name)));
     if fabric_path
         .join(Path::new(&format!("{}.json", &loader_name)))
         .exists()
@@ -406,25 +423,46 @@ async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
     panic!("No items returned from modrinth!")
 }
 
-fn get_minecraft_folder() -> PathBuf {
+fn get_app_data() -> PathBuf {
     if env::consts::OS == "linux" {
-        Path::new(&(dirs::home_dir().unwrap().to_str().unwrap().to_owned() + "/.minecraft"))
-            .to_owned()
-    } else if env::consts::OS == "windows" {
-        Path::new(&(dirs::config_dir().unwrap().to_str().unwrap().to_owned() + "\\.minecraft"))
-            .to_owned()
-    } else if env::consts::OS == "macos" {
-        Path::new(&(dirs::config_dir().unwrap().to_str().unwrap().to_owned() + "/minecraft"))
-            .to_owned()
+        dirs::home_dir().unwrap()
+    } else if env::consts::OS == "windows" || env::consts::OS == "macos" {
+        dirs::config_dir().unwrap()
     } else {
         panic!("Unsupported os '{}'!", env::consts::OS)
     }
 }
 
-fn get_modpack_root(modpack_uuid: &str) -> PathBuf {
-    let root = get_minecraft_folder().join(Path::new(&format!(".WC_OVHL/{}", modpack_uuid)));
-    fs::create_dir_all(&root).expect("Failed to create modpack folder");
-    root
+fn get_multimc_folder(multimc: &str) -> PathBuf {
+    let path = get_app_data().join(multimc);
+    if !path.is_dir() {
+        panic!("Invalid MultiMC!")
+    } else {
+        path
+    }
+}
+
+fn get_minecraft_folder() -> PathBuf {
+    if env::consts::OS == "macos" {
+        get_app_data().join("minecraft")
+    } else {
+        get_app_data().join(".minecraft")
+    }
+}
+
+fn get_modpack_root(launcher: &Launcher, uuid: &String) -> PathBuf {
+    match launcher {
+        Launcher::Vanilla(root) => {
+            let root = root.join(Path::new(&format!(".WC_OVHL/{}", uuid)));
+            fs::create_dir_all(&root).expect("Failed to create modpack folder");
+            root
+        }
+        Launcher::MultiMC(root) => {
+            let root = root.join(Path::new(&format!("instances/{}/.minecraft", uuid)));
+            fs::create_dir_all(&root).expect("Failed to create modpack folder");
+            root
+        }
+    }
 }
 
 fn image_to_base64(img: &DynamicImage) -> String {
@@ -435,48 +473,129 @@ fn image_to_base64(img: &DynamicImage) -> String {
     format!("data:image/png;base64,{}", res_base64)
 }
 
-fn create_launcher_profile(
-    manifest: &Manifest,
-    modpack_root: &Path,
-    icon_img: Option<DynamicImage>,
-) {
+fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Option<DynamicImage>) {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();
     let now = now.to_rfc3339();
-    let version_id = format!(
-        "fabric-loader-{}-{}",
-        &manifest.loader.version, &manifest.loader.minecraft_version
+    let manifest = &installer_profile.manifest;
+    let modpack_root = get_modpack_root(
+        installer_profile
+            .launcher
+            .as_ref()
+            .expect("No launcher selected!"),
+        &manifest.uuid,
     );
-    let icon = if manifest.icon {
-        image_to_base64(&icon_img.expect("manifest.icon was true but no icon was supplied!"))
-    } else {
-        String::from("Furnace")
-    };
-    let profile = LauncherProfile {
-        lastUsed: now.to_string(),
-        lastVersionId: version_id,
-        created: now,
-        name: manifest.name.clone(),
-        icon,
-        r#type: String::from("custom"),
-        gameDir: Some(modpack_root.to_str().unwrap().to_string()),
-        javaDir: None,
-        javaArgs: None,
-        logConfig: None,
-        logConfigIsXML: None,
-        resolution: None,
-    };
-    let lp_file_path = get_minecraft_folder().join(Path::new("launcher_profiles.json"));
-    let mut lp_obj: LauncherProfiles = serde_json::from_str(
-        &fs::read_to_string(&lp_file_path).expect("Failed to read 'launcher_profiles.json'!"),
-    )
-    .expect("Failed to parse 'launcher_profiles.json'!");
-    lp_obj.profiles.insert(manifest.uuid.clone(), profile);
-    fs::write(
-        lp_file_path,
-        serde_json::to_string(&lp_obj).expect("Failed to create new 'launcher_profiles.json'!"),
-    )
-    .expect("Failed to write to 'launcher_profiles.json'");
+    // TODO(make this work on loaders other than fabric)
+    match installer_profile
+        .launcher
+        .as_ref()
+        .expect("Asked to create launcher profile without knowing launcher!")
+    {
+        Launcher::Vanilla(root) => {
+            let icon = if manifest.icon {
+                image_to_base64(
+                    icon_img
+                        .as_ref()
+                        .expect("manifest.icon was true but no icon was supplied!"),
+                )
+            } else {
+                String::from("Furnace")
+            };
+            let profile = LauncherProfile {
+                lastUsed: now.to_string(),
+                lastVersionId: format!(
+                    "fabric-loader-{}-{}",
+                    &manifest.loader.version, &manifest.loader.minecraft_version
+                ),
+                created: now,
+                name: manifest.name.clone(),
+                icon,
+                r#type: String::from("custom"),
+                gameDir: Some(modpack_root.to_str().unwrap().to_string()),
+                javaDir: None,
+                javaArgs: None,
+                logConfig: None,
+                logConfigIsXML: None,
+                resolution: None,
+            };
+            let lp_file_path = root.join(Path::new("launcher_profiles.json"));
+            let mut lp_obj: LauncherProfiles = serde_json::from_str(
+                &fs::read_to_string(&lp_file_path)
+                    .expect("Failed to read 'launcher_profiles.json'!"),
+            )
+            .expect("Failed to parse 'launcher_profiles.json'!");
+            lp_obj.profiles.insert(manifest.uuid.clone(), profile);
+            fs::write(
+                lp_file_path,
+                serde_json::to_string(&lp_obj)
+                    .expect("Failed to create new 'launcher_profiles.json'!"),
+            )
+            .expect("Failed to write to 'launcher_profiles.json'");
+        }
+        Launcher::MultiMC(root) => {
+            let pack = MMCPack {
+                // TODO(Figure out how to get the correct components for the right loader and mc version)
+                components: vec![
+                    MMCComponent {
+                        uid: String::from("org.lwjgl3"),
+                        version: String::from("3.3.1"),
+                        cachedVolatile: Some(true),
+                        dependencyOnly: Some(true),
+                        important: None,
+                    },
+                    MMCComponent {
+                        uid: String::from("net.minecraft"),
+                        version: manifest.loader.minecraft_version.to_string(),
+                        cachedVolatile: None,
+                        dependencyOnly: None,
+                        important: Some(true),
+                    },
+                    MMCComponent {
+                        uid: String::from("net.fabricmc.intermediary"),
+                        version: manifest.loader.minecraft_version.to_string(),
+                        cachedVolatile: Some(true),
+                        dependencyOnly: Some(true),
+                        important: None,
+                    },
+                    MMCComponent {
+                        uid: String::from("net.fabricmc.fabric-loader"),
+                        version: manifest.loader.version.to_string(),
+                        cachedVolatile: None,
+                        dependencyOnly: None,
+                        important: None,
+                    },
+                ],
+                formatVersion: 1,
+            };
+            fs::write(
+                root.join(Path::new(&format!(
+                    "instances/{}/mmc-pack.json",
+                    manifest.uuid
+                ))),
+                serde_json::to_string(&pack).expect("Failed to create 'mmc-pack.json'"),
+            )
+            .expect("Failed to write to 'mmc-pack.json'");
+            fs::write(
+                root.join(Path::new(&format!(
+                    "instances/{}/instance.cfg",
+                    manifest.uuid
+                ))),
+                format!(
+                    "iconKey={}
+            name={}
+            ",
+                    manifest.uuid, manifest.name
+                ),
+            )
+            .expect("Failed to write to 'instance.cfg'");
+            if manifest.icon {
+                icon_img
+                    .expect("'icon' is 'true' but no icon was found")
+                    .save(root.join(Path::new(&format!("icons/{}.png", manifest.uuid))))
+                    .expect("Failed to write 'icon.png'");
+            }
+        }
+    }
 }
 
 fn build_http_client() -> HttpClient {
@@ -495,13 +614,23 @@ async fn install(installer_profile: InstallerProfile) {
     // This might not be needed now to we use isahc
     // Especially now that we use 'InstallerProfile's
     // TODO(Remove unnecessary clone usage)
-    let modpack_root = &installer_profile.modpack_root;
+    let modpack_root = &get_modpack_root(
+        installer_profile
+            .launcher
+            .as_ref()
+            .expect("Launcher not selected!"),
+        &installer_profile.manifest.uuid,
+    );
     let manifest = &installer_profile.manifest;
     let http_client = &installer_profile.http_client;
-    let loader_future =
-        manifest
-            .loader
-            .download(modpack_root, &manifest.loader.r#type, http_client);
+    let loader_future = match installer_profile.launcher.as_ref().unwrap() {
+        Launcher::Vanilla(root) => Some(manifest.loader.download(
+            root,
+            &manifest.loader.r#type,
+            http_client,
+        )),
+        Launcher::MultiMC(_) => None,
+    };
     let mods_w_path = futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async {
         if r#mod.path.is_none() && installer_profile.enabled_features.contains(&r#mod.id) {
             Mod {
@@ -604,9 +733,7 @@ async fn install(installer_profile: InstallerProfile) {
                 continue;
             }
             for asset in &selected_rel.assets {
-                if (asset.name == default_id() + ".zip")
-                    || (asset.name == inc.location.clone() + ".zip")
-                {
+                if asset.name == inc.id.clone() + ".zip" {
                     // download and unzip in modpack root
                     let content = http_client
                         .get_async(&asset.browser_download_url)
@@ -660,7 +787,7 @@ async fn install(installer_profile: InstallerProfile) {
         features: manifest.features.clone(),
     };
     fs::write(
-        get_modpack_root(&manifest.uuid).join(Path::new("manifest.json")),
+        modpack_root.join(Path::new("manifest.json")),
         serde_json::to_string(&local_manifest).expect("Failed to parse 'manifest.json'!"),
     )
     .expect("Failed to save a local copy of 'manifest.json'!");
@@ -688,8 +815,10 @@ async fn install(installer_profile: InstallerProfile) {
     } else {
         None
     };
-    create_launcher_profile(manifest, modpack_root, icon_img);
-    loader_future.await;
+    create_launcher_profile(&installer_profile, icon_img);
+    if loader_future.is_some() {
+        loader_future.unwrap().await;
+    }
 }
 
 macro_rules! remove_items {
@@ -714,9 +843,14 @@ async fn update(installer_profile: InstallerProfile) {
     // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest = match fs::read_to_string(
-        installer_profile
-            .modpack_root
-            .join(Path::new("manifest.json")),
+        get_modpack_root(
+            installer_profile
+                .launcher
+                .as_ref()
+                .expect("Launcher not selected!"),
+            &installer_profile.manifest.uuid,
+        )
+        .join(Path::new("manifest.json")),
     ) {
         Ok(contents) => match serde_json::from_str(&contents) {
             Ok(parsed) => parsed,
@@ -778,10 +912,19 @@ async fn update(installer_profile: InstallerProfile) {
         !new_resourcepacks.contains(x)
     });
     if installer_profile.manifest.loader != local_manifest.loader {
-        fs::remove_dir_all(installer_profile.modpack_root.join(Path::new(&format!(
-            "versions/fabric-loader-{}-{}",
-            &local_manifest.loader.version, &local_manifest.loader.minecraft_version
-        ))))
+        fs::remove_dir_all(
+            get_modpack_root(
+                installer_profile
+                    .launcher
+                    .as_ref()
+                    .expect("Launcher not selected!"),
+                &installer_profile.manifest.uuid,
+            )
+            .join(Path::new(&format!(
+                "versions/fabric-loader-{}-{}",
+                &local_manifest.loader.version, &local_manifest.loader.minecraft_version
+            ))),
+        )
         .expect("Could not delete old fabric version!");
     }
     install(InstallerProfile {
@@ -800,13 +943,13 @@ async fn update(installer_profile: InstallerProfile) {
             description: installer_profile.manifest.description.clone(),
             subtitle: installer_profile.manifest.subtitle.clone(),
         },
-        modpack_root: installer_profile.modpack_root,
         http_client: installer_profile.http_client,
         installed: installer_profile.installed,
         update_available: installer_profile.update_available,
         modpack_source: installer_profile.modpack_source,
         modpack_branch: installer_profile.modpack_branch,
         enabled_features: installer_profile.enabled_features,
+        launcher: installer_profile.launcher,
     })
     .await;
 }
@@ -829,7 +972,17 @@ fn main() {
         } else {
             args.branch.unwrap()
         };
-        let installer_profile = futures::executor::block_on(init(&args.modpack, &branch));
+        let launcher = args.launcher.split('-').collect::<Vec<_>>();
+        let launcher = match *launcher.first().unwrap() {
+            "vanilla" => Launcher::Vanilla(get_minecraft_folder()),
+            "multimc" => Launcher::MultiMC(get_multimc_folder(
+                launcher.last().expect("Invalid MultiMC!"),
+            )),
+            &_ => {
+                panic!("Invalid launcher!")
+            }
+        };
+        let installer_profile = futures::executor::block_on(init(&args.modpack, &branch, launcher));
         match args.action.as_str() {
             "install" => {
                 if installer_profile.installed {
@@ -861,21 +1014,28 @@ fn main() {
                 )
                 .with_icon(
                     Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
-                ),
+                )
+                .with_data_directory(env::temp_dir().join(".WC_OVHL")),
         );
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum Launcher {
+    Vanilla(PathBuf),
+    MultiMC(PathBuf),
 }
 
 #[derive(Debug, Clone)]
 struct InstallerProfile {
     manifest: Manifest,
-    modpack_root: PathBuf,
     http_client: HttpClient,
     installed: bool,
     update_available: bool,
     modpack_source: String,
     modpack_branch: String,
     enabled_features: Vec<String>,
+    launcher: Option<Launcher>,
 }
 
 #[derive(Parser)]
@@ -892,9 +1052,14 @@ struct CLIArgs {
     #[arg(short, long)]
     /// Github branch defaults to default branch as specified on github
     branch: Option<String>,
+    #[arg(short, long)]
+    /// Launcher to install profile on:
+    ///     - vanilla
+    ///     - multimc-<data_dir_name>
+    launcher: String,
 }
 
-async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
+async fn init(modpack_source: &str, modpack_branch: &str, launcher: Launcher) -> InstallerProfile {
     let http_client = build_http_client();
     let manifest: Manifest = serde_json::from_str(
         http_client
@@ -913,7 +1078,7 @@ async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
         "Unsupported manifest version '{}'!",
         manifest.manifest_version
     );
-    let modpack_root = get_modpack_root(&manifest.uuid);
+    let modpack_root = get_modpack_root(&launcher, &manifest.uuid);
     let installed = modpack_root.join(Path::new("manifest.json")).exists();
     let update_available: bool;
     if installed {
@@ -932,12 +1097,12 @@ async fn init(modpack_source: &str, modpack_branch: &str) -> InstallerProfile {
     }
     InstallerProfile {
         manifest,
-        modpack_root,
         http_client,
         installed,
         update_available,
         modpack_source: modpack_source.to_owned(),
         modpack_branch: modpack_branch.to_owned(),
-        enabled_features: vec!["default".to_string()],
+        enabled_features: vec![String::from("default")],
+        launcher: Some(launcher),
     }
 }
