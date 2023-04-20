@@ -136,3 +136,21 @@ body {
         transform: rotate(360deg);
     }
 }
+
+.credits {
+    overflow: auto;
+    max-height: 25vh;
+}
+
+.credits-button {
+    font-family: "minecraft";
+    background-color: #47d195;
+    padding: 1%;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 100%;
+    margin-bottom: 2%;
+    cursor: pointer;
+    border: 2px solid black;
+}

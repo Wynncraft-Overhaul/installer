@@ -25,7 +25,7 @@ use std::{
 
 mod gui;
 
-const CURRENT_MANIFEST_VERSION: i32 = 2;
+const CURRENT_MANIFEST_VERSION: i32 = 3;
 const GH_API: &str = "https://api.github.com/repos/";
 const GH_RAW: &str = "https://raw.githubusercontent.com/";
 const CONCURRENCY: usize = 14;
@@ -48,6 +48,13 @@ trait DownloadableGetters {
     fn get_location(&self) -> &String;
     fn get_version(&self) -> &String;
 }
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+struct Author {
+    name: String,
+    link: String,
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Mod {
     name: String,
@@ -57,6 +64,7 @@ struct Mod {
     path: Option<PathBuf>,
     #[serde(default = "default_id")]
     id: String,
+    authors: Vec<Author>,
 }
 impl DownloadableGetters for Mod {
     fn get_name(&self) -> &String {
@@ -95,6 +103,7 @@ struct Shaderpack {
     path: Option<PathBuf>,
     #[serde(default = "default_id")]
     id: String,
+    authors: Vec<Author>,
 }
 impl DownloadableGetters for Shaderpack {
     fn get_name(&self) -> &String {
@@ -134,6 +143,7 @@ struct Resourcepack {
     path: Option<PathBuf>,
     #[serde(default = "default_id")]
     id: String,
+    authors: Vec<Author>,
 }
 impl DownloadableGetters for Resourcepack {
     fn get_name(&self) -> &String {
@@ -180,20 +190,20 @@ impl Downloadable for Loader {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Feature {
     id: String,
     name: String,
     default: bool,
 }
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Include {
     location: String,
     #[serde(default = "default_id")]
     id: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Manifest {
     manifest_version: i32,
     modpack_version: String,
@@ -644,6 +654,7 @@ async fn install(installer_profile: InstallerProfile) {
                 location: r#mod.location,
                 version: r#mod.version,
                 id: r#mod.id,
+                authors: r#mod.authors,
             }
         } else {
             r#mod
@@ -668,6 +679,7 @@ async fn install(installer_profile: InstallerProfile) {
                     location: shaderpack.location,
                     version: shaderpack.version,
                     id: shaderpack.id,
+                    authors: shaderpack.authors,
                 }
             } else {
                 shaderpack
@@ -696,6 +708,7 @@ async fn install(installer_profile: InstallerProfile) {
                         location: resourcepack.location,
                         version: resourcepack.version,
                         id: resourcepack.id,
+                        authors: resourcepack.authors,
                     }
                 } else {
                     resourcepack

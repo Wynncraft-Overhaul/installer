@@ -30,6 +30,73 @@ fn Spinner(cx: Scope) -> Element {
 }
 
 #[derive(Props, PartialEq)]
+struct CreditsProps {
+    manifest: super::Manifest,
+}
+
+fn Credits(cx: Scope<CreditsProps>) -> Element {
+    cx.render(rsx! {
+        div {
+            class: "credits container",
+            ul {
+                for r#mod in &cx.props.manifest.mods {
+                    li {
+                        "{r#mod.name} by "
+                        for author in &r#mod.authors {
+                            a {
+                                href: "{author.link}",
+                                if r#mod.authors.last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
+                            }
+                        }
+                    }
+                }
+                for shaderpack in &cx.props.manifest.shaderpacks {
+                    li {
+                        "{shaderpack.name} by "
+                        for author in &shaderpack.authors {
+                            a {
+                                href: "{author.link}",
+                                if shaderpack.authors.last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
+                            }
+                        }
+                    }
+                }
+                for resourcepack in &cx.props.manifest.resourcepacks {
+                    li {
+                        "{resourcepack.name} by "
+                        for author in &resourcepack.authors {
+                            a {
+                                href: "{author.link}",
+                                if resourcepack.authors.last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
+fn LauncherSelection(cx: Scope) -> Element {
+    // TODO(Launcher selection screen)
+    cx.render(rsx! {
+        "Hello, World!"
+    })
+}
+
+#[derive(Props, PartialEq)]
 struct VersionProps {
     modpack_source: String,
     modpack_branch: String,
@@ -59,6 +126,7 @@ fn Version(cx: Scope<VersionProps>) -> Element {
     // TODO(Clean this up)
     let installer_profile = use_state(cx, || profile.unwrap().to_owned());
     let installing = use_state(cx, || false);
+    let credits = use_state(cx, || false);
     let on_submit = move |event: FormEvent| {
         cx.spawn({
             let mut installer_profile = profile.unwrap().to_owned();
@@ -104,6 +172,31 @@ fn Version(cx: Scope<VersionProps>) -> Element {
                 }
             }
         })
+    } else if **credits {
+        cx.render(rsx! {
+            div {
+                class: "version-container",
+                div {
+                    class: "subtitle-container",
+                    h1 {
+                        "{installer_profile.manifest.subtitle}"
+                    }
+                }
+                div {
+                    class: "version-inner-container",
+                    button {
+                        class: "credits-button",
+                        onclick: move |_| {
+                             credits.set(false);
+                        },
+                        "Back"
+                    }
+                    Credits {
+                        manifest: installer_profile.manifest.clone()
+                    }
+                }
+            }
+        })
     } else {
         cx.render(rsx! {
             div {
@@ -118,6 +211,13 @@ fn Version(cx: Scope<VersionProps>) -> Element {
                     }
                     div {
                         class: "version-inner-container",
+                        button {
+                            class: "credits-button",
+                            onclick: move |_| {
+                                 credits.set(true);
+                            },
+                            "Mods"
+                        }
                         div {
                             class: "container",
                             div {
@@ -169,19 +269,32 @@ pub fn App(cx: Scope) -> Element {
             .as_str(),
     )
     .expect("Failed to parse branches!");
-    // TODO(Launcher selection screen)
-    cx.render(rsx! {
-        style { include_str!("style.css") }
-        Header {}
-        div {
-            class: "fake-body",
-            for i in 0..branches.len() {
-                Version {
-                    modpack_source: modpack_source.to_string(),
-                    modpack_branch: branches[i].name.clone(),
-                    launcher: super::Launcher::Vanilla(super::get_minecraft_folder())
+    let launcher: &UseState<Option<super::Launcher>> = use_state(cx, || {
+        Some(super::Launcher::Vanilla(super::get_minecraft_folder()))
+    });
+    if launcher.is_none() {
+        cx.render(rsx! {
+            style { include_str!("style.css") }
+            Header {}
+            div {
+                class: "fake-body",
+                LauncherSelection {}
+            }
+        })
+    } else {
+        cx.render(rsx! {
+            style { include_str!("style.css") }
+            Header {}
+            div {
+                class: "fake-body",
+                for i in 0..branches.len() {
+                    Version {
+                        modpack_source: modpack_source.to_string(),
+                        modpack_branch: branches[i].name.clone(),
+                        launcher: launcher.as_ref().unwrap().clone()
+                    }
                 }
             }
-        }
-    })
+        })
+    }
 }

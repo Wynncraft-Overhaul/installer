@@ -34,6 +34,9 @@ Mods is a list which contains mod objects for which the fields are:
 - `version`: If `source` is set to `modrinth`, then this must be set to exactly the same as the version number of the mod you want to download. However, if source is set to `ddl`, then this can be anything, but it's best to set it to the actual version to improve clarity.
 - `path`: This field should be left out when creating manifests as it's meant to be a place the installer can store the path of a downloaded mod.
 - `id`: This is an optional field which defaults to `default` it is the id of the feature requried to be true in order to be included. (`default` is always true)
+- `authors`: This is a list with objects which the following fields:
+  - `name`: This field is the authors name.
+  - `link`: This field is a link to the authors page.
 
 ## Shaderpacks
 
