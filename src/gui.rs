@@ -36,50 +36,47 @@ struct CreditsProps {
 
 fn Credits(cx: Scope<CreditsProps>) -> Element {
     cx.render(rsx! {
-        div {
-            class: "credits container",
-            ul {
-                for r#mod in &cx.props.manifest.mods {
-                    li {
-                        "{r#mod.name} by "
-                        for author in &r#mod.authors {
-                            a {
-                                href: "{author.link}",
-                                if r#mod.authors.last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
-                                }
+        ul {
+            for r#mod in &cx.props.manifest.mods {
+                li {
+                    "{r#mod.name} by "
+                    for author in &r#mod.authors {
+                        a {
+                            href: "{author.link}",
+                            if r#mod.authors.last().unwrap() == author {
+                                author.name.to_string()
+                            } else {
+                                author.name.to_string() + ", "
                             }
                         }
                     }
                 }
-                for shaderpack in &cx.props.manifest.shaderpacks {
-                    li {
-                        "{shaderpack.name} by "
-                        for author in &shaderpack.authors {
-                            a {
-                                href: "{author.link}",
-                                if shaderpack.authors.last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
-                                }
+            }
+            for shaderpack in &cx.props.manifest.shaderpacks {
+                li {
+                    "{shaderpack.name} by "
+                    for author in &shaderpack.authors {
+                        a {
+                            href: "{author.link}",
+                            if shaderpack.authors.last().unwrap() == author {
+                                author.name.to_string()
+                            } else {
+                                author.name.to_string() + ", "
                             }
                         }
                     }
                 }
-                for resourcepack in &cx.props.manifest.resourcepacks {
-                    li {
-                        "{resourcepack.name} by "
-                        for author in &resourcepack.authors {
-                            a {
-                                href: "{author.link}",
-                                if resourcepack.authors.last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
-                                }
+            }
+            for resourcepack in &cx.props.manifest.resourcepacks {
+                li {
+                    "{resourcepack.name} by "
+                    for author in &resourcepack.authors {
+                        a {
+                            href: "{author.link}",
+                            if resourcepack.authors.last().unwrap() == author {
+                                author.name.to_string()
+                            } else {
+                                author.name.to_string() + ", "
                             }
                         }
                     }
@@ -89,21 +86,70 @@ fn Credits(cx: Scope<CreditsProps>) -> Element {
     })
 }
 
-fn LauncherSelection(cx: Scope) -> Element {
+#[derive(Props, PartialEq)]
+struct SettingsProps<'a> {
+    launcher_state: &'a UseState<super::Launcher>,
+    settings: &'a UseState<bool>,
+}
+
+fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
     // TODO(Launcher selection screen)
     cx.render(rsx! {
-        "Hello, World!"
+        div {
+            class: "container",
+            form {
+                id: "launcher-select",
+                onsubmit: move |event| {
+                    let launcher = event.data.values["launcher-select"].split('-').collect::<Vec<_>>();
+                    cx.props.launcher_state.set(match *launcher.first().unwrap() {
+                        "vanilla" => super::Launcher::Vanilla(super::get_minecraft_folder()),
+                        "multimc" => super::Launcher::MultiMC(super::get_multimc_folder(
+                            launcher.last().expect("Invalid MultiMC!"),
+                        )),
+                        &_ => {
+                            panic!("Invalid launcher!")
+                        }
+                    });
+                    cx.props.settings.set(false);
+                },
+                select {
+                    name: "launcher-select",
+                    option {
+                        value: "vanilla",
+                        "Vanilla"
+                    }
+                    option {
+                        value: "multimc-MultiMC",
+                        "MultiMC"
+                    }
+                    option {
+                        value: "multimc-PrismLauncher",
+                        "Prism Launcher"
+                    }
+                    // TODO(Add other launchers support)
+                    option {
+                        value: "other",
+                        "Other"
+                    }
+                }
+                input {
+                    r#type: "submit",
+                    value: "Save",
+                    class: "install-button"
+                }
+            }
+        }
     })
 }
 
 #[derive(Props, PartialEq)]
-struct VersionProps {
+struct VersionProps<'a> {
     modpack_source: String,
     modpack_branch: String,
-    launcher: super::Launcher,
+    launcher: &'a super::Launcher,
 }
 
-fn Version(cx: Scope<VersionProps>) -> Element {
+fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     let modpack_source = (cx.props.modpack_source).to_owned();
     let modpack_branch = (cx.props.modpack_branch).to_owned();
     let launcher = (cx.props.launcher).to_owned();
@@ -184,15 +230,27 @@ fn Version(cx: Scope<VersionProps>) -> Element {
                 }
                 div {
                     class: "version-inner-container",
-                    button {
-                        class: "credits-button",
-                        onclick: move |_| {
-                             credits.set(false);
-                        },
-                        "Back"
-                    }
-                    Credits {
-                        manifest: installer_profile.manifest.clone()
+                    div {
+                        class: "container",
+                        div {
+                            class: "info-container",
+                            div {
+                                class: "button-container",
+                                button {
+                                    class: "credits-button",
+                                    onclick: move |_| {
+                                        credits.set(false);
+                                    },
+                                    "X"
+                                }
+                            }
+                            div {
+                                class: "credits",
+                                Credits {
+                                    manifest: installer_profile.manifest.clone()
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -211,32 +269,38 @@ fn Version(cx: Scope<VersionProps>) -> Element {
                     }
                     div {
                         class: "version-inner-container",
-                        button {
-                            class: "credits-button",
-                            onclick: move |_| {
-                                 credits.set(true);
-                            },
-                            "Mods"
-                        }
                         div {
                             class: "container",
                             div {
-                                class: "feature-list",
-                                for feat in &installer_profile.manifest.features {
-                                    label {
-                                        if feat.default {
-                                            rsx!(input {
-                                                name: "{feat.id}",
-                                                r#type: "checkbox",
-                                                checked: "true"
-                                            })
-                                        } else {
-                                            rsx!(input {
-                                                name: "{feat.id}",
-                                                r#type: "checkbox"
-                                            })
+                                class: "info-container",
+                                div {
+                                    class: "button-container",
+                                    button {
+                                        class: "credits-button",
+                                        onclick: move |_| {
+                                            credits.set(true);
+                                        },
+                                        "i"
+                                    }
+                                }
+                                div {
+                                    class: "feature-list",
+                                    for feat in &installer_profile.manifest.features {
+                                        label {
+                                            if feat.default {
+                                                rsx!(input {
+                                                    name: "{feat.id}",
+                                                    r#type: "checkbox",
+                                                    checked: "true"
+                                                })
+                                            } else {
+                                                rsx!(input {
+                                                    name: "{feat.id}",
+                                                    r#type: "checkbox"
+                                                })
+                                            }
+                                            "{feat.name}"
                                         }
-                                        "{feat.name}"
                                     }
                                 }
                             }
@@ -269,21 +333,41 @@ pub fn App(cx: Scope) -> Element {
             .as_str(),
     )
     .expect("Failed to parse branches!");
-    let launcher: &UseState<Option<super::Launcher>> = use_state(cx, || {
-        Some(super::Launcher::Vanilla(super::get_minecraft_folder()))
+    let launcher: &UseState<super::Launcher> = use_state(cx, || {
+        super::Launcher::Vanilla(super::get_minecraft_folder())
     });
-    if launcher.is_none() {
+    let settings: &UseState<bool> = use_state(cx, || false);
+    let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
+    // TODO(Speed up font)
+    let style_css = include_str!("style.css");
+    let style_css = style_css.replace(
+        "Wynncraft_Game_Font.woff2.base64",
+        include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
+    );
+    if **settings {
         cx.render(rsx! {
-            style { include_str!("style.css") }
+            style { style_css }
             Header {}
             div {
                 class: "fake-body",
-                LauncherSelection {}
+                Settings {
+                    launcher_state: launcher,
+                    settings: settings
+                }
             }
         })
     } else {
         cx.render(rsx! {
-            style { include_str!("style.css") }
+            style { style_css }
+                button {
+                    class: "settings-button",
+                    onclick: move |_| {
+                        settings.set(true);
+                    },
+                    img {
+                        src: "{cog}",
+                    }
+                }
             Header {}
             div {
                 class: "fake-body",
@@ -291,7 +375,7 @@ pub fn App(cx: Scope) -> Element {
                     Version {
                         modpack_source: modpack_source.to_string(),
                         modpack_branch: branches[i].name.clone(),
-                        launcher: launcher.as_ref().unwrap().clone()
+                        launcher: &**launcher
                     }
                 }
             }
