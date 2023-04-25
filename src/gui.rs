@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 use dioxus::prelude::*;
-use isahc::ReadResponseExt;
 
 fn Header(cx: Scope) -> Element {
     // TODO(figure out how to make this from modpack_source)
@@ -93,58 +92,72 @@ struct SettingsProps<'a> {
 }
 
 fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
-    // TODO(Launcher selection screen)
     cx.render(rsx! {
         div {
-            class: "container",
-            form {
-                id: "launcher-select",
-                onsubmit: move |event| {
-                    let launcher = event.data.values["launcher-select"].split('-').collect::<Vec<_>>();
-                    cx.props.launcher_state.set(match *launcher.first().unwrap() {
-                        "vanilla" => super::Launcher::Vanilla(super::get_minecraft_folder()),
-                        "multimc" => super::Launcher::MultiMC(super::get_multimc_folder(
-                            launcher.last().expect("Invalid MultiMC!"),
-                        )),
-                        &_ => {
-                            panic!("Invalid launcher!")
+            class: "version-inner-container",
+            style: "width: 21.25vw;",
+            div {
+                class: "container",
+                style: "width: 20vw;",
+                form {
+                    id: "settings",
+                    onsubmit: move |event| {
+                        let launcher = event.data.values["launcher-select"].split('-').collect::<Vec<_>>();
+                        cx.props.launcher_state.set(match *launcher.first().unwrap() {
+                            "vanilla" => super::Launcher::Vanilla(super::get_minecraft_folder()),
+                            "multimc" => super::Launcher::MultiMC(super::get_multimc_folder(
+                                launcher.last().expect("Invalid MultiMC!"),
+                            )),
+                            &_ => {
+                                panic!("Invalid launcher!")
+                            }
+                        });
+                        cx.props.settings.set(false);
+                    },
+                    div {
+                        class: "label",
+                        span {
+                            "Launcher:"
                         }
-                    });
-                    cx.props.settings.set(false);
-                },
-                select {
-                    name: "launcher-select",
-                    option {
-                        value: "vanilla",
-                        "Vanilla"
+                        select {
+                            name: "launcher-select",
+                            id: "launcher-select",
+                            form: "settings",
+                            class: "credits-button",
+                            option {
+                                value: "vanilla",
+                                "Vanilla"
+                            }
+                            option {
+                                value: "multimc-MultiMC",
+                                "MultiMC"
+                            }
+                            option {
+                                value: "multimc-PrismLauncher",
+                                "Prism Launcher"
+                            }
+                            // TODO(Add other launchers support)
+                            option {
+                                value: "other",
+                                "Other"
+                            }
+                        }
                     }
-                    option {
-                        value: "multimc-MultiMC",
-                        "MultiMC"
+                    input {
+                        r#type: "submit",
+                        value: "Save",
+                        class: "install-button",
+                        id: "save"
                     }
-                    option {
-                        value: "multimc-PrismLauncher",
-                        "Prism Launcher"
-                    }
-                    // TODO(Add other launchers support)
-                    option {
-                        value: "other",
-                        "Other"
-                    }
-                }
-                input {
-                    r#type: "submit",
-                    value: "Save",
-                    class: "install-button"
                 }
             }
         }
     })
 }
 
-#[derive(Props, PartialEq)]
+#[derive(Props)]
 struct VersionProps<'a> {
-    modpack_source: String,
+    modpack_source: &'a String,
     modpack_branch: String,
     launcher: &'a super::Launcher,
 }
@@ -322,43 +335,40 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     }
 }
 
-pub fn App(cx: Scope) -> Element {
-    let modpack_source = "Commander07/modpack-test/";
-    let branches: Vec<super::GithubBranch> = serde_json::from_str(
-        super::build_http_client()
-            .get(super::GH_API.to_owned() + modpack_source + "branches")
-            .expect("Failed to retrive branches!")
-            .text()
-            .unwrap()
-            .as_str(),
-    )
-    .expect("Failed to parse branches!");
+#[derive(Props, PartialEq)]
+pub(crate) struct AppProps {
+    pub branches: Vec<super::GithubBranch>,
+    pub modpack_source: String,
+}
+
+pub(crate) fn App(cx: Scope<AppProps>) -> Element {
+    let modpack_source = &cx.props.modpack_source;
+    let branches = &cx.props.branches;
     let launcher: &UseState<super::Launcher> = use_state(cx, || {
         super::Launcher::Vanilla(super::get_minecraft_folder())
     });
     let settings: &UseState<bool> = use_state(cx, || false);
     let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
-    // TODO(Speed up font)
     let style_css = include_str!("style.css");
     let style_css = style_css.replace(
         "Wynncraft_Game_Font.woff2.base64",
         include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
     );
-    if **settings {
-        cx.render(rsx! {
-            style { style_css }
-            Header {}
-            div {
-                class: "fake-body",
-                Settings {
-                    launcher_state: launcher,
-                    settings: settings
+    cx.render(rsx! {
+        style { style_css }
+        if **settings {
+            rsx!{
+                Header {}
+                div {
+                    class: "fake-body",
+                    Settings {
+                        launcher_state: launcher,
+                        settings: settings
+                    }
                 }
             }
-        })
-    } else {
-        cx.render(rsx! {
-            style { style_css }
+        } else {
+            rsx!{
                 button {
                     class: "settings-button",
                     onclick: move |_| {
@@ -368,17 +378,18 @@ pub fn App(cx: Scope) -> Element {
                         src: "{cog}",
                     }
                 }
-            Header {}
-            div {
-                class: "fake-body",
-                for i in 0..branches.len() {
-                    Version {
-                        modpack_source: modpack_source.to_string(),
-                        modpack_branch: branches[i].name.clone(),
-                        launcher: &**launcher
+                Header {}
+                div {
+                    class: "fake-body",
+                    for i in 0..branches.len() {
+                        Version {
+                            modpack_source: modpack_source,
+                            modpack_branch: branches[i].name.clone(),
+                            launcher: &**launcher
+                        }
                     }
                 }
             }
-        })
-    }
+        }
+    })
 }

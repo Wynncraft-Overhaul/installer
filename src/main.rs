@@ -4,6 +4,8 @@
 )]
 use async_trait::async_trait;
 use base64::{engine, Engine};
+use cached::proc_macro::cached;
+use cached::SizedCache;
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use dioxus_desktop::tao::window::Icon;
@@ -13,7 +15,7 @@ use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
 use isahc::config::RedirectPolicy;
 use isahc::prelude::Configurable;
-use isahc::{AsyncReadResponseExt, HttpClient, ReadResponseExt};
+use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{
@@ -33,6 +35,82 @@ const CONCURRENCY: usize = 14;
 fn default_id() -> String {
     String::from("default")
 }
+macro_rules! add_headers {
+    ($items:expr, $($headers:expr),*) => {
+        $items.$(header($headers.next().unwrap().0, $headers.next().unwrap().1))*
+    };
+}
+
+struct CachedResponse {
+    resp: Response<AsyncBody>,
+    bytes: Vec<u8>,
+}
+
+impl Clone for CachedResponse {
+    fn clone(&self) -> Self {
+        let builder = Response::builder()
+            .status(self.resp.status())
+            .version(self.resp.version());
+        let builder = add_headers!(builder, self.resp.headers().into_iter());
+
+        Self {
+            resp: builder.body(AsyncBody::from(self.bytes.clone())).unwrap(),
+            bytes: self.bytes.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CachedHttpClient {
+    http_client: HttpClient,
+}
+
+impl CachedHttpClient {
+    fn new() -> CachedHttpClient {
+        CachedHttpClient {
+            http_client: build_http_client(),
+        }
+    }
+
+    async fn get_async<T: Into<String>>(
+        &self,
+        url: T,
+    ) -> Result<Response<AsyncBody>, isahc::Error> {
+        let resp = get_cached(&self.http_client, url.into()).await;
+        match resp {
+            Ok(val) => Ok(val.resp),
+            Err(val) => Err(val),
+        }
+    }
+}
+
+#[cached(
+    type = "SizedCache<String, Result<CachedResponse, isahc::Error>>",
+    create = "{ SizedCache::with_size(100) }",
+    convert = r#"{ format!("{}", url) }"#
+)]
+async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedResponse, isahc::Error> {
+    let resp = http_client.get_async(url).await;
+    match resp {
+        Ok(mut val) => {
+            let bytes = val.bytes().await.unwrap();
+            // CachedRespones needs to be cloned in order to init the AsyncBody otherwise the cache will not return anything on first call
+            Ok(CachedResponse { resp: val, bytes }.clone())
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn build_http_client() -> HttpClient {
+    HttpClient::builder()
+        .redirect_policy(RedirectPolicy::Limit(5))
+        .default_headers(&[(
+            "User-Agent",
+            "wynncraft-overhaul/installer/0.1.0 (commander#4392)",
+        )])
+        .build()
+        .unwrap()
+}
 
 #[async_trait]
 trait Downloadable {
@@ -40,7 +118,7 @@ trait Downloadable {
         &self,
         modpack_root: &Path,
         loader_type: &str,
-        http_client: &HttpClient,
+        http_client: &CachedHttpClient,
     ) -> PathBuf;
 }
 trait DownloadableGetters {
@@ -83,7 +161,7 @@ impl Downloadable for Mod {
         &self,
         modpack_root: &Path,
         loader_type: &str,
-        http_client: &HttpClient,
+        http_client: &CachedHttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
@@ -122,7 +200,7 @@ impl Downloadable for Shaderpack {
         &self,
         modpack_root: &Path,
         loader_type: &str,
-        http_client: &HttpClient,
+        http_client: &CachedHttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
@@ -162,7 +240,7 @@ impl Downloadable for Resourcepack {
         &self,
         modpack_root: &Path,
         loader_type: &str,
-        http_client: &HttpClient,
+        http_client: &CachedHttpClient,
     ) -> PathBuf {
         match self.source.as_str() {
             "modrinth" => {
@@ -182,7 +260,7 @@ struct Loader {
 }
 #[async_trait]
 impl Downloadable for Loader {
-    async fn download(&self, root: &Path, _: &str, http_client: &HttpClient) -> PathBuf {
+    async fn download(&self, root: &Path, _: &str, http_client: &CachedHttpClient) -> PathBuf {
         match self.r#type.as_str() {
             "fabric" => download_fabric(self, root, http_client).await,
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
@@ -287,7 +365,7 @@ struct GithubRelease {
     assets: Vec<GithubAsset>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 struct GithubBranch {
     name: String,
 }
@@ -312,7 +390,7 @@ struct MMCPack {
     formatVersion: i32,
 }
 
-async fn download_fabric(loader: &Loader, root: &Path, http_client: &HttpClient) -> PathBuf {
+async fn download_fabric(loader: &Loader, root: &Path, http_client: &CachedHttpClient) -> PathBuf {
     // TODO(download into .minecraft not modpack root)
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
@@ -354,7 +432,7 @@ async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     item: &T,
     modpack_root: &Path,
     r#type: &str,
-    http_client: &HttpClient,
+    http_client: &CachedHttpClient,
 ) -> PathBuf {
     let content = http_client
         .get_async(item.get_location())
@@ -388,7 +466,7 @@ async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
     modpack_root: &Path,
     loader_type: &str,
     r#type: &str,
-    http_client: &HttpClient,
+    http_client: &CachedHttpClient,
 ) -> PathBuf {
     let resp = http_client
         .get_async(format!(
@@ -606,17 +684,6 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
             }
         }
     }
-}
-
-fn build_http_client() -> HttpClient {
-    HttpClient::builder()
-        .redirect_policy(RedirectPolicy::Limit(5))
-        .default_headers(&[(
-            "User-Agent",
-            "wynncraft-overhaul/installer/0.1.0 (commander#4392)",
-        )])
-        .build()
-        .unwrap()
 }
 
 async fn install(installer_profile: InstallerProfile) {
@@ -1016,8 +1083,21 @@ fn main() {
     } else {
         // Only the executable was present in arguments entering GUI mode
         let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
-        dioxus_desktop::launch_cfg(
+        let branches: Vec<GithubBranch> = serde_json::from_str(
+            build_http_client()
+                .get(GH_API.to_owned() + "Commander07/modpack-test/" + "branches")
+                .expect("Failed to retrive branches!")
+                .text()
+                .unwrap()
+                .as_str(),
+        )
+        .expect("Failed to parse branches!");
+        dioxus_desktop::launch_with_props(
             gui::App,
+            gui::AppProps {
+                branches,
+                modpack_source: String::from("Commander07/modpack-test/"),
+            },
             Config::new()
                 .with_window(
                     WindowBuilder::new()
@@ -1042,7 +1122,7 @@ enum Launcher {
 #[derive(Debug, Clone)]
 struct InstallerProfile {
     manifest: Manifest,
-    http_client: HttpClient,
+    http_client: CachedHttpClient,
     installed: bool,
     update_available: bool,
     modpack_source: String,
@@ -1073,7 +1153,7 @@ struct CLIArgs {
 }
 
 async fn init(modpack_source: &str, modpack_branch: &str, launcher: Launcher) -> InstallerProfile {
-    let http_client = build_http_client();
+    let http_client = CachedHttpClient::new();
     let manifest: Manifest = serde_json::from_str(
         http_client
             .get_async(GH_RAW.to_owned() + modpack_source + modpack_branch + "/manifest.json")

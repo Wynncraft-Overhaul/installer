@@ -60,7 +60,7 @@ body {
     margin-left: 2%;
     background-color: #2a3751;
     border: 0.16vw solid black;
-    padding: 2%;
+    padding: 0.5vw;
     display: grid;
 }
 
@@ -197,4 +197,34 @@ img {
     display: flex;
     justify-content: space-between;
     flex-direction: row-reverse;
+}
+
+select,
+option {
+    font-family: "wynncraft";
+}
+
+#settings {
+    display: flex;
+    flex-direction: column;
+}
+
+#save {
+    margin-top: auto;
+}
+
+#launcher-select {
+    width: 12vw;
+    outline: none;
+}
+
+.label {
+    display: flex;
+    height: 2vw;
+}
+
+.label span {
+    display: flex;
+    align-items: center;
+    margin-right: 1vw;
 }
