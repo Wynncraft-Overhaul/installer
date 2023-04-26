@@ -24,3 +24,4 @@ zip = "0.6.4"
 dioxus = { git = "https://github.com/DioxusLabs/dioxus", rev = "9b02b21" }
 dioxus-desktop = { git = "https://github.com/DioxusLabs/dioxus", rev = "9b02b21" }
 cached = { version = "0.43.0", features = ["redis_async_std"] }
+regex = "1.8.1"

@@ -696,6 +696,29 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
     }
 }
 
+macro_rules! validate_item_path {
+    ($item:expr, $modpack_root:expr) => {
+        if $item.path.is_some() {
+            if $item
+                .path
+                .as_ref()
+                .unwrap()
+                .parent()
+                .expect("Illegal item file path!")
+                .parent()
+                .expect("Illegal item dir path!")
+                == $modpack_root.as_path()
+            {
+                $item
+            } else {
+                panic!("{:?}'s path was not located in modpack root!", $item);
+            }
+        } else {
+            $item
+        }
+    };
+}
+
 async fn install(installer_profile: InstallerProfile) {
     // Yes this is needed and no i wont change it
     // This might not be needed now to we use isahc
@@ -734,7 +757,7 @@ async fn install(installer_profile: InstallerProfile) {
                 authors: r#mod.authors,
             }
         } else {
-            r#mod
+            validate_item_path!(r#mod, modpack_root)
         }
     }))
     .buffer_unordered(CONCURRENCY)
@@ -759,7 +782,7 @@ async fn install(installer_profile: InstallerProfile) {
                     authors: shaderpack.authors,
                 }
             } else {
-                shaderpack
+                validate_item_path!(shaderpack, modpack_root)
             }
         },
     ))
@@ -788,7 +811,7 @@ async fn install(installer_profile: InstallerProfile) {
                         authors: resourcepack.authors,
                     }
                 } else {
-                    resourcepack
+                    validate_item_path!(resourcepack, modpack_root)
                 }
             },
         ))

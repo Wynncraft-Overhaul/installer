@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use regex::Regex;
 
 fn Header(cx: Scope) -> Element {
     // TODO(figure out how to make this from modpack_source)
@@ -216,6 +217,13 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
             }
         });
     };
+    let re = Regex::new("on\\w*=\"").unwrap();
+    let description = installer_profile
+        .manifest
+        .description
+        .replace("<script>", "<noscript>")
+        .replace("<script/>", "<noscript/>");
+    let description = re.replace_all(description.as_str(), "harmless=\"");
     // TODO(Split these renders into multiple components)
     if **installing {
         cx.render(rsx! {
@@ -328,8 +336,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                             }
                             div {
                                 class: "description",
-                                // Yes this will allow modpacks to include any valid html including script tags
-                                dangerous_inner_html: "{installer_profile.manifest.description}"
+                                dangerous_inner_html: "{description}"
                             }
                         }
                         input {
