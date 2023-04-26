@@ -1,4 +1,6 @@
 #![allow(non_snake_case)]
+use std::path::PathBuf;
+
 use dioxus::prelude::*;
 
 fn Header(cx: Scope) -> Element {
@@ -87,11 +89,22 @@ fn Credits(cx: Scope<CreditsProps>) -> Element {
 
 #[derive(Props, PartialEq)]
 struct SettingsProps<'a> {
-    launcher_state: &'a UseState<super::Launcher>,
+    config: &'a UseRef<super::Config>,
     settings: &'a UseState<bool>,
+    config_path: &'a PathBuf,
 }
 
 fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
+    let mut vanilla = None;
+    let mut multimc = None;
+    let mut prism = None;
+    let launcher = cx.props.config.with(|cfg| cfg.launcher.clone());
+    match &*launcher {
+        "vanilla" => vanilla = Some("true"),
+        "multimc-MultiMC" => multimc = Some("true"),
+        "multimc-PrismLauncher" => prism = Some("true"),
+        _ => {}
+    }
     cx.render(rsx! {
         div {
             class: "version-inner-container",
@@ -102,16 +115,8 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                 form {
                     id: "settings",
                     onsubmit: move |event| {
-                        let launcher = event.data.values["launcher-select"].split('-').collect::<Vec<_>>();
-                        cx.props.launcher_state.set(match *launcher.first().unwrap() {
-                            "vanilla" => super::Launcher::Vanilla(super::get_minecraft_folder()),
-                            "multimc" => super::Launcher::MultiMC(super::get_multimc_folder(
-                                launcher.last().expect("Invalid MultiMC!"),
-                            )),
-                            &_ => {
-                                panic!("Invalid launcher!")
-                            }
-                        });
+                        cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
+                        std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap()).expect("Failed to write config!");
                         cx.props.settings.set(false);
                     },
                     div {
@@ -126,20 +131,18 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                             class: "credits-button",
                             option {
                                 value: "vanilla",
+                                selected: vanilla,
                                 "Vanilla"
                             }
                             option {
                                 value: "multimc-MultiMC",
+                                selected: multimc,
                                 "MultiMC"
                             }
                             option {
                                 value: "multimc-PrismLauncher",
+                                selected: prism,
                                 "Prism Launcher"
-                            }
-                            // TODO(Add other launchers support)
-                            option {
-                                value: "other",
-                                "Other"
                             }
                         }
                     }
@@ -159,7 +162,7 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
 struct VersionProps<'a> {
     modpack_source: &'a String,
     modpack_branch: String,
-    launcher: &'a super::Launcher,
+    launcher: super::Launcher,
 }
 
 fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
@@ -339,14 +342,14 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
 pub(crate) struct AppProps {
     pub branches: Vec<super::GithubBranch>,
     pub modpack_source: String,
+    pub config: super::Config,
+    pub config_path: PathBuf,
 }
 
 pub(crate) fn App(cx: Scope<AppProps>) -> Element {
     let modpack_source = &cx.props.modpack_source;
     let branches = &cx.props.branches;
-    let launcher: &UseState<super::Launcher> = use_state(cx, || {
-        super::Launcher::Vanilla(super::get_minecraft_folder())
-    });
+    let config: &UseRef<super::Config> = use_ref(cx, || cx.props.config.clone());
     let settings: &UseState<bool> = use_state(cx, || false);
     let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
     let style_css = include_str!("style.css");
@@ -354,6 +357,7 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
         "Wynncraft_Game_Font.woff2.base64",
         include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
     );
+    let launcher = config.with(|cfg| super::get_launcher(&cfg.launcher));
     cx.render(rsx! {
         style { style_css }
         if **settings {
@@ -362,8 +366,9 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
                 div {
                     class: "fake-body",
                     Settings {
-                        launcher_state: launcher,
+                        config: config,
                         settings: settings
+                        config_path: &cx.props.config_path
                     }
                 }
             }
@@ -385,7 +390,7 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
                         Version {
                             modpack_source: modpack_source,
                             modpack_branch: branches[i].name.clone(),
-                            launcher: &**launcher
+                            launcher: launcher.clone()
                         }
                     }
                 }

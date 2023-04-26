@@ -9,7 +9,7 @@ use cached::SizedCache;
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use dioxus_desktop::tao::window::Icon;
-use dioxus_desktop::{Config, LogicalSize, WindowBuilder};
+use dioxus_desktop::{Config as DioxusConfig, LogicalSize, WindowBuilder};
 use futures::StreamExt;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
@@ -94,7 +94,7 @@ async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedRespo
     match resp {
         Ok(mut val) => {
             let bytes = val.bytes().await.unwrap();
-            // CachedRespones needs to be cloned in order to init the AsyncBody otherwise the cache will not return anything on first call
+            // CachedResponse needs to be cloned in order to init the AsyncBody otherwise the cache will not return anything on first call
             Ok(CachedResponse { resp: val, bytes }.clone())
         }
         Err(err) => Err(err),
@@ -125,6 +125,11 @@ trait DownloadableGetters {
     fn get_name(&self) -> &String;
     fn get_location(&self) -> &String;
     fn get_version(&self) -> &String;
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+struct Config {
+    launcher: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -1034,6 +1039,19 @@ async fn update(installer_profile: InstallerProfile) {
     .await;
 }
 
+fn get_launcher(string_representation: &str) -> Launcher {
+    let launcher = string_representation.split('-').collect::<Vec<_>>();
+    match *launcher.first().unwrap() {
+        "vanilla" => Launcher::Vanilla(get_minecraft_folder()),
+        "multimc" => Launcher::MultiMC(get_multimc_folder(
+            launcher.last().expect("Invalid MultiMC!"),
+        )),
+        &_ => {
+            panic!("Invalid launcher!")
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
@@ -1052,16 +1070,7 @@ fn main() {
         } else {
             args.branch.unwrap()
         };
-        let launcher = args.launcher.split('-').collect::<Vec<_>>();
-        let launcher = match *launcher.first().unwrap() {
-            "vanilla" => Launcher::Vanilla(get_minecraft_folder()),
-            "multimc" => Launcher::MultiMC(get_multimc_folder(
-                launcher.last().expect("Invalid MultiMC!"),
-            )),
-            &_ => {
-                panic!("Invalid launcher!")
-            }
-        };
+        let launcher = get_launcher(&args.launcher);
         let installer_profile = futures::executor::block_on(init(&args.modpack, &branch, launcher));
         match args.action.as_str() {
             "install" => {
@@ -1092,13 +1101,30 @@ fn main() {
                 .as_str(),
         )
         .expect("Failed to parse branches!");
+        let config_path = env::temp_dir().join(".WC_OVHL/config.json");
+        let config: Config;
+        if config_path.exists() {
+            config =
+                serde_json::from_slice(&fs::read(&config_path).expect("Failed to read config!"))
+                    .expect("Failed to load config!");
+        } else {
+            config = Config {
+                launcher: String::from("vanilla"),
+            };
+            fs::create_dir_all(config_path.parent().unwrap())
+                .expect("Failed to create config dir!");
+            fs::write(&config_path, serde_json::to_vec(&config).unwrap())
+                .expect("Failed to write config!");
+        }
         dioxus_desktop::launch_with_props(
             gui::App,
             gui::AppProps {
                 branches,
                 modpack_source: String::from("Commander07/modpack-test/"),
+                config,
+                config_path,
             },
-            Config::new()
+            DioxusConfig::new()
                 .with_window(
                     WindowBuilder::new()
                         .with_resizable(false)
