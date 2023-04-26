@@ -129,20 +129,26 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                             id: "launcher-select",
                             form: "settings",
                             class: "credits-button",
-                            option {
-                                value: "vanilla",
-                                selected: vanilla,
-                                "Vanilla"
+                            if super::get_minecraft_folder().is_dir() {
+                                rsx!(option {
+                                    value: "vanilla",
+                                    selected: vanilla,
+                                    "Vanilla"
+                                })
                             }
-                            option {
-                                value: "multimc-MultiMC",
-                                selected: multimc,
-                                "MultiMC"
+                            if super::get_multimc_folder("MultiMC").is_ok() {
+                                rsx!(option {
+                                    value: "multimc-MultiMC",
+                                    selected: multimc,
+                                    "MultiMC"
+                                })
                             }
-                            option {
-                                value: "multimc-PrismLauncher",
-                                selected: prism,
-                                "Prism Launcher"
+                            if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                rsx!(option {
+                                    value: "multimc-PrismLauncher",
+                                    selected: prism,
+                                    "Prism Launcher"
+                                })
                             }
                         }
                     }

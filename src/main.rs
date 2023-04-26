@@ -526,12 +526,17 @@ fn get_app_data() -> PathBuf {
     }
 }
 
-fn get_multimc_folder(multimc: &str) -> PathBuf {
+fn get_multimc_folder(multimc: &str) -> Result<PathBuf, std::io::Error> {
     let path = get_app_data().join(multimc);
-    if !path.is_dir() {
-        panic!("Invalid MultiMC!")
-    } else {
-        path
+    match path.metadata() {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                Ok(path)
+            } else {
+                panic!("MultiMC directory is not a directort!");
+            }
+        }
+        Err(metadata) => Err(metadata),
     }
 }
 
@@ -1043,9 +1048,10 @@ fn get_launcher(string_representation: &str) -> Launcher {
     let launcher = string_representation.split('-').collect::<Vec<_>>();
     match *launcher.first().unwrap() {
         "vanilla" => Launcher::Vanilla(get_minecraft_folder()),
-        "multimc" => Launcher::MultiMC(get_multimc_folder(
-            launcher.last().expect("Invalid MultiMC!"),
-        )),
+        "multimc" => Launcher::MultiMC(
+            get_multimc_folder(launcher.last().expect("Invalid MultiMC!"))
+                .expect("Invalid MultiMC!"),
+        ),
         &_ => {
             panic!("Invalid launcher!")
         }
