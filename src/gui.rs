@@ -93,6 +93,7 @@ struct SettingsProps<'a> {
     config: &'a UseRef<super::Config>,
     settings: &'a UseState<bool>,
     config_path: &'a PathBuf,
+    error: &'a UseRef<Option<String>>,
 }
 
 fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
@@ -117,7 +118,13 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                     id: "settings",
                     onsubmit: move |event| {
                         cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
-                        std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap()).expect("Failed to write config!");
+                        let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
+                        match res {
+                            Ok(_) => {},
+                            Err(e) => {
+                                cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                            },
+                        }
                         cx.props.settings.set(false);
                     },
                     div {
@@ -170,17 +177,20 @@ struct VersionProps<'a> {
     modpack_source: &'a String,
     modpack_branch: String,
     launcher: super::Launcher,
+    error: &'a UseRef<Option<String>>,
 }
 
 fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     let modpack_source = (cx.props.modpack_source).to_owned();
     let modpack_branch = (cx.props.modpack_branch).to_owned();
     let launcher = (cx.props.launcher).to_owned();
+    // TODO(Remove weird clonage)
+    let error = cx.props.error.clone();
+    let err = error.clone();
     let profile = use_future(cx, (), |_| async move {
-        super::init(&modpack_source, &modpack_branch, launcher).await
+        super::init(modpack_source, modpack_branch, launcher).await
     })
     .value();
-
     // 'use_future's will always be 'None' on components first render
     if profile.is_none() {
         return cx.render(rsx! {
@@ -190,17 +200,26 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
             }
         });
     };
-
+    match profile.unwrap() {
+        Ok(_) => (),
+        Err(e) => {
+            err.set(Some(
+                format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
+            ));
+            return None;
+        }
+    }
     // states can be turned into an Rc using .current() and can be made into an owned value by using .as_ref().to_owned()
     // TODO(Clean this up)
-    let installer_profile = use_state(cx, || profile.unwrap().to_owned());
+    let installer_profile = use_state(cx, || profile.unwrap().to_owned().unwrap());
     let installing = use_state(cx, || false);
     let credits = use_state(cx, || false);
     let on_submit = move |event: FormEvent| {
         cx.spawn({
-            let mut installer_profile = profile.unwrap().to_owned();
+            let mut installer_profile = profile.unwrap().to_owned().unwrap();
             installing.set(true);
             let installing = installing.clone();
+            let error = error.clone();
             async move {
                 for k in event.data.values.keys() {
                     if event.data.values[k] == "true" {
@@ -209,9 +228,19 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 }
 
                 if !installer_profile.installed {
-                    super::install(installer_profile).await;
+                    match super::install(installer_profile).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error.set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
+                        }
+                    }
                 } else if installer_profile.update_available {
-                    super::update(installer_profile).await;
+                    match super::update(installer_profile).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error.set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
+                        }
+                    }
                 }
                 installing.set(false);
             }
@@ -352,6 +381,17 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
 }
 
 #[derive(Props, PartialEq)]
+struct ErrorProps {
+    error: String,
+}
+
+fn Error(cx: Scope<ErrorProps>) -> Element {
+    cx.render(rsx! {
+        "{cx.props.error}"
+    })
+}
+
+#[derive(Props, PartialEq)]
 pub(crate) struct AppProps {
     pub branches: Vec<super::GithubBranch>,
     pub modpack_source: String,
@@ -370,7 +410,26 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
         "Wynncraft_Game_Font.woff2.base64",
         include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
     );
-    let launcher = config.with(|cfg| super::get_launcher(&cfg.launcher));
+    let err: &UseRef<Option<String>> = use_ref(cx, || None);
+    if err.with(|e| e.is_some()) {
+        return cx.render(rsx!(Error {
+            error: err.with(|e| e.clone().unwrap())
+        }));
+    }
+    let cfg = config.with(|cfg| cfg.clone());
+    let launcher = match super::get_launcher(&cfg.launcher) {
+        Ok(val) => Some(val),
+        Err(e) => {
+            err.set(Some(format!("{:#?}", e) + " (Invalid launcher!)"));
+            None
+        }
+    };
+    if err.with(|e| e.is_some()) {
+        return cx.render(rsx!(Error {
+            error: err.with(|e| e.clone().unwrap())
+        }));
+    }
+    let launcher = launcher.unwrap();
     cx.render(rsx! {
         style { style_css }
         if **settings {
@@ -381,7 +440,8 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
                     Settings {
                         config: config,
                         settings: settings
-                        config_path: &cx.props.config_path
+                        config_path: &cx.props.config_path,
+                        error: err
                     }
                 }
             }
@@ -403,7 +463,8 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
                         Version {
                             modpack_source: modpack_source,
                             modpack_branch: branches[i].name.clone(),
-                            launcher: launcher.clone()
+                            launcher: launcher.clone(),
+                            error: err
                         }
                     }
                 }

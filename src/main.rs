@@ -396,7 +396,6 @@ struct MMCPack {
 }
 
 async fn download_fabric(loader: &Loader, root: &Path, http_client: &CachedHttpClient) -> PathBuf {
-    // TODO(download into .minecraft not modpack root)
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
         loader.minecraft_version, loader.version
@@ -526,17 +525,17 @@ fn get_app_data() -> PathBuf {
     }
 }
 
-fn get_multimc_folder(multimc: &str) -> Result<PathBuf, std::io::Error> {
+fn get_multimc_folder(multimc: &str) -> Result<PathBuf, String> {
     let path = get_app_data().join(multimc);
     match path.metadata() {
         Ok(metadata) => {
             if metadata.is_dir() {
                 Ok(path)
             } else {
-                panic!("MultiMC directory is not a directort!");
+                Err(String::from("MultiMC directory is not a directory!"))
             }
         }
-        Err(metadata) => Err(metadata),
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -719,7 +718,7 @@ macro_rules! validate_item_path {
     };
 }
 
-async fn install(installer_profile: InstallerProfile) {
+async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     // Yes this is needed and no i wont change it
     // This might not be needed now to we use isahc
     // Especially now that we use 'InstallerProfile's
@@ -932,6 +931,7 @@ async fn install(installer_profile: InstallerProfile) {
     if loader_future.is_some() {
         loader_future.unwrap().await;
     }
+    Ok(())
 }
 
 macro_rules! remove_items {
@@ -952,7 +952,7 @@ macro_rules! remove_items {
 }
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
-async fn update(installer_profile: InstallerProfile) {
+async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
     // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest = match fs::read_to_string(
@@ -1064,20 +1064,25 @@ async fn update(installer_profile: InstallerProfile) {
         enabled_features: installer_profile.enabled_features,
         launcher: installer_profile.launcher,
     })
-    .await;
+    .await
 }
 
-fn get_launcher(string_representation: &str) -> Launcher {
+fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
     let launcher = string_representation.split('-').collect::<Vec<_>>();
     match *launcher.first().unwrap() {
-        "vanilla" => Launcher::Vanilla(get_minecraft_folder()),
-        "multimc" => Launcher::MultiMC(
-            get_multimc_folder(launcher.last().expect("Invalid MultiMC!"))
-                .expect("Invalid MultiMC!"),
-        ),
-        &_ => {
-            panic!("Invalid launcher!")
+        "vanilla" => Ok(Launcher::Vanilla(get_minecraft_folder())),
+        "multimc" => {
+            let data_dir = get_multimc_folder(
+                launcher
+                    .last()
+                    .expect("Missing data dir segement in MultiMC!"),
+            );
+            match data_dir {
+                Ok(path) => Ok(Launcher::MultiMC(path)),
+                Err(e) => Err(e),
+            }
         }
+        _ => Err(String::from("Invalid launcher!")),
     }
 }
 
@@ -1100,19 +1105,26 @@ fn main() {
             args.branch.unwrap()
         };
         let launcher = get_launcher(&args.launcher);
-        let installer_profile = futures::executor::block_on(init(&args.modpack, &branch, launcher));
+        let installer_profile = futures::executor::block_on(init(
+            args.modpack,
+            branch,
+            launcher.expect("Failed to get launcher!"),
+        ))
+        .expect("Failed to retrieve installer profile!");
         match args.action.as_str() {
             "install" => {
                 if installer_profile.installed {
                     return;
                 }
                 futures::executor::block_on(install(installer_profile))
+                    .expect("Failed to install modpack!");
             }
             "update" => {
                 if !installer_profile.installed || !installer_profile.update_available {
                     return;
                 }
                 futures::executor::block_on(update(installer_profile))
+                    .expect("Failed to update modpack!");
             }
             "play" => (),
             _ => (),
@@ -1207,19 +1219,27 @@ struct CLIArgs {
     launcher: String,
 }
 
-async fn init(modpack_source: &str, modpack_branch: &str, launcher: Launcher) -> InstallerProfile {
+async fn init(
+    modpack_source: String,
+    modpack_branch: String,
+    launcher: Launcher,
+) -> Result<InstallerProfile, String> {
+    let modpack_source = &modpack_source;
+    let modpack_branch = &modpack_branch;
     let http_client = CachedHttpClient::new();
-    let manifest: Manifest = serde_json::from_str(
-        http_client
-            .get_async(GH_RAW.to_owned() + modpack_source + modpack_branch + "/manifest.json")
-            .await
-            .expect("Failed to retrieve manifest!")
-            .text()
-            .await
-            .unwrap()
-            .as_str(),
-    )
-    .expect("Failed to parse json!");
+    let mut manifest_resp = match http_client
+        .get_async(GH_RAW.to_owned() + modpack_source + modpack_branch + "/manifest.json")
+        .await
+    {
+        Ok(val) => val,
+        Err(e) => return Err(e.to_string()),
+    };
+    // HANDLE ERROR
+    let manifest: Manifest =
+        match serde_json::from_str(manifest_resp.text().await.unwrap().as_str()) {
+            Ok(val) => val,
+            Err(e) => return Err(e.to_string()),
+        };
     // TODO(Figure out a way to support older manifest versions)
     assert!(
         CURRENT_MANIFEST_VERSION == manifest.manifest_version,
@@ -1228,22 +1248,20 @@ async fn init(modpack_source: &str, modpack_branch: &str, launcher: Launcher) ->
     );
     let modpack_root = get_modpack_root(&launcher, &manifest.uuid);
     let installed = modpack_root.join(Path::new("manifest.json")).exists();
-    let update_available: bool;
-    if installed {
-        let local_manifest: Manifest = serde_json::from_str(
+    let update_available = if installed {
+        // HANDLE ERROR
+        let local_manifest: Result<Manifest, serde_json::Error> = serde_json::from_str(
             &fs::read_to_string(modpack_root.join(Path::new("manifest.json")))
                 .expect("Failed to read local manifest!"),
-        )
-        .expect("Failed to parse local manifest!");
-        if manifest.modpack_version != local_manifest.modpack_version {
-            update_available = true;
-        } else {
-            update_available = false;
+        );
+        match local_manifest {
+            Ok(val) => manifest.modpack_version != val.modpack_version,
+            Err(_) => false,
         }
     } else {
-        update_available = false;
-    }
-    InstallerProfile {
+        false
+    };
+    Ok(InstallerProfile {
         manifest,
         http_client,
         installed,
@@ -1252,5 +1270,5 @@ async fn init(modpack_source: &str, modpack_branch: &str, launcher: Launcher) ->
         modpack_branch: modpack_branch.to_owned(),
         enabled_features: vec![String::from("default")],
         launcher: Some(launcher),
-    }
+    })
 }
