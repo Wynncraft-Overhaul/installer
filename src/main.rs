@@ -1234,7 +1234,6 @@ async fn init(
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
-    // HANDLE ERROR
     let manifest: Manifest =
         match serde_json::from_str(manifest_resp.text().await.unwrap().as_str()) {
             Ok(val) => val,
@@ -1249,11 +1248,13 @@ async fn init(
     let modpack_root = get_modpack_root(&launcher, &manifest.uuid);
     let installed = modpack_root.join(Path::new("manifest.json")).exists();
     let update_available = if installed {
-        // HANDLE ERROR
-        let local_manifest: Result<Manifest, serde_json::Error> = serde_json::from_str(
-            &fs::read_to_string(modpack_root.join(Path::new("manifest.json")))
-                .expect("Failed to read local manifest!"),
-        );
+        let local_manifest_content =
+            match fs::read_to_string(modpack_root.join(Path::new("manifest.json"))) {
+                Ok(val) => val,
+                Err(e) => return Err(e.to_string()),
+            };
+        let local_manifest: Result<Manifest, serde_json::Error> =
+            serde_json::from_str(&local_manifest_content);
         match local_manifest {
             Ok(val) => manifest.modpack_version != val.modpack_version,
             Err(_) => false,
