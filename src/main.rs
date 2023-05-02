@@ -35,6 +35,11 @@ const CONCURRENCY: usize = 14;
 fn default_id() -> String {
     String::from("default")
 }
+
+fn default_enabled_features() -> Vec<String> {
+    vec![default_id()]
+}
+
 macro_rules! add_headers {
     ($items:expr, $($headers:expr),*) => {
         $items.$(header($headers.next().unwrap().0, $headers.next().unwrap().1))*
@@ -301,6 +306,8 @@ struct Manifest {
     resourcepacks: Vec<Resourcepack>,
     include: Vec<Include>,
     features: Vec<Feature>,
+    #[serde(default = "default_enabled_features")]
+    enabled_features: Vec<String>,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -897,6 +904,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         resourcepacks: resourcepacks_w_path,
         include: manifest.include.clone(),
         features: manifest.features.clone(),
+        enabled_features: installer_profile.enabled_features.clone(),
     };
     fs::write(
         modpack_root.join(Path::new("manifest.json")),
@@ -1055,6 +1063,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
             features: installer_profile.manifest.features.clone(),
             description: installer_profile.manifest.description.clone(),
             subtitle: installer_profile.manifest.subtitle.clone(),
+            enabled_features: installer_profile.manifest.enabled_features,
         },
         http_client: installer_profile.http_client,
         installed: installer_profile.installed,
@@ -1063,6 +1072,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         modpack_branch: installer_profile.modpack_branch,
         enabled_features: installer_profile.enabled_features,
         launcher: installer_profile.launcher,
+        local_manifest: installer_profile.local_manifest,
     })
     .await
 }
@@ -1196,6 +1206,7 @@ struct InstallerProfile {
     modpack_branch: String,
     enabled_features: Vec<String>,
     launcher: Option<Launcher>,
+    local_manifest: Option<Manifest>,
 }
 
 #[derive(Parser)]
@@ -1246,16 +1257,20 @@ async fn init(
         manifest.manifest_version
     );
     let modpack_root = get_modpack_root(&launcher, &manifest.uuid);
-    let installed = modpack_root.join(Path::new("manifest.json")).exists();
-    let update_available = if installed {
+    let mut installed = modpack_root.join(Path::new("manifest.json")).exists();
+    let local_manifest: Option<Result<Manifest, serde_json::Error>> = if installed {
         let local_manifest_content =
             match fs::read_to_string(modpack_root.join(Path::new("manifest.json"))) {
                 Ok(val) => val,
                 Err(e) => return Err(e.to_string()),
             };
-        let local_manifest: Result<Manifest, serde_json::Error> =
-            serde_json::from_str(&local_manifest_content);
-        match local_manifest {
+        Some(serde_json::from_str(&local_manifest_content))
+    } else {
+        installed = false;
+        None
+    };
+    let update_available = if installed {
+        match local_manifest.as_ref().unwrap() {
             Ok(val) => manifest.modpack_version != val.modpack_version,
             Err(_) => false,
         }
@@ -1271,5 +1286,10 @@ async fn init(
         modpack_branch: modpack_branch.to_owned(),
         enabled_features: vec![String::from("default")],
         launcher: Some(launcher),
+        local_manifest: if local_manifest.is_some() && local_manifest.as_ref().unwrap().is_ok() {
+            Some(local_manifest.unwrap().unwrap())
+        } else {
+            None
+        },
     })
 }

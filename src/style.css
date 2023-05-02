@@ -89,6 +89,10 @@ body {
     border: 0.16vw solid black;
 }
 
+.install-button:disabled {
+    cursor: default;
+}
+
 .feature-list input[type="checkbox"] {
     margin-right: 5px;
 }

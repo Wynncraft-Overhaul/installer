@@ -60,3 +60,7 @@ Features is a list which contains feature objects for which the fields are:
 - `name`: Name of the feature
 - `id`: Id of the feature
 - `default`: This is a bool specifying if it should be on by default
+
+## Enabled Features
+
+This field should be left out when creating a modpack as it tells the installer which features were enabled by the user.

@@ -216,33 +216,41 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     let credits = use_state(cx, || false);
     let on_submit = move |event: FormEvent| {
         cx.spawn({
-            let mut installer_profile = profile.unwrap().to_owned().unwrap();
+            let mut mut_installer_profile = profile.unwrap().to_owned().unwrap();
             installing.set(true);
             let installing = installing.clone();
+            let installer_profile = installer_profile.clone();
             let error = error.clone();
             async move {
                 for k in event.data.values.keys() {
                     if event.data.values[k] == "true" {
-                        installer_profile.enabled_features.push(k.to_owned())
+                        mut_installer_profile.enabled_features.push(k.to_owned());
+                        mut_installer_profile
+                            .manifest
+                            .enabled_features
+                            .push(k.to_owned());
                     }
                 }
 
-                if !installer_profile.installed {
-                    match super::install(installer_profile).await {
+                if !mut_installer_profile.installed {
+                    match super::install(mut_installer_profile.clone()).await {
                         Ok(_) => {}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
                         }
                     }
-                } else if installer_profile.update_available {
-                    match super::update(installer_profile).await {
+                } else if mut_installer_profile.update_available {
+                    match super::update(mut_installer_profile.clone()).await {
                         Ok(_) => {}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
                         }
                     }
                 }
+                mut_installer_profile.local_manifest = Some(mut_installer_profile.manifest.clone());
+                mut_installer_profile.installed = true;
                 installing.set(false);
+                installer_profile.set(mut_installer_profile);
             }
         });
     };
@@ -253,6 +261,11 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
         .replace("<script>", "<noscript>")
         .replace("<script/>", "<noscript/>");
     let description = re.replace_all(description.as_str(), "harmless=\"");
+    let install_disable = if installer_profile.installed && !installer_profile.update_available {
+        Some("true")
+    } else {
+        None
+    };
     // TODO(Split these renders into multiple components)
     if **installing {
         cx.render(rsx! {
@@ -346,7 +359,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                     class: "feature-list",
                                     for feat in &installer_profile.manifest.features {
                                         label {
-                                            if feat.default {
+                                            if feat.default || (installer_profile.installed && installer_profile.local_manifest.as_ref().unwrap().enabled_features.contains(&feat.id)) {
                                                 rsx!(input {
                                                     name: "{feat.id}",
                                                     r#type: "checkbox",
@@ -370,8 +383,9 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                         }
                         input {
                             r#type: "submit",
-                            value: "Install",
-                            class: "install-button"
+                            value: if !installer_profile.installed {"Install"} else {"Update"},
+                            class: "install-button",
+                            disabled: install_disable
                         }
                     }
                 }
