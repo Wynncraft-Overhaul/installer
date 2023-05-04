@@ -144,6 +144,12 @@ struct Author {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+struct Included {
+    md5: String,
+    files: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Mod {
     name: String,
     source: String,
@@ -308,6 +314,7 @@ struct Manifest {
     features: Vec<Feature>,
     #[serde(default = "default_enabled_features")]
     enabled_features: Vec<String>,
+    included_files: Option<HashMap<String, Included>>,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -374,6 +381,7 @@ struct GithubAsset {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct GithubRelease {
     tag_name: String,
+    body: Option<String>,
     assets: Vec<GithubAsset>,
 }
 
@@ -824,6 +832,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         .buffer_unordered(CONCURRENCY)
         .collect::<Vec<Resourcepack>>()
         .await;
+    let mut included_files: HashMap<String, Included> = HashMap::new();
     if !manifest.include.is_empty() {
         // Include files exist
         let release: Vec<GithubRelease> = serde_json::from_str(
@@ -847,12 +856,51 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
             .first()
             .cloned()
             .expect("Failed to retrieve release for selected branch!");
+        let hash_pairs: HashMap<String, String> = serde_json::from_str(
+            &selected_rel
+                .body
+                .as_ref()
+                .expect("Missing body on modpack release!"),
+        )
+        .expect("Failed to parse hash pairs!");
+        let inc_files = match installer_profile.local_manifest.clone() {
+            Some(local_manifest) => local_manifest
+                .included_files
+                .expect("Local manifest missing 'included_files'!"),
+            None => HashMap::new(),
+        };
         for inc in &manifest.include {
             if !installer_profile.enabled_features.contains(&inc.id) {
                 continue;
             }
-            for asset in &selected_rel.assets {
-                if asset.name == inc.id.clone() + ".zip" {
+            'a: for asset in &selected_rel.assets {
+                let inc_zip_name = inc.id.clone() + ".zip";
+                if asset.name == inc_zip_name {
+                    let md5 = hash_pairs
+                        .get(&inc_zip_name)
+                        .expect("Asset does not have hash in release body")
+                        .to_owned();
+                    match inc_files.get(&inc_zip_name) {
+                        Some(local_inc) => {
+                            if local_inc.md5 == md5 {
+                                included_files.insert(inc_zip_name, local_inc.to_owned());
+                                break 'a;
+                            } else {
+                                for file in &local_inc.files {
+                                    let path = Path::new(file);
+                                    assert!(
+                                        path.starts_with(modpack_root),
+                                        "Local include path was not located in modpack root!"
+                                    );
+                                    fs::remove_file(path)
+                                        .expect("Failed to remove outdated include!");
+                                }
+                            }
+                        }
+                        None => (),
+                    }
+                    println!("Downloading: {:#?}", asset);
+                    let mut files: Vec<String> = vec![];
                     // download and unzip in modpack root
                     let content = http_client
                         .get_async(&asset.browser_download_url)
@@ -882,9 +930,11 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                             }
                             let mut outfile = fs::File::create(&outpath).unwrap();
                             std::io::copy(&mut file, &mut outfile).unwrap();
+                            files.push(outpath.to_str().unwrap().to_string());
                         }
                     }
                     fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'include.zip'!");
+                    included_files.insert(inc_zip_name.clone(), Included { md5, files });
                     break;
                 }
             }
@@ -905,6 +955,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         include: manifest.include.clone(),
         features: manifest.features.clone(),
         enabled_features: installer_profile.enabled_features.clone(),
+        included_files: Some(included_files),
     };
     fs::write(
         modpack_root.join(Path::new("manifest.json")),
@@ -961,7 +1012,6 @@ macro_rules! remove_items {
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
 async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
-    // TODO(figure out how to handle 'include' updates) current behaviour is writing over existing includes and files
     // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest = match fs::read_to_string(
         get_modpack_root(
@@ -1064,6 +1114,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
             description: installer_profile.manifest.description.clone(),
             subtitle: installer_profile.manifest.subtitle.clone(),
             enabled_features: installer_profile.manifest.enabled_features,
+            included_files: None,
         },
         http_client: installer_profile.http_client,
         installed: installer_profile.installed,
@@ -1250,7 +1301,8 @@ async fn init(
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
         };
-    // TODO(Figure out a way to support older manifest versions)
+    // If the manifest version is different the contents are probably different enough to cause a failure to parse.
+    // TODO(Parse only manifest_version)
     assert!(
         CURRENT_MANIFEST_VERSION == manifest.manifest_version,
         "Unsupported manifest version '{}'!",

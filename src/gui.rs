@@ -249,6 +249,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 }
                 mut_installer_profile.local_manifest = Some(mut_installer_profile.manifest.clone());
                 mut_installer_profile.installed = true;
+                mut_installer_profile.update_available = false;
                 installing.set(false);
                 installer_profile.set(mut_installer_profile);
             }

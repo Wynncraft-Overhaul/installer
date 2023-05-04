@@ -64,3 +64,7 @@ Features is a list which contains feature objects for which the fields are:
 ## Enabled Features
 
 This field should be left out when creating a modpack as it tells the installer which features were enabled by the user.
+
+## Included Files
+
+This field should be left out when creating a modpack as it tells the installer which files were included.
