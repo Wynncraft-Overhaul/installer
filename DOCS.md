@@ -20,7 +20,7 @@ The Header section contains metadata about the modpack, such as the name and the
 
 The `loader` section specifies the target mod loader for the modpack.
 
-- `type`: This field specifies the target mod loader. Currently supported values are: `fabric`.
+- `type`: This field specifies the target mod loader. Currently supported loaders are: `fabric` and `quilt`.
 - `version`: This field specifies the target mod loader version. Make sure this is compatible with your target Minecraft version.
 - `minecraft_version`: This field specifies the target Minecraft version. Make sure that the loader version supports it.
 

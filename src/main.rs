@@ -278,7 +278,30 @@ struct Loader {
 impl Downloadable for Loader {
     async fn download(&self, root: &Path, _: &str, http_client: &CachedHttpClient) -> PathBuf {
         match self.r#type.as_str() {
-            "fabric" => download_fabric(self, root, http_client).await,
+            "fabric" => {
+                download_loader_json(
+                    &format!(
+                        "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
+                        self.minecraft_version, self.version
+                    ),
+                    &format!("fabric-loader-{}-{}", self.version, self.minecraft_version),
+                    root,
+                    http_client,
+                )
+                .await
+            }
+            "quilt" => {
+                download_loader_json(
+                    &format!(
+                        "https://meta.quiltmc.org/v3/versions/loader/{}/{}/profile/json",
+                        self.minecraft_version, self.version
+                    ),
+                    &format!("quilt-loader-{}-{}", self.version, self.minecraft_version),
+                    root,
+                    http_client,
+                )
+                .await
+            }
             _ => panic!("Unsupported loader '{}'!", self.r#type.as_str()),
         }
     }
@@ -410,41 +433,38 @@ struct MMCPack {
     formatVersion: i32,
 }
 
-async fn download_fabric(loader: &Loader, root: &Path, http_client: &CachedHttpClient) -> PathBuf {
-    let url = format!(
-        "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
-        loader.minecraft_version, loader.version
-    );
-    let loader_name = format!(
-        "fabric-loader-{}-{}",
-        &loader.version, &loader.minecraft_version
-    );
-    let fabric_path = root.join(Path::new(&format!("versions/{}", &loader_name)));
-    if fabric_path
+async fn download_loader_json(
+    url: &str,
+    loader_name: &str,
+    root: &Path,
+    http_client: &CachedHttpClient,
+) -> PathBuf {
+    let loader_path = root.join(Path::new(&format!("versions/{}", &loader_name)));
+    if loader_path
         .join(Path::new(&format!("{}.json", &loader_name)))
         .exists()
     {
         return PathBuf::new();
     }
     let resp = http_client
-        .get_async(url.as_str())
+        .get_async(url)
         .await
-        .expect("Failed to download fabric loader!")
+        .expect("Failed to download loader!")
         .text()
         .await
         .unwrap();
-    fs::create_dir_all(&fabric_path).expect("Failed to create fabric directory");
+    fs::create_dir_all(&loader_path).expect("Failed to create loader directory");
     fs::write(
-        fabric_path.join(Path::new(&format!("{}.json", &loader_name))),
+        loader_path.join(Path::new(&format!("{}.json", &loader_name))),
         resp,
     )
-    .expect("Failed to write fabric json");
+    .expect("Failed to write loader json");
     fs::write(
-        fabric_path.join(Path::new(&format!("{}.jar", &loader_name))),
+        loader_path.join(Path::new(&format!("{}.jar", &loader_name))),
         "",
     )
-    .expect("Failed to write fabric dummy jar");
-    fabric_path
+    .expect("Failed to write loader dummy jar");
+    loader_path
 }
 
 async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
@@ -646,15 +666,7 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
         }
         Launcher::MultiMC(root) => {
             let pack = MMCPack {
-                // TODO(Figure out how to get the correct components for the right loader and mc version)
                 components: vec![
-                    MMCComponent {
-                        uid: String::from("org.lwjgl3"),
-                        version: String::from("3.3.1"),
-                        cachedVolatile: Some(true),
-                        dependencyOnly: Some(true),
-                        important: None,
-                    },
                     MMCComponent {
                         uid: String::from("net.minecraft"),
                         version: manifest.loader.minecraft_version.to_string(),
@@ -662,19 +674,22 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                         dependencyOnly: None,
                         important: Some(true),
                     },
-                    MMCComponent {
-                        uid: String::from("net.fabricmc.intermediary"),
-                        version: manifest.loader.minecraft_version.to_string(),
-                        cachedVolatile: Some(true),
-                        dependencyOnly: Some(true),
-                        important: None,
-                    },
-                    MMCComponent {
-                        uid: String::from("net.fabricmc.fabric-loader"),
-                        version: manifest.loader.version.to_string(),
-                        cachedVolatile: None,
-                        dependencyOnly: None,
-                        important: None,
+                    match &manifest.loader.r#type[..] {
+                        "fabric" => MMCComponent {
+                            uid: String::from("net.fabricmc.fabric-loader"),
+                            version: manifest.loader.version.to_string(),
+                            cachedVolatile: None,
+                            dependencyOnly: None,
+                            important: None,
+                        },
+                        "quilt" => MMCComponent {
+                            uid: String::from("org.quiltmc.quilt-loader"),
+                            version: manifest.loader.version.to_string(),
+                            cachedVolatile: None,
+                            dependencyOnly: None,
+                            important: None,
+                        },
+                        _ => panic!(),
                     },
                 ],
                 formatVersion: 1,
@@ -899,7 +914,6 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                         }
                         None => (),
                     }
-                    println!("Downloading: {:#?}", asset);
                     let mut files: Vec<String> = vec![];
                     // download and unzip in modpack root
                     let content = http_client
