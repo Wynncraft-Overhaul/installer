@@ -89,6 +89,21 @@ body {
     border: 0.16vw solid black;
 }
 
+.uninstall-button {
+    font-family: "wynncraft";
+    background-color: #d95248;
+    padding: 4%;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 100%;
+    margin-right: 2%;
+    margin-left: 2%;
+    margin-bottom: 2%;
+    cursor: pointer;
+    border: 0.16vw solid black;
+}
+
 .install-button:disabled {
     cursor: default;
 }

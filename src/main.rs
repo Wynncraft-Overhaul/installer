@@ -582,7 +582,7 @@ fn get_minecraft_folder() -> PathBuf {
     }
 }
 
-fn get_modpack_root(launcher: &Launcher, uuid: &String) -> PathBuf {
+fn get_modpack_root(launcher: &Launcher, uuid: &str) -> PathBuf {
     match launcher {
         Launcher::Vanilla(root) => {
             let root = root.join(Path::new(&format!(".WC_OVHL/{}", uuid)));
@@ -746,6 +746,31 @@ macro_rules! validate_item_path {
             $item
         }
     };
+}
+
+fn uninstall(launcher: &Launcher, b64_id: &str) {
+    match launcher {
+        Launcher::Vanilla(root) => {
+            let root = root.join(".WC_OVHL/");
+            for instance in fs::read_dir(root).unwrap() {
+                let instance = instance.unwrap().path();
+                if instance.join(b64_id).is_file() {
+                    fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
+                    fs::create_dir(instance).unwrap();
+                }
+            }
+        }
+        Launcher::MultiMC(root) => {
+            let root = root.join("instances/");
+            for instance in fs::read_dir(root).unwrap() {
+                let instance = instance.unwrap().path();
+                if instance.join(format!(".minecraft/{}", b64_id)).is_file() {
+                    fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
+                    fs::create_dir_all(instance.join(".minecraft/")).unwrap();
+                }
+            }
+        }
+    }
 }
 
 async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
@@ -971,6 +996,15 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         enabled_features: installer_profile.enabled_features.clone(),
         included_files: Some(included_files),
     };
+    fs::write(
+        modpack_root.join(
+            engine::general_purpose::STANDARD
+                .encode(&installer_profile.modpack_source)
+                .replace('=', "_"),
+        ),
+        "",
+    )
+    .expect("Failed to save b64_id");
     fs::write(
         modpack_root.join(Path::new("manifest.json")),
         serde_json::to_string(&local_manifest).expect("Failed to parse 'manifest.json'!"),

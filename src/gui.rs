@@ -1,8 +1,11 @@
 #![allow(non_snake_case)]
 use std::path::PathBuf;
 
+use base64::{engine, Engine};
 use dioxus::prelude::*;
 use regex::Regex;
+
+use crate::get_launcher;
 
 fn Header(cx: Scope) -> Element {
     // TODO(figure out how to make this from modpack_source)
@@ -94,6 +97,7 @@ struct SettingsProps<'a> {
     settings: &'a UseState<bool>,
     config_path: &'a PathBuf,
     error: &'a UseRef<Option<String>>,
+    b64_id: String,
 }
 
 fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
@@ -165,6 +169,13 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                         value: "Save",
                         class: "install-button",
                         id: "save"
+                    }
+                    button {
+                        class: "uninstall-button",
+                        onclick: move |_evt| {
+                            super::uninstall(&get_launcher(&launcher).unwrap(), &cx.props.b64_id);
+                        },
+                        "Uninstall"
                     }
                 }
             }
@@ -456,7 +467,8 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
                         config: config,
                         settings: settings
                         config_path: &cx.props.config_path,
-                        error: err
+                        error: err,
+                        b64_id: engine::general_purpose::STANDARD.encode(modpack_source).replace('=', "_")
                     }
                 }
             }
