@@ -1253,6 +1253,11 @@ fn main() {
         .expect("Failed to parse branches!");
         let config_path = env::temp_dir().join(".WC_OVHL/config.json");
         let config: Config;
+        let style_css = include_str!("style.css");
+        let style_css = style_css.replace(
+            "Wynncraft_Game_Font.woff2.base64",
+            include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
+        );
         if config_path.exists() {
             config =
                 serde_json::from_slice(&fs::read(&config_path).expect("Failed to read config!"))
@@ -1266,6 +1271,7 @@ fn main() {
             fs::write(&config_path, serde_json::to_vec(&config).unwrap())
                 .expect("Failed to write config!");
         }
+
         dioxus_desktop::launch_with_props(
             gui::App,
             gui::AppProps {
@@ -1273,6 +1279,7 @@ fn main() {
                 modpack_source: String::from("Commander07/modpack-test/"),
                 config,
                 config_path,
+                style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
             },
             DioxusConfig::new()
                 .with_window(

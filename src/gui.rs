@@ -418,24 +418,20 @@ fn Error(cx: Scope<ErrorProps>) -> Element {
 }
 
 #[derive(Props, PartialEq)]
-pub(crate) struct AppProps {
+pub(crate) struct AppProps<'a> {
     pub branches: Vec<super::GithubBranch>,
     pub modpack_source: String,
     pub config: super::Config,
     pub config_path: PathBuf,
+    pub style_css: &'a str,
 }
 
-pub(crate) fn App(cx: Scope<AppProps>) -> Element {
+pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
     let modpack_source = &cx.props.modpack_source;
     let branches = &cx.props.branches;
     let config: &UseRef<super::Config> = use_ref(cx, || cx.props.config.clone());
     let settings: &UseState<bool> = use_state(cx, || false);
     let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
-    let style_css = include_str!("style.css");
-    let style_css = style_css.replace(
-        "Wynncraft_Game_Font.woff2.base64",
-        include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
-    );
     let err: &UseRef<Option<String>> = use_ref(cx, || None);
     if err.with(|e| e.is_some()) {
         return cx.render(rsx!(Error {
@@ -457,7 +453,7 @@ pub(crate) fn App(cx: Scope<AppProps>) -> Element {
     }
     let launcher = launcher.unwrap();
     cx.render(rsx! {
-        style { style_css }
+        style { cx.props.style_css }
         if **settings {
             rsx!{
                 Header {}
