@@ -998,9 +998,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     };
     fs::write(
         modpack_root.join(
-            engine::general_purpose::STANDARD
-                .encode(&installer_profile.modpack_source)
-                .replace('=', "_"),
+            engine::general_purpose::URL_SAFE_NO_PAD.encode(&installer_profile.modpack_source),
         ),
         "",
     )

@@ -464,7 +464,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                         settings: settings
                         config_path: &cx.props.config_path,
                         error: err,
-                        b64_id: engine::general_purpose::STANDARD.encode(modpack_source).replace('=', "_")
+                        b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(modpack_source)
                     }
                 }
             }
