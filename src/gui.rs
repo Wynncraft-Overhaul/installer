@@ -35,56 +35,63 @@ fn Spinner(cx: Scope) -> Element {
 }
 
 #[derive(Props, PartialEq)]
-struct CreditsProps {
+struct CreditsProps<'a> {
     manifest: super::Manifest,
+    enabled: &'a UseRef<Vec<String>>,
 }
 
-fn Credits(cx: Scope<CreditsProps>) -> Element {
+fn Credits<'a>(cx: Scope<'a, CreditsProps>) -> Element<'a> {
     cx.render(rsx! {
         ul {
             for r#mod in &cx.props.manifest.mods {
-                li {
-                    "{r#mod.name} by "
-                    for author in &r#mod.authors {
-                        a {
-                            href: "{author.link}",
-                            if r#mod.authors.last().unwrap() == author {
-                                author.name.to_string()
-                            } else {
-                                author.name.to_string() + ", "
+                if cx.props.enabled.with(|x| x.contains(&r#mod.id)) {
+                    rsx!(li {
+                        "{r#mod.name} by "
+                        for author in &r#mod.authors {
+                            a {
+                                href: "{author.link}",
+                                if r#mod.authors.last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
                             }
                         }
-                    }
+                    })
                 }
             }
             for shaderpack in &cx.props.manifest.shaderpacks {
-                li {
-                    "{shaderpack.name} by "
-                    for author in &shaderpack.authors {
-                        a {
-                            href: "{author.link}",
-                            if shaderpack.authors.last().unwrap() == author {
-                                author.name.to_string()
-                            } else {
-                                author.name.to_string() + ", "
+                if cx.props.enabled.with(|x| x.contains(&shaderpack.id)) {
+                    rsx!(li {
+                        "{shaderpack.name} by "
+                        for author in &shaderpack.authors {
+                            a {
+                                href: "{author.link}",
+                                if shaderpack.authors.last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
                             }
                         }
-                    }
+                    })
                 }
             }
             for resourcepack in &cx.props.manifest.resourcepacks {
-                li {
-                    "{resourcepack.name} by "
-                    for author in &resourcepack.authors {
-                        a {
-                            href: "{author.link}",
-                            if resourcepack.authors.last().unwrap() == author {
-                                author.name.to_string()
-                            } else {
-                                author.name.to_string() + ", "
+                if cx.props.enabled.with(|x| x.contains(&resourcepack.id)) {
+                    rsx!(li {
+                        "{resourcepack.name} by "
+                        for author in &resourcepack.authors {
+                            a {
+                                href: "{author.link}",
+                                if resourcepack.authors.last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
                             }
                         }
-                    }
+                    })
                 }
             }
         }
@@ -189,12 +196,26 @@ fn feature_change(
     evt: FormEvent,
     feat: &super::Feature,
     modify_count: &UseRef<i32>,
+    enabled_features: &UseRef<Vec<String>>,
 ) {
     let enabled = match &*evt.data.value {
         "true" => true,
         "false" => false,
         _ => panic!("Invalid bool from feature"),
     };
+    if enabled {
+        enabled_features.with_mut(|x| {
+            if !x.contains(&feat.id) {
+                x.push(feat.id.clone());
+            }
+        })
+    } else {
+        enabled_features.with_mut(|x| {
+            if x.contains(&feat.id) {
+                x.retain(|x| x != &feat.id);
+            }
+        })
+    }
     if installer_profile.with(|profile| profile.installed) {
         let modify_res = installer_profile.with(|profile| {
             profile
@@ -266,35 +287,41 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     // TODO(Clean this up)
     let installer_profile = use_ref(cx, || profile.unwrap().to_owned().unwrap());
     let installing = use_state(cx, || false);
+    let spinner_status = use_state(cx, || "");
     let modify = use_state(cx, || false);
     let modify_count = use_ref(cx, || 0);
+    let enabled_features = use_ref(cx, || {
+        if installer_profile.with(|profile| profile.installed) {
+            installer_profile.with(|profile| {
+                profile
+                    .local_manifest
+                    .as_ref()
+                    .unwrap()
+                    .enabled_features
+                    .clone()
+            })
+        } else {
+            installer_profile.with(|profile| profile.enabled_features.clone())
+        }
+    });
     let credits = use_state(cx, || false);
-    let on_submit = move |event: FormEvent| {
+    let on_submit = move |_event: FormEvent| {
         cx.spawn({
             installing.set(true);
             let installing = installing.clone();
+            let spinner_status = spinner_status.clone();
             let installer_profile = installer_profile.clone();
             let modify = modify.clone();
             let modify_count = modify_count.clone();
             let error = error.clone();
+            let enabled_features = enabled_features.clone();
             async move {
-                for k in event.data.values.keys() {
-                    if event.data.values[k] == "true" {
-                        installer_profile
-                            .with_mut(|profile| profile.enabled_features.push(k.to_owned()));
-                        installer_profile.with_mut(|profile| {
-                            profile.manifest.enabled_features.push(k.to_owned())
-                        });
-                    } else {
-                        installer_profile
-                            .with_mut(|profile| profile.enabled_features.retain(|x| x != k));
-                        installer_profile.with_mut(|profile| {
-                            profile.manifest.enabled_features.retain(|x| x != k)
-                        });
-                    }
-                }
-
+                installer_profile.with_mut(|profile| {
+                    profile.enabled_features = enabled_features.with(|x| x.clone());
+                    profile.manifest.enabled_features = enabled_features.with(|x| x.clone());
+                });
                 if !installer_profile.with(|profile| profile.installed) {
+                    spinner_status.set("Installing...");
                     match super::install(installer_profile.with(|profile| profile.clone())).await {
                         Ok(_) => {}
                         Err(e) => {
@@ -302,6 +329,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                         }
                     }
                 } else if installer_profile.with(|profile| profile.update_available) {
+                    spinner_status.set("Updating...");
                     match super::update(installer_profile.with(|profile| profile.clone())).await {
                         Ok(_) => {}
                         Err(e) => {
@@ -309,6 +337,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                         }
                     }
                 } else if *modify {
+                    spinner_status.set("Modifying...");
                     match super::update(installer_profile.with(|profile| profile.clone())).await {
                         Ok(_) => {}
                         Err(e) => {
@@ -360,7 +389,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                         style: "justify-items: center;",
                         Spinner {}
                         p {
-                            "Installing..."
+                            "{spinner_status}"
                         }
                     }
                 }
@@ -394,8 +423,12 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                             }
                             div {
                                 class: "credits",
-                                Credits {
-                                    manifest: installer_profile.with(|profile| profile.manifest.clone())
+                                div {
+                                    class: "credits-inner",
+                                    Credits {
+                                        manifest: installer_profile.with(|profile| profile.manifest.clone())
+                                        enabled: enabled_features
+                                    }
                                 }
                             }
                         }
@@ -437,7 +470,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                         label {
                                             input {
                                                 checked: if installer_profile.with(|profile| profile.installed) {
-                                                    if installer_profile.with(|profile| profile.local_manifest.as_ref().unwrap().enabled_features.contains(&feat.id)) {
+                                                    if enabled_features.with(|x| x.contains(&feat.id)) {
                                                         Some("true")
                                                     } else {
                                                         None
@@ -451,7 +484,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                                 },
                                                 name: "{feat.id}",
                                                 onchange: move |evt| {
-                                                    feature_change(installer_profile, modify, evt, &feat, modify_count);
+                                                    feature_change(installer_profile, modify, evt, &feat, modify_count, enabled_features);
                                                 },
                                                 r#type: "checkbox",    
                                             }

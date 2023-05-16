@@ -161,8 +161,13 @@ body {
 
 .credits {
     overflow: auto;
-    max-height: 24vh;
+    max-height: 24.1vh;
     margin-bottom: 1vw;
+    direction: rtl;
+}
+
+.credits-inner {
+    direction: ltr;
 }
 
 .credits-button {
