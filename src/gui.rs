@@ -121,10 +121,10 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
     cx.render(rsx! {
         div {
             class: "version-inner-container",
-            style: "width: 21.25vw;",
+            style: "width: 25.25vw;",
             div {
                 class: "container",
-                style: "width: 20vw;",
+                style: "width: 24vw;",
                 form {
                     id: "settings",
                     onsubmit: move |event| {

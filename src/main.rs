@@ -1367,7 +1367,7 @@ fn main() {
                     WindowBuilder::new()
                         .with_resizable(false)
                         .with_title("Wynncraft Overhaul Installer")
-                        .with_inner_size(LogicalSize::new(1280, 720)),
+                        .with_inner_size(LogicalSize::new(960, 540)),
                 )
                 .with_icon(
                     Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),

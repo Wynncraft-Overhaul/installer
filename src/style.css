@@ -72,6 +72,7 @@ body {
     display: flex;
     margin-bottom: 5%;
     height: 11vh;
+    align-items: center;
 }
 
 .install-button {
@@ -161,7 +162,7 @@ body {
 
 .credits {
     overflow: auto;
-    max-height: 24.1vh;
+    max-height: 31.1vh;
     margin-bottom: 1vw;
     direction: rtl;
 }
@@ -238,7 +239,8 @@ option {
 }
 
 #launcher-select {
-    width: 12vw;
+    width: 100%;
+    padding: 0;
     outline: none;
 }
 
