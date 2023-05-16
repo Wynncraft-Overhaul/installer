@@ -617,7 +617,6 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
             .expect("No launcher selected!"),
         &manifest.uuid,
     );
-    // TODO(make this work on loaders other than fabric)
     match installer_profile
         .launcher
         .as_ref()
@@ -635,10 +634,17 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
             };
             let profile = LauncherProfile {
                 lastUsed: now.to_string(),
-                lastVersionId: format!(
-                    "fabric-loader-{}-{}",
-                    &manifest.loader.version, &manifest.loader.minecraft_version
-                ),
+                lastVersionId: match &manifest.loader.r#type[..] {
+                    "fabric" => format!(
+                        "fabric-loader-{}-{}",
+                        &manifest.loader.version, &manifest.loader.minecraft_version
+                    ),
+                    "quilt" => format!(
+                        "quilt-loader-{}-{}",
+                        &manifest.loader.version, &manifest.loader.minecraft_version
+                    ),
+                    _ => panic!("Invalid loader"),
+                },
                 created: now,
                 name: manifest.name.clone(),
                 icon,
@@ -689,7 +695,7 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                             dependencyOnly: None,
                             important: None,
                         },
-                        _ => panic!(),
+                        _ => panic!("Invalid loader"),
                     },
                 ],
                 formatVersion: 1,
@@ -1198,7 +1204,6 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
     remove_items!(local_manifest.resourcepacks, |x| {
         !new_resourcepacks.contains(x)
     });
-    // TODO(Update to support quilt)
     if installer_profile.manifest.loader != local_manifest.loader {
         fs::remove_dir_all(
             get_modpack_root(
@@ -1208,10 +1213,17 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
                     .expect("Launcher not selected!"),
                 &installer_profile.manifest.uuid,
             )
-            .join(Path::new(&format!(
-                "versions/fabric-loader-{}-{}",
-                &local_manifest.loader.version, &local_manifest.loader.minecraft_version
-            ))),
+            .join(match &installer_profile.manifest.loader.r#type[..] {
+                "fabric" => format!(
+                    "versions/fabric-loader-{}-{}",
+                    &local_manifest.loader.version, &local_manifest.loader.minecraft_version
+                ),
+                "quilt" => format!(
+                    "versions/quilt-loader-{}-{}",
+                    &local_manifest.loader.version, &local_manifest.loader.minecraft_version
+                ),
+                _ => panic!("Invalid loader"),
+            }),
         )
         .expect("Could not delete old fabric version!");
     }
