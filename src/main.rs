@@ -725,6 +725,8 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
     }
 }
 
+/// Panics:
+///     If path is not located in modpack_root
 macro_rules! validate_item_path {
     ($item:expr, $modpack_root:expr) => {
         if $item.path.is_some() {
@@ -811,7 +813,23 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                 authors: r#mod.authors,
             }
         } else {
-            validate_item_path!(r#mod, modpack_root)
+            let r#mod = validate_item_path!(r#mod, modpack_root);
+            let path;
+            if !installer_profile.enabled_features.contains(&r#mod.id) && r#mod.path.is_some() {
+                fs::remove_file(r#mod.path.as_ref().unwrap()).expect("Failed to remove old mod");
+                path = None;
+            } else {
+                path = r#mod.path;
+            }
+            Mod {
+                path,
+                name: r#mod.name,
+                source: r#mod.source,
+                location: r#mod.location,
+                version: r#mod.version,
+                id: r#mod.id,
+                authors: r#mod.authors,
+            }
         }
     }))
     .buffer_unordered(CONCURRENCY)
@@ -836,7 +854,26 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                     authors: shaderpack.authors,
                 }
             } else {
-                validate_item_path!(shaderpack, modpack_root)
+                let shaderpack = validate_item_path!(shaderpack, modpack_root);
+                let path;
+                if !installer_profile.enabled_features.contains(&shaderpack.id)
+                    && shaderpack.path.is_some()
+                {
+                    fs::remove_file(shaderpack.path.as_ref().unwrap())
+                        .expect("Failed to remove old mod");
+                    path = None;
+                } else {
+                    path = shaderpack.path;
+                }
+                Shaderpack {
+                    path,
+                    name: shaderpack.name,
+                    source: shaderpack.source,
+                    location: shaderpack.location,
+                    version: shaderpack.version,
+                    id: shaderpack.id,
+                    authors: shaderpack.authors,
+                }
             }
         },
     ))
@@ -865,7 +902,28 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                         authors: resourcepack.authors,
                     }
                 } else {
-                    validate_item_path!(resourcepack, modpack_root)
+                    let resourcepack = validate_item_path!(resourcepack, modpack_root);
+                    let path;
+                    if !installer_profile
+                        .enabled_features
+                        .contains(&resourcepack.id)
+                        && resourcepack.path.is_some()
+                    {
+                        fs::remove_file(resourcepack.path.as_ref().unwrap())
+                            .expect("Failed to remove old mod");
+                        path = None;
+                    } else {
+                        path = resourcepack.path;
+                    }
+                    Resourcepack {
+                        path,
+                        name: resourcepack.name,
+                        source: resourcepack.source,
+                        location: resourcepack.location,
+                        version: resourcepack.version,
+                        id: resourcepack.id,
+                        authors: resourcepack.authors,
+                    }
                 }
             },
         ))
@@ -873,6 +931,23 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         .collect::<Vec<Resourcepack>>()
         .await;
     let mut included_files: HashMap<String, Included> = HashMap::new();
+    let inc_files = match installer_profile.local_manifest.clone() {
+        Some(local_manifest) => match local_manifest.included_files {
+            Some(files) => files,
+            None => HashMap::new(),
+        },
+        None => HashMap::new(),
+    };
+    for inc in &inc_files {
+        if !installer_profile
+            .enabled_features
+            .contains(&inc.0.replace(".zip", ""))
+        {
+            for file in &inc.1.files {
+                fs::remove_file(file).expect("Failed to remove inc")
+            }
+        }
+    }
     if !manifest.include.is_empty() {
         // Include files exist
         let release: Vec<GithubRelease> = serde_json::from_str(
@@ -903,12 +978,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                 .expect("Missing body on modpack release!"),
         )
         .expect("Failed to parse hash pairs!");
-        let inc_files = match installer_profile.local_manifest.clone() {
-            Some(local_manifest) => local_manifest
-                .included_files
-                .expect("Local manifest missing 'included_files'!"),
-            None => HashMap::new(),
-        };
+
         for inc in &manifest.include {
             if !installer_profile.enabled_features.contains(&inc.id) {
                 continue;
@@ -1128,6 +1198,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
     remove_items!(local_manifest.resourcepacks, |x| {
         !new_resourcepacks.contains(x)
     });
+    // TODO(Update to support quilt)
     if installer_profile.manifest.loader != local_manifest.loader {
         fs::remove_dir_all(
             get_modpack_root(
@@ -1160,7 +1231,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
             description: installer_profile.manifest.description.clone(),
             subtitle: installer_profile.manifest.subtitle.clone(),
             enabled_features: installer_profile.manifest.enabled_features,
-            included_files: None,
+            included_files: local_manifest.included_files.clone(),
         },
         http_client: installer_profile.http_client,
         installed: installer_profile.installed,
@@ -1169,7 +1240,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         modpack_branch: installer_profile.modpack_branch,
         enabled_features: installer_profile.enabled_features,
         launcher: installer_profile.launcher,
-        local_manifest: installer_profile.local_manifest,
+        local_manifest: Some(local_manifest),
     })
     .await
 }

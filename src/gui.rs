@@ -5,7 +5,7 @@ use base64::{engine, Engine};
 use dioxus::prelude::*;
 use regex::Regex;
 
-use crate::get_launcher;
+use crate::{get_launcher, InstallerProfile};
 
 fn Header(cx: Scope) -> Element {
     // TODO(figure out how to make this from modpack_source)
@@ -183,6 +183,48 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
     })
 }
 
+fn feature_change(
+    installer_profile: &UseRef<InstallerProfile>,
+    modify: &UseState<bool>,
+    evt: FormEvent,
+    feat: &super::Feature,
+    modify_count: &UseRef<i32>,
+) {
+    let enabled = match &*evt.data.value {
+        "true" => true,
+        "false" => false,
+        _ => panic!("Invalid bool from feature"),
+    };
+    if installer_profile.with(|profile| profile.installed) {
+        let modify_res = installer_profile.with(|profile| {
+            profile
+                .local_manifest
+                .as_ref()
+                .unwrap()
+                .enabled_features
+                .contains(&feat.id)
+                != enabled
+        });
+        if modify_count.with(|x| *x <= 1) {
+            modify.set(
+                installer_profile.with(|profile| {
+                    profile
+                        .local_manifest
+                        .as_ref()
+                        .unwrap()
+                        .enabled_features
+                        .contains(&feat.id)
+                }) != enabled,
+            );
+        }
+        if modify_res {
+            modify_count.with_mut(|x| *x += 1);
+        } else {
+            modify_count.with_mut(|x| *x -= 1);
+        }
+    }
+}
+
 #[derive(Props)]
 struct VersionProps<'a> {
     modpack_source: &'a String,
@@ -222,58 +264,80 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     }
     // states can be turned into an Rc using .current() and can be made into an owned value by using .as_ref().to_owned()
     // TODO(Clean this up)
-    let installer_profile = use_state(cx, || profile.unwrap().to_owned().unwrap());
+    let installer_profile = use_ref(cx, || profile.unwrap().to_owned().unwrap());
     let installing = use_state(cx, || false);
+    let modify = use_state(cx, || false);
+    let modify_count = use_ref(cx, || 0);
     let credits = use_state(cx, || false);
     let on_submit = move |event: FormEvent| {
         cx.spawn({
-            let mut mut_installer_profile = profile.unwrap().to_owned().unwrap();
             installing.set(true);
             let installing = installing.clone();
             let installer_profile = installer_profile.clone();
+            let modify = modify.clone();
+            let modify_count = modify_count.clone();
             let error = error.clone();
             async move {
                 for k in event.data.values.keys() {
                     if event.data.values[k] == "true" {
-                        mut_installer_profile.enabled_features.push(k.to_owned());
-                        mut_installer_profile
-                            .manifest
-                            .enabled_features
-                            .push(k.to_owned());
+                        installer_profile
+                            .with_mut(|profile| profile.enabled_features.push(k.to_owned()));
+                        installer_profile.with_mut(|profile| {
+                            profile.manifest.enabled_features.push(k.to_owned())
+                        });
+                    } else {
+                        installer_profile
+                            .with_mut(|profile| profile.enabled_features.retain(|x| x != k));
+                        installer_profile.with_mut(|profile| {
+                            profile.manifest.enabled_features.retain(|x| x != k)
+                        });
                     }
                 }
 
-                if !mut_installer_profile.installed {
-                    match super::install(mut_installer_profile.clone()).await {
+                if !installer_profile.with(|profile| profile.installed) {
+                    match super::install(installer_profile.with(|profile| profile.clone())).await {
                         Ok(_) => {}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
                         }
                     }
-                } else if mut_installer_profile.update_available {
-                    match super::update(mut_installer_profile.clone()).await {
+                } else if installer_profile.with(|profile| profile.update_available) {
+                    match super::update(installer_profile.with(|profile| profile.clone())).await {
                         Ok(_) => {}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
                         }
                     }
+                } else if *modify {
+                    match super::update(installer_profile.with(|profile| profile.clone())).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error.set(Some(format!("{:#?}", e) + " (Failed to modify modpack!)"));
+                        }
+                    }
+                    modify.with_mut(|x| *x = false);
+                    modify_count.with_mut(|x| *x = 0);
                 }
-                mut_installer_profile.local_manifest = Some(mut_installer_profile.manifest.clone());
-                mut_installer_profile.installed = true;
-                mut_installer_profile.update_available = false;
+                installer_profile.with_mut(|profile| {
+                    profile.local_manifest = Some(profile.manifest.clone());
+                    profile.installed = true;
+                    profile.update_available = false;
+                });
                 installing.set(false);
-                installer_profile.set(mut_installer_profile);
             }
         });
     };
     let re = Regex::new("on\\w*=\"").unwrap();
     let description = installer_profile
-        .manifest
+        .with(|profile| profile.manifest.clone())
         .description
         .replace("<script>", "<noscript>")
         .replace("<script/>", "<noscript/>");
     let description = re.replace_all(description.as_str(), "harmless=\"");
-    let install_disable = if installer_profile.installed && !installer_profile.update_available {
+    let install_disable = if installer_profile.with(|profile| profile.installed)
+        && installer_profile.with(|profile| !profile.update_available)
+        && !modify
+    {
         Some("true")
     } else {
         None
@@ -286,7 +350,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 div {
                     class: "subtitle-container",
                     h1 {
-                        "{installer_profile.manifest.subtitle}"
+                        "{installer_profile.with(|profile| profile.manifest.subtitle.clone())}"
                     }
                 }
                 div {
@@ -309,7 +373,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 div {
                     class: "subtitle-container",
                     h1 {
-                        "{installer_profile.manifest.subtitle}"
+                        "{installer_profile.with(|profile| profile.manifest.subtitle.clone())}"
                     }
                 }
                 div {
@@ -331,7 +395,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                             div {
                                 class: "credits",
                                 Credits {
-                                    manifest: installer_profile.manifest.clone()
+                                    manifest: installer_profile.with(|profile| profile.manifest.clone())
                                 }
                             }
                         }
@@ -348,7 +412,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                     div {
                         class: "subtitle-container",
                         h1 {
-                            "{installer_profile.manifest.subtitle}"
+                            "{installer_profile.with(|profile| profile.manifest.subtitle.clone())}"
                         }
                     }
                     div {
@@ -369,19 +433,27 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                 }
                                 div {
                                     class: "feature-list",
-                                    for feat in &installer_profile.manifest.features {
+                                    for feat in installer_profile.with(|profile| profile.manifest.features.clone()) {
                                         label {
-                                            if feat.default || (installer_profile.installed && installer_profile.local_manifest.as_ref().unwrap().enabled_features.contains(&feat.id)) {
-                                                rsx!(input {
-                                                    name: "{feat.id}",
-                                                    r#type: "checkbox",
-                                                    checked: "true"
-                                                })
-                                            } else {
-                                                rsx!(input {
-                                                    name: "{feat.id}",
-                                                    r#type: "checkbox"
-                                                })
+                                            input {
+                                                checked: if installer_profile.with(|profile| profile.installed) {
+                                                    if installer_profile.with(|profile| profile.local_manifest.as_ref().unwrap().enabled_features.contains(&feat.id)) {
+                                                        Some("true")
+                                                    } else {
+                                                        None
+                                                    }
+                                                } else {
+                                                    if feat.default {
+                                                        Some("true")
+                                                    } else {
+                                                        None
+                                                    }
+                                                },
+                                                name: "{feat.id}",
+                                                onchange: move |evt| {
+                                                    feature_change(installer_profile, modify, evt, &feat, modify_count);
+                                                },
+                                                r#type: "checkbox",    
                                             }
                                             "{feat.name}"
                                         }
@@ -395,7 +467,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                         }
                         input {
                             r#type: "submit",
-                            value: if !installer_profile.installed {"Install"} else {"Update"},
+                            value: if !installer_profile.with(|profile| profile.installed) {"Install"} else {if **modify {"Modify"} else {"Update"}},
                             class: "install-button",
                             disabled: install_disable
                         }
