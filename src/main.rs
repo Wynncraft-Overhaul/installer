@@ -561,7 +561,12 @@ fn get_app_data() -> PathBuf {
 }
 
 fn get_multimc_folder(multimc: &str) -> Result<PathBuf, String> {
-    let path = get_app_data().join(multimc);
+    let path = match env::consts::OS {
+        "linux" => get_app_data().join(format!(".local/share/{}", multimc)),
+        "windows" => get_app_data().join(multimc),
+        "macos" => todo!("Add macOS support"),
+        _ => panic!("Unsupported os '{}'!", env::consts::OS),
+    };
     match path.metadata() {
         Ok(metadata) => {
             if metadata.is_dir() {
