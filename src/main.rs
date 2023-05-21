@@ -338,6 +338,8 @@ struct Manifest {
     #[serde(default = "default_enabled_features")]
     enabled_features: Vec<String>,
     included_files: Option<HashMap<String, Included>>,
+    source: Option<String>,
+    installer_path: Option<String>,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -1075,6 +1077,20 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         features: manifest.features.clone(),
         enabled_features: installer_profile.enabled_features.clone(),
         included_files: Some(included_files),
+        source: Some(format!(
+            "{}{}",
+            installer_profile.modpack_source, installer_profile.modpack_branch
+        )),
+        installer_path: Some(
+            env::current_exe()
+                .unwrap()
+                .canonicalize()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned()
+                .replace("\\\\?\\", ""),
+        ),
     };
     fs::write(
         modpack_root.join(
@@ -1248,6 +1264,8 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
             subtitle: installer_profile.manifest.subtitle.clone(),
             enabled_features: installer_profile.manifest.enabled_features,
             included_files: local_manifest.included_files.clone(),
+            source: local_manifest.source.clone(),
+            installer_path: local_manifest.installer_path.clone(),
         },
         http_client: installer_profile.http_client,
         installed: installer_profile.installed,
