@@ -563,8 +563,7 @@ fn get_app_data() -> PathBuf {
 fn get_multimc_folder(multimc: &str) -> Result<PathBuf, String> {
     let path = match env::consts::OS {
         "linux" => get_app_data().join(format!(".local/share/{}", multimc)),
-        "windows" => get_app_data().join(multimc),
-        "macos" => todo!("Add macOS support"),
+        "windows" | "macos" => get_app_data().join(multimc),
         _ => panic!("Unsupported os '{}'!", env::consts::OS),
     };
     match path.metadata() {
@@ -1470,6 +1469,14 @@ async fn init(
     } else {
         false
     };
+    let mut enabled_features = vec![default_id()];
+    if !installed {
+        for feat in &manifest.features {
+            if feat.default {
+                enabled_features.push(feat.id.clone());
+            }
+        }
+    }
     Ok(InstallerProfile {
         manifest,
         http_client,
@@ -1477,7 +1484,7 @@ async fn init(
         update_available,
         modpack_source: modpack_source.to_owned(),
         modpack_branch: modpack_branch.to_owned(),
-        enabled_features: vec![String::from("default")],
+        enabled_features,
         launcher: Some(launcher),
         local_manifest: if local_manifest.is_some() && local_manifest.as_ref().unwrap().is_ok() {
             Some(local_manifest.unwrap().unwrap())
