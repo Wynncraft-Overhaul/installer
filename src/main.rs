@@ -788,10 +788,6 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
 }
 
 async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
-    // Yes this is needed and no i wont change it
-    // This might not be needed now to we use isahc
-    // Especially now that we use 'InstallerProfile's
-    // TODO(Remove unnecessary clone usage)
     let modpack_root = &get_modpack_root(
         installer_profile
             .launcher
@@ -809,6 +805,8 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         )),
         Launcher::MultiMC(_) => None,
     };
+    // TODO(Combine mod, shaderpack and resourcepack handling into a single function)
+    // This should probably be done with a function requirng Downloadable + DownloadableGetters as a argument
     let mods_w_path = futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async {
         if r#mod.path.is_none() && installer_profile.enabled_features.contains(&r#mod.id) {
             Mod {
@@ -1459,13 +1457,14 @@ async fn init(
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
         };
-    // If the manifest version is different the contents are probably different enough to cause a failure to parse.
-    // TODO(Parse only manifest_version)
-    assert!(
-        CURRENT_MANIFEST_VERSION == manifest.manifest_version,
-        "Unsupported manifest version '{}'!",
-        manifest.manifest_version
-    );
+
+    // Its not guaranteed that a manifest with a different version manages to parse however we handle parsing failures and therefore we should be fine to just return an error here
+    if CURRENT_MANIFEST_VERSION != manifest.manifest_version {
+        return Err(format!(
+            "Unsupported manifest version '{}'!",
+            manifest.manifest_version
+        ));
+    }
     let modpack_root = get_modpack_root(&launcher, &manifest.uuid);
     let mut installed = modpack_root.join(Path::new("manifest.json")).exists();
     let local_manifest: Option<Result<Manifest, serde_json::Error>> = if installed {
