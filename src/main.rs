@@ -18,6 +18,7 @@ use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::{
     env, fs,
     io::Cursor,
@@ -125,11 +126,25 @@ trait Downloadable {
         loader_type: &str,
         http_client: &CachedHttpClient,
     ) -> PathBuf;
+
+    fn new(
+        name: String,
+        source: String,
+        location: String,
+        version: String,
+        path: Option<PathBuf>,
+        id: String,
+        authors: Vec<Author>,
+    ) -> Self;
 }
 trait DownloadableGetters {
     fn get_name(&self) -> &String;
     fn get_location(&self) -> &String;
     fn get_version(&self) -> &String;
+    fn get_path(&self) -> &Option<PathBuf>;
+    fn get_id(&self) -> &String;
+    fn get_source(&self) -> &String;
+    fn get_authors(&self) -> &Vec<Author>;
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -149,6 +164,73 @@ struct Included {
     files: Vec<String>,
 }
 
+macro_rules! gen_downloadble_impl {
+    ($item:ty, $type:literal) => {
+        impl DownloadableGetters for $item {
+            fn get_name(&self) -> &String {
+                &self.name
+            }
+            fn get_location(&self) -> &String {
+                &self.location
+            }
+            fn get_version(&self) -> &String {
+                &self.version
+            }
+            fn get_path(&self) -> &Option<PathBuf> {
+                &self.path
+            }
+            fn get_id(&self) -> &String {
+                &self.id
+            }
+            fn get_source(&self) -> &String {
+                &self.source
+            }
+            fn get_authors(&self) -> &Vec<Author> {
+                &self.authors
+            }
+        }
+
+        #[async_trait]
+        impl Downloadable for $item {
+            async fn download(
+                &self,
+                modpack_root: &Path,
+                loader_type: &str,
+                http_client: &CachedHttpClient,
+            ) -> PathBuf {
+                match self.source.as_str() {
+                    "modrinth" => {
+                        download_from_modrinth(self, modpack_root, loader_type, $type, http_client)
+                            .await
+                    }
+                    "ddl" => download_from_ddl(self, modpack_root, $type, http_client).await,
+                    _ => panic!("Unsupported source '{}'!", self.source.as_str()),
+                }
+            }
+
+            fn new(
+                name: String,
+                source: String,
+                location: String,
+                version: String,
+                path: Option<PathBuf>,
+                id: String,
+                authors: Vec<Author>,
+            ) -> Self {
+                Self {
+                    name,
+                    source,
+                    location,
+                    version,
+                    path,
+                    id,
+                    authors,
+                }
+            }
+        }
+    };
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Mod {
     name: String,
@@ -160,34 +242,7 @@ struct Mod {
     id: String,
     authors: Vec<Author>,
 }
-impl DownloadableGetters for Mod {
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_location(&self) -> &String {
-        &self.location
-    }
-    fn get_version(&self) -> &String {
-        &self.version
-    }
-}
-#[async_trait]
-impl Downloadable for Mod {
-    async fn download(
-        &self,
-        modpack_root: &Path,
-        loader_type: &str,
-        http_client: &CachedHttpClient,
-    ) -> PathBuf {
-        match self.source.as_str() {
-            "modrinth" => {
-                download_from_modrinth(self, modpack_root, loader_type, "mod", http_client).await
-            }
-            "ddl" => download_from_ddl(self, modpack_root, "mod", http_client).await,
-            _ => panic!("Unsupported source '{}'!", self.source.as_str()),
-        }
-    }
-}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Shaderpack {
     name: String,
@@ -199,35 +254,7 @@ struct Shaderpack {
     id: String,
     authors: Vec<Author>,
 }
-impl DownloadableGetters for Shaderpack {
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_location(&self) -> &String {
-        &self.location
-    }
-    fn get_version(&self) -> &String {
-        &self.version
-    }
-}
-#[async_trait]
-impl Downloadable for Shaderpack {
-    async fn download(
-        &self,
-        modpack_root: &Path,
-        loader_type: &str,
-        http_client: &CachedHttpClient,
-    ) -> PathBuf {
-        match self.source.as_str() {
-            "modrinth" => {
-                download_from_modrinth(self, modpack_root, loader_type, "shaderpack", http_client)
-                    .await
-            }
-            "ddl" => download_from_ddl(self, modpack_root, "shaderpack", http_client).await,
-            _ => panic!("Unsupported source '{}'!", self.source.as_str()),
-        }
-    }
-}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Resourcepack {
     name: String,
@@ -239,43 +266,18 @@ struct Resourcepack {
     id: String,
     authors: Vec<Author>,
 }
-impl DownloadableGetters for Resourcepack {
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_location(&self) -> &String {
-        &self.location
-    }
-    fn get_version(&self) -> &String {
-        &self.version
-    }
-}
-#[async_trait]
-impl Downloadable for Resourcepack {
-    async fn download(
-        &self,
-        modpack_root: &Path,
-        loader_type: &str,
-        http_client: &CachedHttpClient,
-    ) -> PathBuf {
-        match self.source.as_str() {
-            "modrinth" => {
-                download_from_modrinth(self, modpack_root, loader_type, "resourcepack", http_client)
-                    .await
-            }
-            "ddl" => download_from_ddl(self, modpack_root, "resourcepack", http_client).await,
-            _ => panic!("Unsupported source '{}'!", self.source.as_str()),
-        }
-    }
-}
+
+gen_downloadble_impl!(Mod, "mod");
+gen_downloadble_impl!(Shaderpack, "shaderpack");
+gen_downloadble_impl!(Resourcepack, "resourcepack");
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Loader {
     r#type: String,
     version: String,
     minecraft_version: String,
 }
-#[async_trait]
-impl Downloadable for Loader {
+
+impl Loader {
     async fn download(&self, root: &Path, _: &str, http_client: &CachedHttpClient) -> PathBuf {
         match self.r#type.as_str() {
             "fabric" => {
@@ -741,16 +743,16 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
 ///     If path is not located in modpack_root
 macro_rules! validate_item_path {
     ($item:expr, $modpack_root:expr) => {
-        if $item.path.is_some() {
+        if $item.get_path().is_some() {
             if $item
-                .path
+                .get_path()
                 .as_ref()
                 .unwrap()
                 .parent()
                 .expect("Illegal item file path!")
                 .parent()
                 .expect("Illegal item dir path!")
-                == $modpack_root.as_path()
+                == $modpack_root
             {
                 $item
             } else {
@@ -787,6 +789,54 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
     }
 }
 
+async fn download_helper<T: Downloadable + DownloadableGetters + Debug>(
+    items: Vec<T>,
+    enabled_features: &Vec<String>,
+    modpack_root: &Path,
+    loader_type: &str,
+    http_client: &CachedHttpClient,
+) -> Vec<T> {
+    futures::stream::iter(items.into_iter().map(|shaderpack| async {
+        if shaderpack.get_path().is_none() && enabled_features.contains(shaderpack.get_id()) {
+            T::new(
+                shaderpack.get_name().to_owned(),
+                shaderpack.get_source().to_owned(),
+                shaderpack.get_location().to_owned(),
+                shaderpack.get_version().to_owned(),
+                Some(
+                    shaderpack
+                        .download(modpack_root, loader_type, http_client)
+                        .await,
+                ),
+                shaderpack.get_id().to_owned(),
+                shaderpack.get_authors().to_owned(),
+            )
+        } else {
+            let shaderpack = validate_item_path!(shaderpack, modpack_root);
+            let path;
+            if !enabled_features.contains(shaderpack.get_id()) && shaderpack.get_path().is_some() {
+                fs::remove_file(shaderpack.get_path().as_ref().unwrap())
+                    .expect("Failed to remove old mod");
+                path = None;
+            } else {
+                path = shaderpack.get_path().to_owned();
+            }
+            T::new(
+                shaderpack.get_name().to_owned(),
+                shaderpack.get_source().to_owned(),
+                shaderpack.get_location().to_owned(),
+                shaderpack.get_version().to_owned(),
+                path,
+                shaderpack.get_id().to_owned(),
+                shaderpack.get_authors().to_owned(),
+            )
+        }
+    }))
+    .buffer_unordered(CONCURRENCY)
+    .collect::<Vec<T>>()
+    .await
+}
+
 async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     let modpack_root = &get_modpack_root(
         installer_profile
@@ -805,141 +855,30 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         )),
         Launcher::MultiMC(_) => None,
     };
-    // TODO(Combine mod, shaderpack and resourcepack handling into a single function)
-    // This should probably be done with a function requirng Downloadable + DownloadableGetters as a argument
-    let mods_w_path = futures::stream::iter(manifest.mods.clone().into_iter().map(|r#mod| async {
-        if r#mod.path.is_none() && installer_profile.enabled_features.contains(&r#mod.id) {
-            Mod {
-                path: Some(
-                    r#mod
-                        .download(modpack_root, &manifest.loader.r#type, http_client)
-                        .await,
-                ),
-                name: r#mod.name,
-                source: r#mod.source,
-                location: r#mod.location,
-                version: r#mod.version,
-                id: r#mod.id,
-                authors: r#mod.authors,
-            }
-        } else {
-            let r#mod = validate_item_path!(r#mod, modpack_root);
-            let path;
-            if !installer_profile.enabled_features.contains(&r#mod.id) && r#mod.path.is_some() {
-                fs::remove_file(r#mod.path.as_ref().unwrap()).expect("Failed to remove old mod");
-                path = None;
-            } else {
-                path = r#mod.path;
-            }
-            Mod {
-                path,
-                name: r#mod.name,
-                source: r#mod.source,
-                location: r#mod.location,
-                version: r#mod.version,
-                id: r#mod.id,
-                authors: r#mod.authors,
-            }
-        }
-    }))
-    .buffer_unordered(CONCURRENCY)
-    .collect::<Vec<Mod>>()
+    let mods_w_path = download_helper(
+        manifest.mods.clone(),
+        &installer_profile.enabled_features,
+        modpack_root.as_path(),
+        &manifest.loader.r#type,
+        http_client,
+    )
     .await;
-    let shaderpacks_w_path = futures::stream::iter(manifest.shaderpacks.clone().into_iter().map(
-        |shaderpack| async {
-            if shaderpack.path.is_none()
-                && installer_profile.enabled_features.contains(&shaderpack.id)
-            {
-                Shaderpack {
-                    path: Some(
-                        shaderpack
-                            .download(modpack_root, &manifest.loader.r#type, http_client)
-                            .await,
-                    ),
-                    name: shaderpack.name,
-                    source: shaderpack.source,
-                    location: shaderpack.location,
-                    version: shaderpack.version,
-                    id: shaderpack.id,
-                    authors: shaderpack.authors,
-                }
-            } else {
-                let shaderpack = validate_item_path!(shaderpack, modpack_root);
-                let path;
-                if !installer_profile.enabled_features.contains(&shaderpack.id)
-                    && shaderpack.path.is_some()
-                {
-                    fs::remove_file(shaderpack.path.as_ref().unwrap())
-                        .expect("Failed to remove old mod");
-                    path = None;
-                } else {
-                    path = shaderpack.path;
-                }
-                Shaderpack {
-                    path,
-                    name: shaderpack.name,
-                    source: shaderpack.source,
-                    location: shaderpack.location,
-                    version: shaderpack.version,
-                    id: shaderpack.id,
-                    authors: shaderpack.authors,
-                }
-            }
-        },
-    ))
-    .buffer_unordered(CONCURRENCY)
-    .collect::<Vec<Shaderpack>>()
+    let shaderpacks_w_path = download_helper(
+        manifest.shaderpacks.clone(),
+        &installer_profile.enabled_features,
+        modpack_root.as_path(),
+        &manifest.loader.r#type,
+        http_client,
+    )
     .await;
-    let resourcepacks_w_path =
-        futures::stream::iter(manifest.resourcepacks.clone().into_iter().map(
-            |resourcepack| async {
-                if resourcepack.path.is_none()
-                    && installer_profile
-                        .enabled_features
-                        .contains(&resourcepack.id)
-                {
-                    Resourcepack {
-                        path: Some(
-                            resourcepack
-                                .download(modpack_root, &manifest.loader.r#type, http_client)
-                                .await,
-                        ),
-                        name: resourcepack.name,
-                        source: resourcepack.source,
-                        location: resourcepack.location,
-                        version: resourcepack.version,
-                        id: resourcepack.id,
-                        authors: resourcepack.authors,
-                    }
-                } else {
-                    let resourcepack = validate_item_path!(resourcepack, modpack_root);
-                    let path;
-                    if !installer_profile
-                        .enabled_features
-                        .contains(&resourcepack.id)
-                        && resourcepack.path.is_some()
-                    {
-                        fs::remove_file(resourcepack.path.as_ref().unwrap())
-                            .expect("Failed to remove old mod");
-                        path = None;
-                    } else {
-                        path = resourcepack.path;
-                    }
-                    Resourcepack {
-                        path,
-                        name: resourcepack.name,
-                        source: resourcepack.source,
-                        location: resourcepack.location,
-                        version: resourcepack.version,
-                        id: resourcepack.id,
-                        authors: resourcepack.authors,
-                    }
-                }
-            },
-        ))
-        .buffer_unordered(CONCURRENCY)
-        .collect::<Vec<Resourcepack>>()
-        .await;
+    let resourcepacks_w_path = download_helper(
+        manifest.resourcepacks.clone(),
+        &installer_profile.enabled_features,
+        modpack_root.as_path(),
+        &manifest.loader.r#type,
+        http_client,
+    )
+    .await;
     let mut included_files: HashMap<String, Included> = HashMap::new();
     let inc_files = match installer_profile.local_manifest.clone() {
         Some(local_manifest) => match local_manifest.included_files {
@@ -1133,26 +1072,43 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     Ok(())
 }
 
-macro_rules! remove_items {
-    ($items:expr, $predicate:expr) => {
-        $items.iter().filter($predicate).for_each(|x| {
-            fs::remove_file(x.path.as_ref().expect(&format!(
+fn remove_old_items<T: Downloadable + DownloadableGetters + PartialEq + Clone>(
+    items: Vec<T>,
+    installed_items: &Vec<T>,
+) -> Vec<T> {
+    let new_items: Vec<T> = items
+        .iter()
+        .filter_map(|item| {
+            installed_items
+                .iter()
+                .find(|installed_item| installed_item.get_name() == item.get_name())
+                .map_or_else(
+                    || Some(item.clone()),
+                    |installed_item| Some(installed_item.clone()),
+                )
+        })
+        .collect();
+    installed_items
+        .iter()
+        .filter(|x| !new_items.contains(x))
+        .for_each(|x| {
+            fs::remove_file(x.get_path().as_ref().expect(&format!(
                 "Missing 'path' field on installed {} '{}'!",
-                stringify!($items),
-                x.name
+                stringify!(x),
+                x.get_name()
             )))
             .expect(&format!(
                 "Failed to delete outdated {} '{}'!",
-                stringify!($items),
-                x.name
+                stringify!(x),
+                x.get_name()
             ));
         });
-    };
+    new_items
 }
+
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
 async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
-    // TODO(change this to be idiomatic and good) im not sure if the 'remove_items' macro should exist and if it should then maybe the filtering could be turned into a macro too
     let local_manifest: Manifest = match fs::read_to_string(
         get_modpack_root(
             installer_profile
@@ -1169,59 +1125,15 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         },
         Err(err) => panic!("Failed to read local manifest: {}", err),
     };
-
-    let new_mods: Vec<Mod> = installer_profile
-        .manifest
-        .mods
-        .iter()
-        .filter_map(|r#mod| {
-            local_manifest
-                .mods
-                .iter()
-                .find(|installed_mod| installed_mod.name == r#mod.name)
-                .map_or_else(
-                    || Some(r#mod.clone()),
-                    |installed_mod| Some(installed_mod.clone()),
-                )
-        })
-        .collect();
-    remove_items!(local_manifest.mods, |x| { !new_mods.contains(x) });
-    let new_shaderpacks: Vec<Shaderpack> = installer_profile
-        .manifest
-        .shaderpacks
-        .iter()
-        .filter_map(|shaderpack| {
-            local_manifest
-                .shaderpacks
-                .iter()
-                .find(|installed_sp| installed_sp.name == shaderpack.name)
-                .map_or_else(
-                    || Some(shaderpack.clone()),
-                    |installed_sp| Some(installed_sp.clone()),
-                )
-        })
-        .collect();
-    remove_items!(local_manifest.shaderpacks, |x| {
-        !new_shaderpacks.contains(x)
-    });
-    let new_resourcepacks: Vec<Resourcepack> = installer_profile
-        .manifest
-        .resourcepacks
-        .iter()
-        .filter_map(|resourcepack| {
-            local_manifest
-                .resourcepacks
-                .iter()
-                .find(|installed_rp| installed_rp.name == resourcepack.name)
-                .map_or_else(
-                    || Some(resourcepack.clone()),
-                    |installed_rp| Some(installed_rp.clone()),
-                )
-        })
-        .collect();
-    remove_items!(local_manifest.resourcepacks, |x| {
-        !new_resourcepacks.contains(x)
-    });
+    let new_mods = remove_old_items(installer_profile.manifest.mods, &local_manifest.mods);
+    let new_shaderpacks = remove_old_items(
+        installer_profile.manifest.shaderpacks,
+        &local_manifest.shaderpacks,
+    );
+    let new_resourcepacks = remove_old_items(
+        installer_profile.manifest.resourcepacks,
+        &local_manifest.resourcepacks,
+    );
     if installer_profile.manifest.loader != local_manifest.loader {
         fs::remove_dir_all(
             get_modpack_root(
