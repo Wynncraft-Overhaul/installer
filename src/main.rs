@@ -136,8 +136,6 @@ trait Downloadable {
         id: String,
         authors: Vec<Author>,
     ) -> Self;
-}
-trait DownloadableGetters {
     fn get_name(&self) -> &String;
     fn get_location(&self) -> &String;
     fn get_version(&self) -> &String;
@@ -166,30 +164,6 @@ struct Included {
 
 macro_rules! gen_downloadble_impl {
     ($item:ty, $type:literal) => {
-        impl DownloadableGetters for $item {
-            fn get_name(&self) -> &String {
-                &self.name
-            }
-            fn get_location(&self) -> &String {
-                &self.location
-            }
-            fn get_version(&self) -> &String {
-                &self.version
-            }
-            fn get_path(&self) -> &Option<PathBuf> {
-                &self.path
-            }
-            fn get_id(&self) -> &String {
-                &self.id
-            }
-            fn get_source(&self) -> &String {
-                &self.source
-            }
-            fn get_authors(&self) -> &Vec<Author> {
-                &self.authors
-            }
-        }
-
         #[async_trait]
         impl Downloadable for $item {
             async fn download(
@@ -226,6 +200,28 @@ macro_rules! gen_downloadble_impl {
                     id,
                     authors,
                 }
+            }
+
+            fn get_name(&self) -> &String {
+                &self.name
+            }
+            fn get_location(&self) -> &String {
+                &self.location
+            }
+            fn get_version(&self) -> &String {
+                &self.version
+            }
+            fn get_path(&self) -> &Option<PathBuf> {
+                &self.path
+            }
+            fn get_id(&self) -> &String {
+                &self.id
+            }
+            fn get_source(&self) -> &String {
+                &self.source
+            }
+            fn get_authors(&self) -> &Vec<Author> {
+                &self.authors
             }
         }
     };
@@ -471,7 +467,7 @@ async fn download_loader_json(
     loader_path
 }
 
-async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
+async fn download_from_ddl<T: Downloadable>(
     item: &T,
     modpack_root: &Path,
     r#type: &str,
@@ -504,7 +500,7 @@ async fn download_from_ddl<T: Downloadable + DownloadableGetters>(
     final_dist
 }
 
-async fn download_from_modrinth<T: Downloadable + DownloadableGetters>(
+async fn download_from_modrinth<T: Downloadable>(
     item: &T,
     modpack_root: &Path,
     loader_type: &str,
@@ -789,7 +785,7 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
     }
 }
 
-async fn download_helper<T: Downloadable + DownloadableGetters + Debug>(
+async fn download_helper<T: Downloadable + Debug>(
     items: Vec<T>,
     enabled_features: &Vec<String>,
     modpack_root: &Path,
@@ -1072,7 +1068,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     Ok(())
 }
 
-fn remove_old_items<T: Downloadable + DownloadableGetters + PartialEq + Clone>(
+fn remove_old_items<T: Downloadable + PartialEq + Clone>(
     items: Vec<T>,
     installed_items: &Vec<T>,
 ) -> Vec<T> {
