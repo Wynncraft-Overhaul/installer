@@ -52,15 +52,29 @@ struct CachedResponse {
     bytes: Vec<u8>,
 }
 
-impl Clone for CachedResponse {
-    fn clone(&self) -> Self {
-        let builder = Response::builder()
-            .status(self.resp.status())
-            .version(self.resp.version());
-        let builder = add_headers!(builder, self.resp.headers().into_iter());
+fn resp_rebuilder(resp: &Response<AsyncBody>, bytes: &Vec<u8>) -> Response<AsyncBody> {
+    let builder = Response::builder()
+        .status(resp.status())
+        .version(resp.version());
+    let builder = add_headers!(builder, resp.headers().into_iter());
+    builder.body(AsyncBody::from(bytes.to_owned())).unwrap()
+}
+
+impl CachedResponse {
+    async fn new(mut resp: Response<AsyncBody>) -> Self {
+        let bytes = resp.bytes().await.unwrap();
 
         Self {
-            resp: builder.body(AsyncBody::from(self.bytes.clone())).unwrap(),
+            resp: resp_rebuilder(&resp, &bytes),
+            bytes,
+        }
+    }
+}
+
+impl Clone for CachedResponse {
+    fn clone(&self) -> Self {
+        Self {
+            resp: resp_rebuilder(&self.resp, &self.bytes),
             bytes: self.bytes.clone(),
         }
     }
@@ -88,6 +102,13 @@ impl CachedHttpClient {
             Err(val) => Err(val),
         }
     }
+
+    async fn get_nocache<T: Into<String>>(
+        &self,
+        url: T,
+    ) -> Result<Response<AsyncBody>, isahc::Error> {
+        self.http_client.get_async(url.into()).await
+    }
 }
 
 #[cached(
@@ -98,11 +119,7 @@ impl CachedHttpClient {
 async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedResponse, isahc::Error> {
     let resp = http_client.get_async(url).await;
     match resp {
-        Ok(mut val) => {
-            let bytes = val.bytes().await.unwrap();
-            // CachedResponse needs to be cloned in order to init the AsyncBody otherwise the cache will not return anything on first call
-            Ok(CachedResponse { resp: val, bytes }.clone())
-        }
+        Ok(val) => Ok(CachedResponse::new(val).await),
         Err(err) => Err(err),
     }
 }
@@ -474,7 +491,7 @@ async fn download_from_ddl<T: Downloadable>(
     http_client: &CachedHttpClient,
 ) -> PathBuf {
     let content = http_client
-        .get_async(item.get_location())
+        .get_nocache(item.get_location())
         .await
         .expect(&format!("Failed to download '{}'!", item.get_name()))
         .bytes()
@@ -536,7 +553,7 @@ async fn download_from_modrinth<T: Downloadable>(
                 || r#type == "shaderpack")
         {
             let content = http_client
-                .get_async(&_mod.files[0].url)
+                .get_nocache(&_mod.files[0].url)
                 .await
                 .expect(&format!("Failed to download '{}'!", item.get_name()))
                 .bytes()
