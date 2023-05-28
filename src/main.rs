@@ -513,13 +513,34 @@ async fn download_from_ddl<T: Downloadable>(
     r#type: &str,
     http_client: &CachedHttpClient,
 ) -> PathBuf {
-    let content = http_client
+    let mut resp = http_client
         .get_nocache(item.get_location())
         .await
-        .expect(&format!("Failed to download '{}'!", item.get_name()))
-        .bytes()
-        .await
-        .unwrap();
+        .expect(&format!("Failed to download '{}'!", item.get_name()));
+    let filename = if let Some(x) = resp.headers().get("content-disposition") {
+        let x = x.to_str().unwrap();
+        if x.contains("attachment") {
+            x.split("filename=").last().unwrap().replace('"', "")
+        } else {
+            item.get_location()
+                .split('/')
+                .last()
+                .expect(&format!(
+                    "Could not determine file name for ddl: '{}'!",
+                    item.get_location()
+                ))
+                .to_string()
+        }
+    } else {
+        item.get_location()
+            .split('/')
+            .last()
+            .expect(&format!(
+                "Could not determine file name for ddl: '{}'!",
+                item.get_location()
+            ))
+            .to_string()
+    };
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
@@ -530,13 +551,8 @@ async fn download_from_ddl<T: Downloadable>(
         "Failed to create '{}' directory",
         &dist.to_str().unwrap()
     ));
-    let final_dist = dist.join(Path::new(item.get_location().split('/').last().expect(
-        &format!(
-            "Could not determine file name for ddl: '{}'!",
-            item.get_location()
-        ),
-    )));
-    fs::write(&final_dist, content).expect("Failed to write ddl item!");
+    let final_dist = dist.join(filename);
+    fs::write(&final_dist, resp.bytes().await.unwrap()).expect("Failed to write ddl item!");
     final_dist
 }
 
@@ -548,7 +564,7 @@ async fn download_from_modrinth<T: Downloadable>(
     http_client: &CachedHttpClient,
 ) -> PathBuf {
     let resp = http_client
-        .get_async(format!(
+        .get_nocache(format!(
             "https://api.modrinth.com/v2/project/{}/version",
             item.get_location()
         ))
@@ -935,10 +951,13 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     }
     if !manifest.include.is_empty() {
         // Include files exist
-        let release: Vec<GithubRelease> = serde_json::from_str(
+        let release: GithubRelease = serde_json::from_str(
             http_client
                 .get_async(
-                    GH_API.to_owned() + installer_profile.modpack_source.as_str() + "releases",
+                    GH_API.to_owned()
+                        + installer_profile.modpack_source.as_str()
+                        + "releases/tags/"
+                        + installer_profile.modpack_branch.as_str(),
                 )
                 .await
                 .expect("Failed to retrieve releases!")
@@ -948,16 +967,8 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                 .as_str(),
         )
         .expect("Failed to parse release response!");
-
-        let selected_rel = release
-            .iter()
-            .filter(|rel| rel.tag_name == installer_profile.modpack_branch)
-            .collect::<Vec<&GithubRelease>>()
-            .first()
-            .cloned()
-            .expect("Failed to retrieve release for selected branch!");
         let hash_pairs: HashMap<String, String> = serde_json::from_str(
-            &selected_rel
+            &release
                 .body
                 .as_ref()
                 .expect("Missing body on modpack release!"),
@@ -967,7 +978,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
             if !installer_profile.enabled_features.contains(&inc.id) {
                 continue;
             }
-            'a: for asset in &selected_rel.assets {
+            'a: for asset in &release.assets {
                 let inc_zip_name = inc.id.clone() + ".zip";
                 if asset.name == inc_zip_name {
                     let md5 = hash_pairs
