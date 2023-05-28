@@ -15,7 +15,7 @@ use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
 use isahc::config::RedirectPolicy;
 use isahc::prelude::Configurable;
-use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Response};
+use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -109,6 +109,20 @@ impl CachedHttpClient {
     ) -> Result<Response<AsyncBody>, isahc::Error> {
         self.http_client.get_async(url.into()).await
     }
+
+    async fn with_headers<T: Into<String>>(
+        &self,
+        url: T,
+        headers: &[(&str, &str)],
+    ) -> Result<Response<AsyncBody>, isahc::Error> {
+        self.http_client
+            .send_async(
+                add_headers!(Request::get(url.into()), headers.into_iter())
+                    .body(())
+                    .unwrap(),
+            )
+            .await
+    }
 }
 
 #[cached(
@@ -124,17 +138,25 @@ async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedRespo
     }
 }
 
+#[cfg(debug_assertions)]
 fn build_http_client() -> HttpClient {
     HttpClient::builder()
         .redirect_policy(RedirectPolicy::Limit(5))
-        .default_headers(&[(
-            "User-Agent",
-            "wynncraft-overhaul/installer/0.1.0 (commander#4392)",
-        )])
+        .default_headers(&[
+            ("User-Agent", "wynncraft-overhaul/installer/0.1.0"),
+            ("Authorization", &format!("Bearer {}", include_str!("pat"))),
+        ])
         .build()
         .unwrap()
 }
-
+#[cfg(not(debug_assertions))]
+fn build_http_client() -> HttpClient {
+    HttpClient::builder()
+        .redirect_policy(RedirectPolicy::Limit(5))
+        .default_headers(&[("User-Agent", "wynncraft-overhaul/installer/0.1.0")])
+        .build()
+        .unwrap()
+}
 #[async_trait]
 trait Downloadable {
     async fn download(
@@ -415,6 +437,7 @@ struct GithubRepo {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct GithubAsset {
     name: String,
+    id: i32,
     browser_download_url: String,
 }
 
@@ -940,7 +963,6 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                 .expect("Missing body on modpack release!"),
         )
         .expect("Failed to parse hash pairs!");
-
         for inc in &manifest.include {
             if !installer_profile.enabled_features.contains(&inc.id) {
                 continue;
@@ -974,7 +996,13 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                     let mut files: Vec<String> = vec![];
                     // download and unzip in modpack root
                     let content = http_client
-                        .get_async(&asset.browser_download_url)
+                        .with_headers(
+                            format!(
+                                "{}{}releases/assets/{}",
+                                GH_API, installer_profile.modpack_source, asset.id
+                            ),
+                            &[("Accept", "application/octet-stream")],
+                        )
                         .await
                         .expect("Failed to download 'include.zip'")
                         .bytes()
@@ -1270,7 +1298,7 @@ fn main() {
         let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
         let branches: Vec<GithubBranch> = serde_json::from_str(
             build_http_client()
-                .get(GH_API.to_owned() + "Commander07/modpack-test/" + "branches")
+                .get(GH_API.to_owned() + "Wynncraft-Overhaul/ultimate-overhaul/" + "branches")
                 .expect("Failed to retrive branches!")
                 .text()
                 .unwrap()
@@ -1302,7 +1330,7 @@ fn main() {
             gui::App,
             gui::AppProps {
                 branches,
-                modpack_source: String::from("Commander07/modpack-test/"),
+                modpack_source: String::from("Wynncraft-Overhaul/ultimate-overhaul/"),
                 config,
                 config_path,
                 style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
