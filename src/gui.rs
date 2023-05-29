@@ -7,7 +7,12 @@ use regex::Regex;
 
 use crate::{get_launcher, InstallerProfile};
 
-fn Header(cx: Scope) -> Element {
+#[derive(Props, PartialEq)]
+struct HeaderProps {
+    name: String,
+}
+
+fn Header(cx: Scope<HeaderProps>) -> Element {
     // TODO(figure out how to make this from modpack_source)
     cx.render(rsx! {
         div {
@@ -15,7 +20,7 @@ fn Header(cx: Scope) -> Element {
             div {
                 class: "header-inner",
                 h1 {
-                    "Majestic Overhaul"
+                    cx.props.name.clone()
                 }
             }
         }
@@ -252,6 +257,7 @@ struct VersionProps<'a> {
     modpack_branch: String,
     launcher: super::Launcher,
     error: &'a UseRef<Option<String>>,
+    name: &'a UseRef<String>,
 }
 
 fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
@@ -260,7 +266,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     let launcher = (cx.props.launcher).to_owned();
     // TODO(Remove weird clonage)
     let error = cx.props.error.clone();
-    let err = error.clone();
+    let err: UseRef<Option<String>> = error.clone();
     let profile = use_future(cx, (), |_| async move {
         super::init(modpack_source, modpack_branch, launcher).await
     })
@@ -371,6 +377,13 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
     } else {
         None
     };
+
+    if cx.props.name.with(|x| x == &String::default()) {
+        cx.props
+            .name
+            .set(installer_profile.with(|x| x.manifest.name.clone()));
+    }
+
     // TODO(Split these renders into multiple components)
     if **installing {
         cx.render(rsx! {
@@ -538,6 +551,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
     let settings: &UseState<bool> = use_state(cx, || false);
     let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
     let err: &UseRef<Option<String>> = use_ref(cx, || None);
+    let name = use_ref(cx, || String::default());
     if err.with(|e| e.is_some()) {
         return cx.render(rsx!(Error {
             error: err.with(|e| e.clone().unwrap())
@@ -561,7 +575,9 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
         style { cx.props.style_css }
         if **settings {
             rsx!{
-                Header {}
+                Header {
+                    name: name.with(|x| x.clone())
+                }
                 div {
                     class: "fake-body",
                     Settings {
@@ -584,7 +600,9 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                         src: "{cog}",
                     }
                 }
-                Header {}
+                Header {
+                    name: name.with(|x| x.clone())
+                }
                 div {
                     class: "fake-body",
                     for i in 0..branches.len() {
@@ -593,6 +611,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                             modpack_branch: branches[i].name.clone(),
                             launcher: launcher.clone(),
                             error: err
+                            name: &name
                         }
                     }
                 }
