@@ -51,7 +51,6 @@ body {
     margin-right: 10%;
     margin-left: 10%;
     margin-bottom: 4%;
-    display: grid;
     width: 25%;
 }
 
@@ -73,6 +72,7 @@ body {
     margin-bottom: 5%;
     height: 11vh;
     align-items: center;
+    text-align: center;
 }
 
 .install-button {
@@ -163,7 +163,6 @@ body {
 .credits {
     overflow: auto;
     max-height: 31.1vh;
-    margin-bottom: 1vw;
     direction: rtl;
 }
 

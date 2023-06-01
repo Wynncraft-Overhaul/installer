@@ -187,7 +187,7 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                         onclick: move |_evt| {
                             super::uninstall(&get_launcher(&launcher).unwrap(), &cx.props.b64_id);
                         },
-                        "Uninstall"
+                        "Uninstall Modpack"
                     }
                 }
             }
