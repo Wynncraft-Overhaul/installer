@@ -41,6 +41,14 @@ fn default_enabled_features() -> Vec<String> {
     vec![default_id()]
 }
 
+fn default_max_mem() -> i32 {
+    2048
+}
+
+fn default_min_mem() -> i32 {
+    512
+}
+
 macro_rules! add_headers {
     ($items:expr, $($headers:expr),*) => {
         $items.$(header($headers.next().unwrap().0, $headers.next().unwrap().1))*
@@ -377,6 +385,10 @@ struct Manifest {
     included_files: Option<HashMap<String, Included>>,
     source: Option<String>,
     installer_path: Option<String>,
+    #[serde(default = "default_max_mem")]
+    max_mem: i32,
+    #[serde(default = "default_min_mem")]
+    min_mem: i32,
 }
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -711,7 +723,10 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 r#type: String::from("custom"),
                 gameDir: Some(modpack_root.to_str().unwrap().to_string()),
                 javaDir: None,
-                javaArgs: None,
+                javaArgs: Some(format!(
+                    "-Xmx{}M -Xms{}M",
+                    manifest.max_mem, manifest.min_mem
+                )),
                 logConfig: None,
                 logConfigIsXML: None,
                 resolution: None,
@@ -774,10 +789,8 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                     manifest.uuid
                 ))),
                 format!(
-                    "iconKey={}
-            name={}
-            ",
-                    manifest.uuid, manifest.name
+                    "iconKey={}\nname={}\nMaxMemAlloc={}\nMinMemAlloc={}",
+                    manifest.uuid, manifest.name, manifest.max_mem, manifest.min_mem
                 ),
             )
             .expect("Failed to write to 'instance.cfg'");
@@ -1080,6 +1093,8 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                 .to_owned()
                 .replace("\\\\?\\", ""),
         ),
+        max_mem: manifest.max_mem,
+        min_mem: manifest.min_mem,
     };
     fs::write(
         modpack_root.join(
@@ -1228,6 +1243,8 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
             included_files: local_manifest.included_files.clone(),
             source: local_manifest.source.clone(),
             installer_path: local_manifest.installer_path.clone(),
+            max_mem: installer_profile.manifest.max_mem,
+            min_mem: installer_profile.manifest.min_mem,
         },
         http_client: installer_profile.http_client,
         installed: installer_profile.installed,
