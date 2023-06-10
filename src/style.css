@@ -256,3 +256,7 @@ option {
     align-items: center;
     margin-right: 1vw;
 }
+
+li {
+    overflow-wrap: anywhere;
+}
