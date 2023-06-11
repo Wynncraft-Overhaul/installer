@@ -13,7 +13,6 @@ struct HeaderProps {
 }
 
 fn Header(cx: Scope<HeaderProps>) -> Element {
-    // TODO(figure out how to make this from modpack_source)
     cx.render(rsx! {
         div {
             class: "header",
@@ -510,13 +509,13 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                 class: "description",
                                 dangerous_inner_html: "{description}"
                             }
-                        }
-                        input {
-                            r#type: "submit",
-                            value: if !installer_profile.with(|profile| profile.installed) {"Install"} else {if **modify {"Modify"} else {"Update"}},
-                            class: "install-button",
-                            disabled: install_disable
-                        }
+                            input {
+                                r#type: "submit",
+                                value: if !installer_profile.with(|profile| profile.installed) {"Install"} else {if **modify {"Modify"} else {"Update"}},
+                                class: "install-button",
+                                disabled: install_disable
+                            }
+                        }    
                     }
                 }
             }
@@ -575,9 +574,9 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
         style { cx.props.style_css }
         if **settings {
             rsx!{
-                Header {
-                    name: name.with(|x| x.clone())
-                }
+                // Header {
+                //     name: name.with(|x| x.clone())
+                // }
                 div {
                     class: "fake-body",
                     Settings {
@@ -600,9 +599,9 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                         src: "{cog}",
                     }
                 }
-                Header {
-                    name: name.with(|x| x.clone())
-                }
+                // Header {
+                //     name: name.with(|x| x.clone())
+                // }
                 div {
                     class: "fake-body",
                     for i in 0..branches.len() {

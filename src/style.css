@@ -13,14 +13,21 @@ body {
 
 body {
     font-family: "wynncraft";
-    background-color: #4d3d62;
-    height: 99vh;
+    background-image: url(https://cdn.discordapp.com/attachments/1070859814126747679/1117307483422208012/background_installer.png);
+    background-size: cover;
+    color: #fce8f6;
+}
+
+button,
+input {
+    color: #fce8f6;
 }
 
 .fake-body {
     display: flex;
     justify-content: center;
     height: 50vh;
+    margin-top: 10vw;
 }
 
 .header {
@@ -39,11 +46,10 @@ body {
 }
 
 .container {
-    background-color: #7edaf7;
-    border: 0.16vw solid black;
+    background-color: #320625;
+    border: 0;
     padding: 2%;
     display: grid;
-    margin-bottom: 2%;
 }
 
 .version-container {
@@ -57,15 +63,15 @@ body {
 .version-inner-container {
     margin-right: 2%;
     margin-left: 2%;
-    background-color: #2a3751;
-    border: 0.16vw solid black;
+    background-color: #1c0314;
+    border: 0;
     padding: 0.5vw;
     display: grid;
 }
 
 .subtitle-container {
-    background-color: #7edaf7;
-    border: 0.16vw solid black;
+    background-color: #320625;
+    border: 0;
     padding: 2%;
     justify-content: center;
     display: flex;
@@ -77,7 +83,7 @@ body {
 
 .install-button {
     font-family: "wynncraft";
-    background-color: #48d95a;
+    background-color: #073c17;
     padding: 4%;
     text-align: center;
     text-decoration: none;
@@ -87,7 +93,7 @@ body {
     margin-left: 2%;
     margin-bottom: 2%;
     cursor: pointer;
-    border: 0.16vw solid black;
+    border: 0;
 }
 
 .uninstall-button {
@@ -102,11 +108,12 @@ body {
     margin-left: 2%;
     margin-bottom: 2%;
     cursor: pointer;
-    border: 0.16vw solid black;
+    border: 0;
 }
 
 .install-button:disabled {
     cursor: default;
+    color: gray;
 }
 
 .feature-list input[type="checkbox"] {
@@ -173,7 +180,7 @@ body {
 .credits-button {
     font-family: "wynncraft";
     width: 2vw;
-    background-color: #47d195;
+    background-color: #073c17;
     padding: 1%;
     text-align: center;
     text-decoration: none;
@@ -189,7 +196,7 @@ body {
 .settings-button {
     font-family: "wynncraft";
     width: 2vw;
-    background-color: #47d195;
+    background-color: #073c17;
     padding: 1%;
     text-align: center;
     text-decoration: none;
@@ -202,6 +209,7 @@ body {
     align-items: center;
     position: absolute;
     right: 0.5%;
+    top: 0.5%
 }
 
 img {
@@ -244,6 +252,7 @@ option {
     appearance: none;
     -webkit-appearance: none;
     border-radius: 0;
+    color: #fce8f6;
 }
 
 .label {
