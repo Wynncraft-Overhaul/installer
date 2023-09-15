@@ -7,7 +7,6 @@ use base64::{engine, Engine};
 use cached::proc_macro::cached;
 use cached::SizedCache;
 use chrono::{DateTime, Utc};
-use clap::Parser;
 use dioxus_desktop::tao::window::Icon;
 use dioxus_desktop::{Config as DioxusConfig, LogicalSize, WindowBuilder};
 use futures::StreamExt;
@@ -1278,104 +1277,56 @@ fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() > 1 {
-        // Multiple arguments detected entering CLI mode
-        let args = CLIArgs::parse();
-        let branch = if args.branch.is_none() {
-            let repo: GithubRepo = serde_json::from_str(
-                isahc::get(GH_API.to_owned() + &args.modpack)
-                    .expect("Failed to gather modpack repo info!")
-                    .text()
-                    .unwrap()
-                    .as_str(),
-            )
-            .expect("Could not retrieve default branch try specifying it using '--branch'!");
-            repo.default_branch
-        } else {
-            args.branch.unwrap()
-        };
-        let launcher = get_launcher(&args.launcher);
-        let installer_profile = futures::executor::block_on(init(
-            args.modpack,
-            branch,
-            launcher.expect("Failed to get launcher!"),
-        ))
-        .expect("Failed to retrieve installer profile!");
-        match args.action.as_str() {
-            "install" => {
-                if installer_profile.installed {
-                    return;
-                }
-                futures::executor::block_on(install(installer_profile))
-                    .expect("Failed to install modpack!");
-            }
-            "update" => {
-                if !installer_profile.installed || !installer_profile.update_available {
-                    return;
-                }
-                futures::executor::block_on(update(installer_profile))
-                    .expect("Failed to update modpack!");
-            }
-            "play" => (),
-            _ => (),
-        };
-        println!("Success!");
+    let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
+    let branches: Vec<GithubBranch> = serde_json::from_str(
+        build_http_client()
+            .get(GH_API.to_owned() + "Wynncraft-Overhaul/ultimate-overhaul/" + "branches")
+            .expect("Failed to retrive branches!")
+            .text()
+            .unwrap()
+            .as_str(),
+    )
+    .expect("Failed to parse branches!");
+    let config_path = env::temp_dir().join(".WC_OVHL/config.json");
+    let config: Config;
+    let style_css = include_str!("style.css");
+    let style_css = style_css.replace(
+        "Wynncraft_Game_Font.woff2.base64",
+        include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
+    );
+    if config_path.exists() {
+        config = serde_json::from_slice(&fs::read(&config_path).expect("Failed to read config!"))
+            .expect("Failed to load config!");
     } else {
-        // Only the executable was present in arguments entering GUI mode
-        let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
-        let branches: Vec<GithubBranch> = serde_json::from_str(
-            build_http_client()
-                .get(GH_API.to_owned() + "Wynncraft-Overhaul/ultimate-overhaul/" + "branches")
-                .expect("Failed to retrive branches!")
-                .text()
-                .unwrap()
-                .as_str(),
-        )
-        .expect("Failed to parse branches!");
-        let config_path = env::temp_dir().join(".WC_OVHL/config.json");
-        let config: Config;
-        let style_css = include_str!("style.css");
-        let style_css = style_css.replace(
-            "Wynncraft_Game_Font.woff2.base64",
-            include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
-        );
-        if config_path.exists() {
-            config =
-                serde_json::from_slice(&fs::read(&config_path).expect("Failed to read config!"))
-                    .expect("Failed to load config!");
-        } else {
-            config = Config {
-                launcher: String::from("vanilla"),
-            };
-            fs::create_dir_all(config_path.parent().unwrap())
-                .expect("Failed to create config dir!");
-            fs::write(&config_path, serde_json::to_vec(&config).unwrap())
-                .expect("Failed to write config!");
-        }
-
-        dioxus_desktop::launch_with_props(
-            gui::App,
-            gui::AppProps {
-                branches,
-                modpack_source: String::from("Wynncraft-Overhaul/ultimate-overhaul/"),
-                config,
-                config_path,
-                style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
-            },
-            DioxusConfig::new()
-                .with_window(
-                    WindowBuilder::new()
-                        .with_resizable(false)
-                        .with_title("Wynncraft Overhaul Installer")
-                        .with_inner_size(LogicalSize::new(960, 540)),
-                )
-                .with_icon(
-                    Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
-                )
-                .with_data_directory(env::temp_dir().join(".WC_OVHL")),
-        );
+        config = Config {
+            launcher: String::from("vanilla"),
+        };
+        fs::create_dir_all(config_path.parent().unwrap()).expect("Failed to create config dir!");
+        fs::write(&config_path, serde_json::to_vec(&config).unwrap())
+            .expect("Failed to write config!");
     }
+
+    dioxus_desktop::launch_with_props(
+        gui::App,
+        gui::AppProps {
+            branches,
+            modpack_source: String::from("Wynncraft-Overhaul/ultimate-overhaul/"),
+            config,
+            config_path,
+            style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
+        },
+        DioxusConfig::new()
+            .with_window(
+                WindowBuilder::new()
+                    .with_resizable(false)
+                    .with_title("Majestic Overhaul Installer")
+                    .with_inner_size(LogicalSize::new(960, 540)),
+            )
+            .with_icon(
+                Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
+            )
+            .with_data_directory(env::temp_dir().join(".WC_OVHL")),
+    );
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1395,27 +1346,6 @@ struct InstallerProfile {
     enabled_features: Vec<String>,
     launcher: Option<Launcher>,
     local_manifest: Option<Manifest>,
-}
-
-#[derive(Parser)]
-struct CLIArgs {
-    #[arg(short, long, verbatim_doc_comment)]
-    /// Available actions:
-    ///     - install: Install modpack if it does not already exist
-    ///     - update: Updates modpack if it is installed
-    ///     - play: Launches the modpack
-    action: String,
-    #[arg(short, long)]
-    /// Github user and repo for modpack formmated like "<user>/<repo>/"
-    modpack: String,
-    #[arg(short, long)]
-    /// Github branch defaults to default branch as specified on github
-    branch: Option<String>,
-    #[arg(short, long)]
-    /// Launcher to install profile on:
-    ///     - vanilla
-    ///     - multimc-<data_dir_name>
-    launcher: String,
 }
 
 async fn init(

@@ -7,24 +7,6 @@ use regex::Regex;
 
 use crate::{get_launcher, InstallerProfile};
 
-#[derive(Props, PartialEq)]
-struct HeaderProps {
-    name: String,
-}
-
-fn Header(cx: Scope<HeaderProps>) -> Element {
-    cx.render(rsx! {
-        div {
-            class: "header",
-            div {
-                class: "header-inner",
-                h1 {
-                    cx.props.name.clone()
-                }
-            }
-        }
-    })
-}
 
 fn Spinner(cx: Scope) -> Element {
     cx.render(rsx! {
