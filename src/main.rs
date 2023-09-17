@@ -693,7 +693,7 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
         .as_ref()
         .expect("Asked to create launcher profile without knowing launcher!")
     {
-        Launcher::Vanilla(root) => {
+        Launcher::Vanilla(_) => {
             let icon = if manifest.icon {
                 image_to_base64(
                     icon_img
@@ -730,7 +730,7 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 logConfigIsXML: None,
                 resolution: None,
             };
-            let lp_file_path = root.join(Path::new("launcher_profiles.json"));
+            let lp_file_path = get_minecraft_folder().join(Path::new("launcher_profiles.json"));
             let mut lp_obj: LauncherProfiles = serde_json::from_str(
                 &fs::read_to_string(&lp_file_path)
                     .expect("Failed to read 'launcher_profiles.json'!"),
@@ -911,9 +911,10 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     );
     let manifest = &installer_profile.manifest;
     let http_client = &installer_profile.http_client;
+    let minecraft_folder = get_minecraft_folder();
     let loader_future = match installer_profile.launcher.as_ref().unwrap() {
-        Launcher::Vanilla(root) => Some(manifest.loader.download(
-            root,
+        Launcher::Vanilla(_) => Some(manifest.loader.download(
+            &minecraft_folder,
             &manifest.loader.r#type,
             http_client,
         )),
@@ -1260,7 +1261,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
 fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
     let launcher = string_representation.split('-').collect::<Vec<_>>();
     match *launcher.first().unwrap() {
-        "vanilla" => Ok(Launcher::Vanilla(get_minecraft_folder())),
+        "vanilla" => Ok(Launcher::Vanilla(get_app_data())),
         "multimc" => {
             let data_dir = get_multimc_folder(
                 launcher

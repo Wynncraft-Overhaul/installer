@@ -581,9 +581,6 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                         src: "{cog}",
                     }
                 }
-                // Header {
-                //     name: name.with(|x| x.clone())
-                // }
                 div {
                     class: "fake-body",
                     for i in 0..branches.len() {
