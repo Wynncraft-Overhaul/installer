@@ -518,7 +518,7 @@ async fn download_loader_json(
     loader_path
 }
 
-async fn download_from_ddl<T: Downloadable>(
+async fn download_from_ddl<T: Downloadable + Debug>(
     item: &T,
     modpack_root: &Path,
     r#type: &str,
@@ -563,11 +563,12 @@ async fn download_from_ddl<T: Downloadable>(
         &dist.to_str().unwrap()
     ));
     let final_dist = dist.join(filename);
-    fs::write(&final_dist, resp.bytes().await.unwrap()).expect("Failed to write ddl item!");
+    fs::write(&final_dist, resp.bytes().await.unwrap())
+        .expect(&format!("Failed to write ddl {item:#?}"));
     final_dist
 }
 
-async fn download_from_modrinth<T: Downloadable>(
+async fn download_from_modrinth<T: Downloadable + Debug>(
     item: &T,
     modpack_root: &Path,
     loader_type: &str,
@@ -584,8 +585,9 @@ async fn download_from_modrinth<T: Downloadable>(
         .text()
         .await
         .unwrap();
-    let resp_obj: Vec<ModrinthObject> =
-        serde_json::from_str(&resp).expect("Failed to parse modrinth response!");
+    let resp_obj: Vec<ModrinthObject> = serde_json::from_str(&resp).expect(&format!(
+        "Failed to parse modrinth response when querying about: {item:#?}"
+    ));
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
@@ -614,7 +616,7 @@ async fn download_from_modrinth<T: Downloadable>(
             return final_dist;
         }
     }
-    panic!("No items returned from modrinth!")
+    panic!("No items returned from modrinth!\n{item:#?}")
 }
 
 fn get_app_data() -> PathBuf {
@@ -1281,7 +1283,7 @@ fn main() {
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
         build_http_client()
-            .get(GH_API.to_owned() + "Wynncraft-Overhaul/ultimate-overhaul/" + "branches")
+            .get(GH_API.to_owned() + "Wynncraft-Overhaul/majestic-overhaul/" + "branches")
             .expect("Failed to retrive branches!")
             .text()
             .unwrap()
@@ -1311,7 +1313,7 @@ fn main() {
         gui::App,
         gui::AppProps {
             branches,
-            modpack_source: String::from("Wynncraft-Overhaul/ultimate-overhaul/"),
+            modpack_source: String::from("Wynncraft-Overhaul/majestic-overhaul/"),
             config,
             config_path,
             style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
