@@ -15,6 +15,7 @@ use image::{DynamicImage, ImageOutputFormat};
 use isahc::config::RedirectPolicy;
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -224,6 +225,9 @@ macro_rules! gen_downloadble_impl {
                             .await
                     }
                     "ddl" => download_from_ddl(self, modpack_root, $type, http_client).await,
+                    "mediafire" => {
+                        download_from_mediafire(self, modpack_root, $type, http_client).await
+                    }
                     _ => panic!("Unsupported source '{}'!", self.source.as_str()),
                 }
             }
@@ -531,7 +535,10 @@ async fn download_from_ddl<T: Downloadable + Debug>(
     let filename = if let Some(x) = resp.headers().get("content-disposition") {
         let x = x.to_str().unwrap();
         if x.contains("attachment") {
-            x.split("filename=").last().unwrap().replace('"', "")
+            let re = Regex::new(r#"filename="(.*?)""#).unwrap();
+            re.captures(x)
+                .expect("DDL invalid 'content-disposition' header")[1]
+                .to_string()
         } else {
             item.get_location()
                 .split('/')
@@ -586,7 +593,7 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
         .await
         .unwrap();
     let resp_obj: Vec<ModrinthObject> = serde_json::from_str(&resp).expect(&format!(
-        "Failed to parse modrinth response when querying about: {item:#?}"
+        "Failed to parse modrinth response when querying about: {item:#?}\n{resp:#?}"
     ));
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
@@ -617,6 +624,62 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
         }
     }
     panic!("No items returned from modrinth!\n{item:#?}")
+}
+
+async fn download_from_mediafire<T: Downloadable + Debug>(
+    item: &T,
+    modpack_root: &Path,
+    r#type: &str,
+    http_client: &CachedHttpClient,
+) -> PathBuf {
+    let mediafire = http_client
+        .get_nocache(item.get_location())
+        .await
+        .expect(&format!("Failed to download '{}'!", item.get_name()))
+        .text()
+        .await
+        .unwrap();
+    let re = Regex::new(r#"Download file"\s*href="(.*?)""#).unwrap();
+    let ddl = &re
+        .captures(&mediafire)
+        .expect("Failed to download from mediafire")[1];
+    let mut resp = http_client
+        .get_nocache(ddl)
+        .await
+        .expect(&format!("Failed to download '{}'!", item.get_name()));
+    let cd_header = std::str::from_utf8(
+        resp.headers()
+            .get("content-disposition")
+            .expect(
+                "Mediafire download missing 
+        'content-disposition' header",
+            )
+            .as_bytes(),
+    )
+    .expect("Invalid mediafire 'content-disposition' header");
+    let filename = if cd_header.contains("attachment") {
+        cd_header
+            .split("filename=")
+            .last()
+            .unwrap()
+            .replace('"', "")
+    } else {
+        panic!("Invalid mediafire 'content-disposition' header")
+    };
+    let dist = match r#type {
+        "mod" => modpack_root.join(Path::new("mods")),
+        "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
+        "shaderpack" => modpack_root.join(Path::new("shaderpacks")),
+        _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
+    };
+    fs::create_dir_all(&dist).expect(&format!(
+        "Failed to create '{}' directory",
+        &dist.to_str().unwrap()
+    ));
+    let final_dist = dist.join(filename);
+    fs::write(&final_dist, resp.bytes().await.unwrap())
+        .expect(&format!("Failed to write ddl {item:#?}"));
+    final_dist
 }
 
 fn get_app_data() -> PathBuf {
