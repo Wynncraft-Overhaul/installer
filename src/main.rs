@@ -864,7 +864,7 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 Some(v) => format!("\nMaxMemAlloc={}", v),
                 None => String::new(),
             };
-            let min_mem = match manifest.max_mem {
+            let min_mem = match manifest.min_mem {
                 Some(v) => format!("\nMinMemAlloc={}", v),
                 None => String::new(),
             };
