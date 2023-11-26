@@ -15,8 +15,9 @@ The Header section contains metadata about the modpack, such as the name and the
 - `description`: This field is a html representation of a description show in the installer.
 - `uuid`: This field is a [UUID4](https://www.uuidgenerator.net/) and should be the same across all modpack versions. But different across branches/alt versions.
 - `icon`: If this field is set to `true` the installer will look for an `icon.png` in the modpack root.
-- `max_mem`: This field specifices the max memory minecraft is allowed to use in MB. By default this value is 2048.
-- `min_mem`: This field specifices the amount of memory allocated to minecraft at startup in MB. By default this value is 512.
+- `max_mem`: Optional Xmx field (mb)
+- `min_mem`: Optional Xms field (mb)
+- `java_args`: Optional field for arguments to be passed to the jvm
 
 ## Loader
 

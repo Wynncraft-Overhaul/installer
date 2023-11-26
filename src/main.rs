@@ -41,14 +41,6 @@ fn default_enabled_features() -> Vec<String> {
     vec![default_id()]
 }
 
-fn default_max_mem() -> i32 {
-    2048
-}
-
-fn default_min_mem() -> i32 {
-    512
-}
-
 macro_rules! add_headers {
     ($items:expr, $($headers:expr),*) => {
         $items.$(header($headers.next().unwrap().0, $headers.next().unwrap().1))*
@@ -388,10 +380,8 @@ struct Manifest {
     included_files: Option<HashMap<String, Included>>,
     source: Option<String>,
     installer_path: Option<String>,
-    #[serde(default = "default_max_mem")]
-    max_mem: i32,
-    #[serde(default = "default_min_mem")]
-    min_mem: i32,
+    max_mem: Option<i32>,
+    min_mem: Option<i32>,
     java_args: Option<String>,
 }
 #[allow(non_snake_case)]
@@ -769,6 +759,21 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
             } else {
                 String::from("Furnace")
             };
+            let mut jvm_args = String::new();
+            if manifest.java_args.is_none()
+                && (manifest.max_mem.is_some() || manifest.min_mem.is_some())
+            {
+                jvm_args += "XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M";
+            }
+            if let Some(x) = &manifest.java_args {
+                jvm_args += &x
+            }
+            if let Some(x) = manifest.max_mem {
+                jvm_args += &format!(" -Xmx{}M", x)
+            }
+            if let Some(x) = manifest.min_mem {
+                jvm_args += &format!(" -Xms{}M", x)
+            }
             let profile = LauncherProfile {
                 lastUsed: now.to_string(),
                 lastVersionId: match &manifest.loader.r#type[..] {
@@ -788,12 +793,11 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 r#type: String::from("custom"),
                 gameDir: Some(modpack_root.to_str().unwrap().to_string()),
                 javaDir: None,
-                javaArgs: Some(format!(
-                    "-Xmx{}M -Xms{}M {}",
-                    manifest.max_mem,
-                    manifest.min_mem,
-                    manifest.java_args.as_ref().unwrap_or(&String::new())
-                )),
+                javaArgs: if jvm_args.is_empty() {
+                    None
+                } else {
+                    Some(jvm_args)
+                },
                 logConfig: None,
                 logConfigIsXML: None,
                 resolution: None,
@@ -854,14 +858,27 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 Some(v) => format!("\nJvmArgs={}\nOverrideJavaArgs=true", v),
                 None => String::new(),
             };
+            let max_mem = match manifest.max_mem {
+                Some(v) => format!("\nMaxMemAlloc={}", v),
+                None => String::new(),
+            };
+            let min_mem = match manifest.max_mem {
+                Some(v) => format!("\nMinMemAlloc={}", v),
+                None => String::new(),
+            };
+            let override_mem = if max_mem.is_empty() || min_mem.is_empty() {
+                ""
+            } else {
+                "\nOverrideMemory=true"
+            };
             fs::write(
                 root.join(Path::new(&format!(
                     "instances/{}/instance.cfg",
                     manifest.uuid
                 ))),
                 format!(
-                    "iconKey={}\nname={}\nMaxMemAlloc={}\nMinMemAlloc={}\nOverrideMemory=true{}",
-                    manifest.uuid, manifest.name, manifest.max_mem, manifest.min_mem, jvm_args
+                    "iconKey={}\nname={}{}{}{}{}",
+                    manifest.uuid, manifest.name, max_mem, min_mem, override_mem, jvm_args
                 ),
             )
             .expect("Failed to write to 'instance.cfg'");
@@ -1232,16 +1249,11 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone>(
         .iter()
         .filter(|x| !new_items.contains(x))
         .for_each(|x| {
-            fs::remove_file(x.get_path().as_ref().expect(&format!(
+            let _ = fs::remove_file(x.get_path().as_ref().expect(&format!(
                 "Missing 'path' field on installed {} '{}'!",
                 stringify!(x),
                 x.get_name()
-            )))
-            .expect(&format!(
-                "Failed to delete outdated {} '{}'!",
-                stringify!(x),
-                x.get_name()
-            ));
+            )));
         });
     new_items
 }
