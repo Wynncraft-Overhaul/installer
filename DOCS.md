@@ -54,6 +54,10 @@ Include is a list of include objects for which the fields are:
 
 - `location`: Path of the file or folder you want to include
 - `id`: This is an optional field which defaults to `default` it is the id of the feature requried to be true in order to be included. (`default` is always true)
+- `name`: Required for include to be listed in the credits screen. Name for the included file.
+- `authors`: Required for include to be listed in the credits screen. List with objects which the following fields:
+  - `name`: This field is the authors name.
+  - `link`: This field is a link to the authors page.
 
 ## Features
 

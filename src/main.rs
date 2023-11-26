@@ -358,6 +358,8 @@ struct Include {
     location: String,
     #[serde(default = "default_id")]
     id: String,
+    name: Option<String>,
+    authors: Option<Vec<Author>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]

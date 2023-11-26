@@ -80,6 +80,24 @@ fn Credits<'a>(cx: Scope<'a, CreditsProps>) -> Element<'a> {
                     })
                 }
             }
+            for include in &cx.props.manifest.include {
+                if cx.props.enabled.with(|x| x.contains(&include.id)) && include.authors.is_some() && include.name.is_some() {
+                    let name = include.name.as_ref().unwrap();
+                    rsx!(li {
+                        "{name} by "
+                        for author in &include.authors.as_ref().unwrap() {
+                            a {
+                                href: "{author.link}",
+                                if include.authors.as_ref().unwrap().last().unwrap() == author {
+                                    author.name.to_string()
+                                } else {
+                                    author.name.to_string() + ", "
+                                }
+                            }
+                        }
+                    })
+                }
+            }
         }
     })
 }
