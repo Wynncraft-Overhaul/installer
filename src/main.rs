@@ -868,7 +868,7 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 Some(v) => format!("\nMinMemAlloc={}", v),
                 None => String::new(),
             };
-            let override_mem = if max_mem.is_empty() || min_mem.is_empty() {
+            let override_mem = if max_mem.is_empty() && min_mem.is_empty() {
                 ""
             } else {
                 "\nOverrideMemory=true"
