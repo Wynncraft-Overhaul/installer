@@ -31,10 +31,10 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}
-        path: target/release/installer.exe
+        path: target/debug/installer.exe
     - name: capture build artifacts
       if: ${{ matrix.os != 'windows-2022' }}
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}
-        path: target/release/installer
+        path: target/debug/installer
