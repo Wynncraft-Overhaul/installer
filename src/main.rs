@@ -1293,29 +1293,6 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         installer_profile.manifest.resourcepacks,
         &local_manifest.resourcepacks,
     );
-    if installer_profile.manifest.loader != local_manifest.loader {
-        fs::remove_dir_all(
-            get_modpack_root(
-                installer_profile
-                    .launcher
-                    .as_ref()
-                    .expect("Launcher not selected!"),
-                &installer_profile.manifest.uuid,
-            )
-            .join(match &installer_profile.manifest.loader.r#type[..] {
-                "fabric" => format!(
-                    "versions/fabric-loader-{}-{}",
-                    &local_manifest.loader.version, &local_manifest.loader.minecraft_version
-                ),
-                "quilt" => format!(
-                    "versions/quilt-loader-{}-{}",
-                    &local_manifest.loader.version, &local_manifest.loader.minecraft_version
-                ),
-                _ => panic!("Invalid loader"),
-            }),
-        )
-        .expect("Could not delete old fabric version!");
-    }
     install(InstallerProfile {
         manifest: Manifest {
             manifest_version: installer_profile.manifest.manifest_version,
