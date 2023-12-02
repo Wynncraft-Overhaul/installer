@@ -41,6 +41,10 @@ fn default_enabled_features() -> Vec<String> {
     vec![default_id()]
 }
 
+fn default_hidden() -> bool {
+    false
+}
+
 macro_rules! add_headers {
     ($items:expr, $($headers:expr),*) => {
         $items.$(header($headers.next().unwrap().0, $headers.next().unwrap().1))*
@@ -352,6 +356,8 @@ struct Feature {
     id: String,
     name: String,
     default: bool,
+    #[serde(default = "default_hidden")]
+    hidden: bool,
 }
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Include {

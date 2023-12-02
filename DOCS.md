@@ -66,3 +66,4 @@ Features is a list which contains feature objects for which the fields are:
 - `name`: Name of the feature
 - `id`: Id of the feature
 - `default`: This is a bool specifying if it should be on by default
+- `hidden`: When set to true the feature wont be displayed in the installer. This can be used to section off the default includes to improve update speeds.

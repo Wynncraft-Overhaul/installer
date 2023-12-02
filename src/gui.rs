@@ -479,28 +479,32 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                 div {
                                     class: "feature-list",
                                     for feat in installer_profile.with(|profile| profile.manifest.features.clone()) {
-                                        label {
-                                            input {
-                                                checked: if installer_profile.with(|profile| profile.installed) {
-                                                    if enabled_features.with(|x| x.contains(&feat.id)) {
-                                                        Some("true")
-                                                    } else {
-                                                        None
+                                        if !feat.hidden {
+                                            rsx!(
+                                                label {
+                                                    input {
+                                                        checked: if installer_profile.with(|profile| profile.installed) {
+                                                            if enabled_features.with(|x| x.contains(&feat.id)) {
+                                                                Some("true")
+                                                            } else {
+                                                                None
+                                                            }
+                                                        } else {
+                                                            if feat.default {
+                                                                Some("true")
+                                                            } else {
+                                                                None
+                                                            }
+                                                        },
+                                                        name: "{feat.id}",
+                                                        onchange: move |evt| {
+                                                            feature_change(installer_profile, modify, evt, &feat, modify_count, enabled_features);
+                                                        },
+                                                        r#type: "checkbox",    
                                                     }
-                                                } else {
-                                                    if feat.default {
-                                                        Some("true")
-                                                    } else {
-                                                        None
-                                                    }
-                                                },
-                                                name: "{feat.id}",
-                                                onchange: move |evt| {
-                                                    feature_change(installer_profile, modify, evt, &feat, modify_count, enabled_features);
-                                                },
-                                                r#type: "checkbox",    
-                                            }
-                                            "{feat.name}"
+                                                    "{feat.name}"
+                                                }
+                                            )
                                         }
                                     }
                                 }
