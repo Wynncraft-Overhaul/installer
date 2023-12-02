@@ -1107,9 +1107,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                                         path.starts_with(modpack_root),
                                         "Local include path was not located in modpack root!"
                                     );
-                                    fs::remove_file(path).expect(&format!(
-                                        "Failed to remove outdated include: {path:?}"
-                                    ));
+                                    let _ = fs::remove_file(path);
                                 }
                             }
                         }
