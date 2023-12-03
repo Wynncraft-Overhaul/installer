@@ -23,6 +23,7 @@ jobs:
       run: cargo build --verbose
     - name: Build bundle
       run: |
+        chmod +x ./scripts/build-appbundle.sh
         ./scripts/build-appbundle.sh
     - name: capture build artifacts
       uses: actions/upload-artifact@v2
