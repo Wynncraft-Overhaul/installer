@@ -13,12 +13,13 @@ use futures::StreamExt;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
 use isahc::config::RedirectPolicy;
+use isahc::http::StatusCode;
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::{
     env, fs,
     io::Cursor,
@@ -168,7 +169,7 @@ trait Downloadable {
         modpack_root: &Path,
         loader_type: &str,
         http_client: &CachedHttpClient,
-    ) -> PathBuf;
+    ) -> Result<PathBuf, DownloadError>;
 
     fn new(
         name: String,
@@ -214,7 +215,7 @@ macro_rules! gen_downloadble_impl {
                 modpack_root: &Path,
                 loader_type: &str,
                 http_client: &CachedHttpClient,
-            ) -> PathBuf {
+            ) -> Result<PathBuf, DownloadError> {
                 match self.source.as_str() {
                     "modrinth" => {
                         download_from_modrinth(self, modpack_root, loader_type, $type, http_client)
@@ -488,6 +489,52 @@ struct MMCPack {
     formatVersion: i32,
 }
 
+#[derive(Debug)]
+enum DownloadError {
+    Non200StatusCode(String, u16),
+    FailedToParseResponse(String, serde_json::Error),
+    IoError(String, std::io::Error),
+    HttpError(String, isahc::Error),
+    MissingFilename(String),
+    CouldNotFindItem(String),
+    MedafireMissingDDL(String),
+}
+
+impl Display for DownloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DownloadError::Non200StatusCode(item, x) => write!(
+                f,
+                "Encountered '{x}' error code when attempting to download: '{item}'"
+            ),
+
+            DownloadError::FailedToParseResponse(item, e) => write!(
+                f,
+                "Failed to parse download response: '{e}' when attempting to download: '{item}'"
+            ),
+            DownloadError::IoError(item, e) => write!(
+                f,
+                "Encountered io error: '{e}' when attempting to download: '{item}'"
+            ),
+            DownloadError::HttpError(item, e) => write!(
+                f,
+                "Encountered http error: '{e}' when attempting to download: '{item}'"
+            ),
+            DownloadError::MissingFilename(item) => {
+                write!(f, "Could not get filename for: '{item}'")
+            }
+            DownloadError::CouldNotFindItem(item) => {
+                write!(f, "Could not find item: '{item}'")
+            }
+            DownloadError::MedafireMissingDDL(item) => {
+                write!(f, "Could not get DDL link from Nediafire: '{item}'")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DownloadError {}
+
 async fn download_loader_json(
     url: &str,
     loader_name: &str,
@@ -527,52 +574,50 @@ async fn download_from_ddl<T: Downloadable + Debug>(
     modpack_root: &Path,
     r#type: &str,
     http_client: &CachedHttpClient,
-) -> PathBuf {
-    let mut resp = http_client
-        .get_nocache(item.get_location())
-        .await
-        .expect(&format!("Failed to download '{}'!", item.get_name()));
+) -> Result<PathBuf, DownloadError> {
+    let mut resp = match http_client.get_nocache(item.get_location()).await {
+        Ok(v) => v,
+        Err(e) => return Err(DownloadError::HttpError(item.get_name().to_string(), e)),
+    };
     let filename = if let Some(x) = resp.headers().get("content-disposition") {
         let x = x.to_str().unwrap();
         if x.contains("attachment") {
             let re = Regex::new(r#"filename="(.*?)""#).unwrap();
-            re.captures(x)
-                .expect("DDL invalid 'content-disposition' header")[1]
+            (match re.captures(x) {
+                Some(v) => v,
+                None => return Err(DownloadError::MissingFilename(item.get_name().to_string())),
+            })[1]
                 .to_string()
         } else {
             item.get_location()
                 .split('/')
                 .last()
-                .expect(&format!(
-                    "Could not determine file name for ddl: '{}'!",
-                    item.get_location()
-                ))
+                .unwrap() // this should be impossible to error because all locations will have "/"s in them and if they dont it gets caught earlier
                 .to_string()
         }
     } else {
         item.get_location()
             .split('/')
             .last()
-            .expect(&format!(
-                "Could not determine file name for ddl: '{}'!",
-                item.get_location()
-            ))
+            .unwrap() // this should be impossible to error because all locations will have "/"s in them and if they dont it gets caught earlier
             .to_string()
     };
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
         "shaderpack" => modpack_root.join(Path::new("shaderpacks")),
-        _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
+        _ => panic!("Unsupported item type: '{}'???", r#type), // this should be impossible
     };
-    fs::create_dir_all(&dist).expect(&format!(
-        "Failed to create '{}' directory",
-        &dist.to_str().unwrap()
-    ));
+    match fs::create_dir_all(&dist) {
+        Ok(_) => (),
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    }
     let final_dist = dist.join(filename);
-    fs::write(&final_dist, resp.bytes().await.unwrap())
-        .expect(&format!("Failed to write ddl {item:#?}"));
-    final_dist
+    match fs::write(&final_dist, resp.bytes().await.unwrap()) {
+        Ok(_) => (),
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
+    Ok(final_dist)
 }
 
 async fn download_from_modrinth<T: Downloadable + Debug>(
@@ -581,52 +626,70 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
     loader_type: &str,
     r#type: &str,
     http_client: &CachedHttpClient,
-) -> PathBuf {
-    let mut resp = http_client
+) -> Result<PathBuf, DownloadError> {
+    let mut resp = match http_client
         .get_nocache(format!(
             "https://api.modrinth.com/v2/project/{}/version",
             item.get_location()
         ))
         .await
-        .expect(&format!("Failed to download '{}'!", item.get_name()));
-    let resp_text = resp.text().await.unwrap();
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(DownloadError::HttpError(item.get_name().to_string(), e));
+        }
+    };
+    if resp.status() != StatusCode::OK {
+        return Err(DownloadError::Non200StatusCode(
+            item.get_name().to_string(),
+            resp.status().as_u16(),
+        ));
+    }
+    let resp_text = match resp.text().await {
+        Ok(v) => v,
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
     let resp_obj: Vec<ModrinthObject> = match serde_json::from_str(&resp_text) {
         Ok(v) => v,
         Err(e) => {
-            panic!(
-            "Failed to parse modrinth response when querying about: {item:#?}\n{resp_text:#?}\n{e:#?}\n{resp:#?}"
-        );
+            return Err(DownloadError::FailedToParseResponse(
+                item.get_name().to_string(),
+                e,
+            ));
         }
     };
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
         "shaderpack" => modpack_root.join(Path::new("shaderpacks")),
-        _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
+        _ => panic!("Unsupported item type: '{}'???", r#type), // this should be impossible
     };
-    fs::create_dir_all(&dist).expect(&format!(
-        "Failed to create '{}' directory",
-        &dist.to_str().unwrap()
-    ));
+    match fs::create_dir_all(&dist) {
+        Ok(_) => (),
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    }
     for _mod in resp_obj {
         if &_mod.version_number == item.get_version()
             && (_mod.loaders.contains(&String::from("minecraft"))
                 || _mod.loaders.contains(&String::from(loader_type))
                 || r#type == "shaderpack")
         {
-            let content = http_client
-                .get_nocache(&_mod.files[0].url)
-                .await
-                .expect(&format!("Failed to download '{}'!", item.get_name()))
-                .bytes()
-                .await
-                .unwrap();
+            let content = match http_client.get_nocache(&_mod.files[0].url).await {
+                Ok(v) => v,
+                Err(e) => return Err(DownloadError::HttpError(item.get_name().to_string(), e)),
+            }
+            .bytes()
+            .await
+            .unwrap();
             let final_dist = dist.join(Path::new(&_mod.files[0].filename));
-            fs::write(&final_dist, content).expect("Failed to write modrinth item!");
-            return final_dist;
+            match fs::write(&final_dist, content) {
+                Ok(_) => (),
+                Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+            };
+            return Ok(final_dist);
         }
     }
-    panic!("No items returned from modrinth!\n{item:#?}")
+    Err(DownloadError::CouldNotFindItem(item.get_name().to_string()))
 }
 
 async fn download_from_mediafire<T: Downloadable + Debug>(
@@ -634,55 +697,71 @@ async fn download_from_mediafire<T: Downloadable + Debug>(
     modpack_root: &Path,
     r#type: &str,
     http_client: &CachedHttpClient,
-) -> PathBuf {
-    let mediafire = http_client
-        .get_nocache(item.get_location())
-        .await
-        .expect(&format!("Failed to download '{}'!", item.get_name()))
-        .text()
-        .await
-        .unwrap();
-    let re = Regex::new(r#"Download file"\s*href="(.*?)""#).unwrap();
-    let ddl = &re
-        .captures(&mediafire)
-        .expect("Failed to download from mediafire")[1];
-    let mut resp = http_client
-        .get_nocache(ddl)
-        .await
-        .expect(&format!("Failed to download '{}'!", item.get_name()));
-    let cd_header = std::str::from_utf8(
-        resp.headers()
-            .get("content-disposition")
-            .expect(
-                "Mediafire download missing 
-        'content-disposition' header",
-            )
-            .as_bytes(),
-    )
-    .expect("Invalid mediafire 'content-disposition' header");
+) -> Result<PathBuf, DownloadError> {
+    let mut resp = match http_client.get_nocache(item.get_location()).await {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(DownloadError::HttpError(item.get_name().to_string(), e));
+        }
+    };
+    if resp.status() != StatusCode::OK {
+        return Err(DownloadError::Non200StatusCode(
+            item.get_name().to_string(),
+            resp.status().as_u16(),
+        ));
+    }
+    let mediafire = match resp.text().await {
+        Ok(v) => v,
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
+    let re = Regex::new(r#"Download file"\s*href="(.*?)""#).unwrap(); // wont error pattern is valid
+    let ddl = &(match re.captures(&mediafire) {
+        Some(v) => v,
+        None => {
+            return Err(DownloadError::MedafireMissingDDL(
+                item.get_name().to_string(),
+            ))
+        }
+    })[1];
+    let mut resp = match http_client.get_nocache(ddl).await {
+        Ok(v) => v,
+        Err(e) => return Err(DownloadError::HttpError(item.get_name().to_string(), e)),
+    };
+    let cd_header = match std::str::from_utf8(
+        match resp.headers().get("content-disposition") {
+            Some(v) => v,
+            None => return Err(DownloadError::MissingFilename(item.get_name().to_string())),
+        }
+        .as_bytes(),
+    ) {
+        Ok(v) => v,
+        Err(_) => return Err(DownloadError::MissingFilename(item.get_name().to_string())),
+    };
     let filename = if cd_header.contains("attachment") {
-        cd_header
-            .split("filename=")
-            .last()
-            .unwrap()
-            .replace('"', "")
+        match cd_header.split("filename=").last() {
+            Some(v) => v,
+            None => return Err(DownloadError::MissingFilename(item.get_name().to_string())),
+        }
+        .replace('"', "")
     } else {
-        panic!("Invalid mediafire 'content-disposition' header")
+        return Err(DownloadError::MissingFilename(item.get_name().to_string()));
     };
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
         "shaderpack" => modpack_root.join(Path::new("shaderpacks")),
-        _ => panic!("Unsupported 'ModrinthCompatible' item '{}'???", r#type),
+        _ => panic!("Unsupported item type'{}'???", r#type), // this should be impossible
     };
-    fs::create_dir_all(&dist).expect(&format!(
-        "Failed to create '{}' directory",
-        &dist.to_str().unwrap()
-    ));
+    match fs::create_dir_all(&dist) {
+        Ok(_) => (),
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
     let final_dist = dist.join(filename);
-    fs::write(&final_dist, resp.bytes().await.unwrap())
-        .expect(&format!("Failed to write ddl {item:#?}"));
-    final_dist
+    match fs::write(&final_dist, resp.bytes().await.unwrap()) {
+        Ok(_) => (),
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
+    Ok(final_dist)
 }
 
 fn get_app_data() -> PathBuf {
@@ -960,46 +1039,53 @@ async fn download_helper<T: Downloadable + Debug>(
     modpack_root: &Path,
     loader_type: &str,
     http_client: &CachedHttpClient,
-) -> Vec<T> {
-    futures::stream::iter(items.into_iter().map(|shaderpack| async {
-        if shaderpack.get_path().is_none() && enabled_features.contains(shaderpack.get_id()) {
-            T::new(
-                shaderpack.get_name().to_owned(),
-                shaderpack.get_source().to_owned(),
-                shaderpack.get_location().to_owned(),
-                shaderpack.get_version().to_owned(),
-                Some(
-                    shaderpack
-                        .download(modpack_root, loader_type, http_client)
-                        .await,
-                ),
-                shaderpack.get_id().to_owned(),
-                shaderpack.get_authors().to_owned(),
-            )
+) -> Result<Vec<T>, DownloadError> {
+    let results = futures::stream::iter(items.into_iter().map(|item| async {
+        if item.get_path().is_none() && enabled_features.contains(item.get_id()) {
+            let path = item
+                .download(modpack_root, loader_type, http_client)
+                .await?;
+            Ok(T::new(
+                item.get_name().to_owned(),
+                item.get_source().to_owned(),
+                item.get_location().to_owned(),
+                item.get_version().to_owned(),
+                Some(path),
+                item.get_id().to_owned(),
+                item.get_authors().to_owned(),
+            ))
         } else {
-            let shaderpack = validate_item_path!(shaderpack, modpack_root);
+            let item = validate_item_path!(item, modpack_root);
             let path;
-            if !enabled_features.contains(shaderpack.get_id()) && shaderpack.get_path().is_some() {
-                fs::remove_file(shaderpack.get_path().as_ref().unwrap())
+            if !enabled_features.contains(item.get_id()) && item.get_path().is_some() {
+                fs::remove_file(item.get_path().as_ref().unwrap())
                     .expect("Failed to remove old mod");
                 path = None;
             } else {
-                path = shaderpack.get_path().to_owned();
+                path = item.get_path().to_owned();
             }
-            T::new(
-                shaderpack.get_name().to_owned(),
-                shaderpack.get_source().to_owned(),
-                shaderpack.get_location().to_owned(),
-                shaderpack.get_version().to_owned(),
+            Ok(T::new(
+                item.get_name().to_owned(),
+                item.get_source().to_owned(),
+                item.get_location().to_owned(),
+                item.get_version().to_owned(),
                 path,
-                shaderpack.get_id().to_owned(),
-                shaderpack.get_authors().to_owned(),
-            )
+                item.get_id().to_owned(),
+                item.get_authors().to_owned(),
+            ))
         }
     }))
     .buffer_unordered(CONCURRENCY)
-    .collect::<Vec<T>>()
-    .await
+    .collect::<Vec<Result<T, DownloadError>>>()
+    .await;
+    let mut return_vec = vec![];
+    for res in results {
+        match res {
+            Ok(v) => return_vec.push(v),
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(return_vec)
 }
 
 async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
@@ -1021,30 +1107,42 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
         )),
         Launcher::MultiMC(_) => None,
     };
-    let mods_w_path = download_helper(
+    let mods_w_path = match download_helper(
         manifest.mods.clone(),
         &installer_profile.enabled_features,
         modpack_root.as_path(),
         &manifest.loader.r#type,
         http_client,
     )
-    .await;
-    let shaderpacks_w_path = download_helper(
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
+    let shaderpacks_w_path = match download_helper(
         manifest.shaderpacks.clone(),
         &installer_profile.enabled_features,
         modpack_root.as_path(),
         &manifest.loader.r#type,
         http_client,
     )
-    .await;
-    let resourcepacks_w_path = download_helper(
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
+    let resourcepacks_w_path = match download_helper(
         manifest.resourcepacks.clone(),
         &installer_profile.enabled_features,
         modpack_root.as_path(),
         &manifest.loader.r#type,
         http_client,
     )
-    .await;
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
     let mut included_files: HashMap<String, Included> = HashMap::new();
     let inc_files = match installer_profile.local_manifest.clone() {
         Some(local_manifest) => match local_manifest.included_files {
