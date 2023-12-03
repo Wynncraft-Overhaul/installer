@@ -358,6 +358,7 @@ struct Feature {
     default: bool,
     #[serde(default = "default_hidden")]
     hidden: bool,
+    description: Option<String>,
 }
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Include {
@@ -581,19 +582,22 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
     r#type: &str,
     http_client: &CachedHttpClient,
 ) -> PathBuf {
-    let resp = http_client
+    let mut resp = http_client
         .get_nocache(format!(
             "https://api.modrinth.com/v2/project/{}/version",
             item.get_location()
         ))
         .await
-        .expect(&format!("Failed to download '{}'!", item.get_name()))
-        .text()
-        .await
-        .unwrap();
-    let resp_obj: Vec<ModrinthObject> = serde_json::from_str(&resp).expect(&format!(
-        "Failed to parse modrinth response when querying about: {item:#?}\n{resp:#?}"
-    ));
+        .expect(&format!("Failed to download '{}'!", item.get_name()));
+    let resp_text = resp.text().await.unwrap();
+    let resp_obj: Vec<ModrinthObject> = match serde_json::from_str(&resp_text) {
+        Ok(v) => v,
+        Err(e) => {
+            panic!(
+            "Failed to parse modrinth response when querying about: {item:#?}\n{resp_text:#?}\n{e:#?}\n{resp:#?}"
+        );
+        }
+    };
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),

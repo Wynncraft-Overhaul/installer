@@ -195,7 +195,7 @@ input {
 
 .settings-button {
     font-family: "wynncraft";
-    width: 2vw;
+    width: 3vw;
     background-color: #073c17;
     padding: 1%;
     text-align: center;
@@ -204,7 +204,7 @@ input {
     font-size: 100%;
     cursor: pointer;
     border: 0.16vw solid black;
-    height: 2vw;
+    height: 3vw;
     justify-content: space-around;
     align-items: center;
     position: absolute;
@@ -222,7 +222,7 @@ img {
 }
 
 .settings-button img {
-    height: 2vw;
+    height: 3vw;
 }
 
 .info-container {
@@ -268,4 +268,28 @@ option {
 
 li {
     overflow-wrap: anywhere;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: #fce8f6;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+    position: absolute;
+    z-index: 1;
+    width: 100%;
+    bottom: 100%;
+    left: 7%;
+    pointer-events: none;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
 }

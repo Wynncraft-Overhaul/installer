@@ -482,6 +482,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                         if !feat.hidden {
                                             rsx!(
                                                 label {
+                                                    class: "tooltip",
                                                     input {
                                                         checked: if installer_profile.with(|profile| profile.installed) {
                                                             if enabled_features.with(|x| x.contains(&feat.id)) {
@@ -502,7 +503,15 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                                         },
                                                         r#type: "checkbox",    
                                                     }
+                                                    
                                                     "{feat.name}"
+                                                    match feat.description {
+                                                        Some(ref desc) => rsx!(span {
+                                                            class: "tooltiptext",
+                                                            desc.to_owned()
+                                                        }),
+                                                        None => rsx!("")
+                                                    }
                                                 }
                                             )
                                         }
@@ -515,7 +524,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                             }
                             input {
                                 r#type: "submit",
-                                value: if !installer_profile.with(|profile| profile.installed) {"Install"} else {if **modify {"Modify"} else {"Update"}},
+                                value: if !installer_profile.with(|profile| profile.installed) {"Install"} else {if !**modify {"Update"} else {"Modify"}},
                                 class: "install-button",
                                 disabled: install_disable
                             }
@@ -578,9 +587,6 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
         style { cx.props.style_css }
         if **settings {
             rsx!{
-                // Header {
-                //     name: name.with(|x| x.clone())
-                // }
                 div {
                     class: "fake-body",
                     Settings {
