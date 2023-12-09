@@ -1350,7 +1350,20 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone>(
                 .find(|installed_item| installed_item.get_name() == item.get_name())
                 .map_or_else(
                     || Some(item.clone()),
-                    |installed_item| Some(installed_item.clone()),
+                    |installed_item| {
+                        if installed_item.get_version() == item.get_version() {
+                            Some(installed_item.clone())
+                        } else {
+                            let _ = fs::remove_file(installed_item.get_path().as_ref().expect(
+                                &format!(
+                                    "Missing 'path' field on installed {} '{}'!",
+                                    stringify!(installed_item),
+                                    installed_item.get_name()
+                                ),
+                            ));
+                            Some(item.clone())
+                        }
+                    },
                 )
         })
         .collect();
