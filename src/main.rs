@@ -18,6 +18,7 @@ use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::{
@@ -410,27 +411,6 @@ struct LauncherProfile {
     logConfigIsXML: Option<bool>,
     resolution: Option<HashMap<String, i32>>,
 }
-#[allow(non_snake_case)]
-#[derive(Debug, Deserialize, Serialize)]
-struct LauncherProfilesSettings {
-    enableAnalytics: bool,
-    enableAdvanced: bool,
-    keepLauncherOpen: bool,
-    soundOn: bool,
-    showMenu: bool,
-    enableSnapshots: bool,
-    enableHistorical: bool,
-    enableReleases: bool,
-    profileSorting: String,
-    showGameLog: bool,
-    crashAssistance: bool,
-}
-#[derive(Debug, Deserialize, Serialize)]
-struct LauncherProfiles {
-    settings: LauncherProfilesSettings,
-    profiles: HashMap<String, LauncherProfile>,
-    version: i32,
-}
 #[derive(Debug, Deserialize, Serialize)]
 struct ModrinthFile {
     url: String,
@@ -534,6 +514,67 @@ impl Display for DownloadError {
 }
 
 impl std::error::Error for DownloadError {}
+
+#[derive(Debug)]
+enum LauncherProfileError {
+    IoError(std::io::Error),
+    InvalidJson(serde_json::Error),
+    ProfilesNotObject,
+    NoProfiles,
+    RootNotObject,
+    IconNotFound,
+    InvalidIcon(image::error::ImageError),
+}
+
+impl Display for LauncherProfileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LauncherProfileError::IoError(e) => write!(
+                f,
+                "Encountered IO error when creating launcher profile: {e}"
+            ),
+            LauncherProfileError::InvalidJson(e) => {
+                write!(f, "Invalid 'launcher_profiles.json': {e}")
+            }
+            LauncherProfileError::NoProfiles => {
+                write!(f, "'launcher_profiles.json' missing 'profiles' key")
+            }
+            LauncherProfileError::ProfilesNotObject => {
+                write!(f, "Expected 'launcher_profiles.profiles' to be 'object'")
+            }
+            LauncherProfileError::RootNotObject => {
+                write!(f, "Expected 'launcher_profiles' to be 'object'")
+            }
+            LauncherProfileError::IconNotFound => {
+                write!(f, "'manifest.icon' was set to true but no icon was found")
+            }
+            LauncherProfileError::InvalidIcon(e) => write!(
+                f,
+                "Encountered image error when creating launcher profile: {e}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for LauncherProfileError {}
+
+impl From<std::io::Error> for LauncherProfileError {
+    fn from(value: std::io::Error) -> Self {
+        LauncherProfileError::IoError(value)
+    }
+}
+
+impl From<serde_json::Error> for LauncherProfileError {
+    fn from(value: serde_json::Error) -> Self {
+        LauncherProfileError::InvalidJson(value)
+    }
+}
+
+impl From<image::error::ImageError> for LauncherProfileError {
+    fn from(value: image::error::ImageError) -> Self {
+        LauncherProfileError::InvalidIcon(value)
+    }
+}
 
 async fn download_loader_json(
     url: &str,
@@ -823,7 +864,10 @@ fn image_to_base64(img: &DynamicImage) -> String {
     format!("data:image/png;base64,{}", res_base64)
 }
 
-fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Option<DynamicImage>) {
+fn create_launcher_profile(
+    installer_profile: &InstallerProfile,
+    icon_img: Option<DynamicImage>,
+) -> Result<(), LauncherProfileError> {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();
     let now = now.to_rfc3339();
@@ -832,20 +876,20 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
         installer_profile
             .launcher
             .as_ref()
-            .expect("No launcher selected!"),
+            .expect("No launcher selected!"), // should be impossible
         &manifest.uuid,
     );
     match installer_profile
         .launcher
         .as_ref()
-        .expect("Asked to create launcher profile without knowing launcher!")
+        .expect("Asked to create launcher profile without knowing launcher!") // should be impossible
     {
         Launcher::Vanilla(_) => {
-            let icon = if manifest.icon {
+            let icon = if manifest.icon && icon_img.is_some() {
                 image_to_base64(
                     icon_img
                         .as_ref()
-                        .expect("manifest.icon was true but no icon was supplied!"),
+                        .unwrap()
                 )
             } else {
                 String::from("Furnace")
@@ -894,18 +938,23 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                 resolution: None,
             };
             let lp_file_path = get_minecraft_folder().join(Path::new("launcher_profiles.json"));
-            let mut lp_obj: LauncherProfiles = serde_json::from_str(
-                &fs::read_to_string(&lp_file_path)
-                    .expect("Failed to read 'launcher_profiles.json'!"),
-            )
-            .expect("Failed to parse 'launcher_profiles.json'!");
-            lp_obj.profiles.insert(manifest.uuid.clone(), profile);
+            let mut lp_obj: JsonValue = serde_json::from_str(
+                &fs::read_to_string(&lp_file_path)?,
+            )?;
+            match lp_obj {
+                JsonValue::Object(ref obj) => match obj
+                    .get("profiles")
+                    .ok_or(LauncherProfileError::NoProfiles)?
+                {
+                    JsonValue::Object(_) => lp_obj.get_mut("profiles").unwrap().as_object_mut().unwrap().insert(manifest.uuid.clone(), serde_json::to_value(profile)?),
+                    _ => return Err(LauncherProfileError::ProfilesNotObject),
+                },
+                _ => return Err(LauncherProfileError::RootNotObject),
+            };
             fs::write(
                 lp_file_path,
-                serde_json::to_string(&lp_obj)
-                    .expect("Failed to create new 'launcher_profiles.json'!"),
-            )
-            .expect("Failed to write to 'launcher_profiles.json'");
+                serde_json::to_string(&lp_obj)?,
+            )?;
         }
         Launcher::MultiMC(root) => {
             let pack = MMCPack {
@@ -942,9 +991,8 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                     "instances/{}/mmc-pack.json",
                     manifest.uuid
                 ))),
-                serde_json::to_string(&pack).expect("Failed to create 'mmc-pack.json'"),
-            )
-            .expect("Failed to write to 'mmc-pack.json'");
+                serde_json::to_string(&pack)?,
+            )?;
             let jvm_args = match manifest.java_args.as_ref() {
                 Some(v) => format!("\nJvmArgs={}\nOverrideJavaArgs=true", v),
                 None => String::new(),
@@ -971,16 +1019,14 @@ fn create_launcher_profile(installer_profile: &InstallerProfile, icon_img: Optio
                     "iconKey={}\nname={}{}{}{}{}",
                     manifest.uuid, manifest.name, max_mem, min_mem, override_mem, jvm_args
                 ),
-            )
-            .expect("Failed to write to 'instance.cfg'");
+            )?;
             if manifest.icon {
-                icon_img
-                    .expect("'icon' is 'true' but no icon was found")
-                    .save(root.join(Path::new(&format!("icons/{}.png", manifest.uuid))))
-                    .expect("Failed to write 'icon.png'");
+                icon_img.ok_or(LauncherProfileError::IconNotFound)?
+                    .save(root.join(Path::new(&format!("icons/{}.png", manifest.uuid))))?;
             }
         }
-    }
+    };
+    Ok(())
 }
 
 /// Panics:
@@ -1331,7 +1377,10 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     } else {
         None
     };
-    create_launcher_profile(&installer_profile, icon_img);
+    match create_launcher_profile(&installer_profile, icon_img) {
+        Ok(_) => {}
+        Err(e) => return Err(e.to_string()),
+    };
     if loader_future.is_some() {
         loader_future.unwrap().await;
     }
