@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::thread::sleep;
+use std::time::Duration;
 use std::{
     env, fs,
     io::Cursor,
@@ -34,6 +36,8 @@ const CURRENT_MANIFEST_VERSION: i32 = 3;
 const GH_API: &str = "https://api.github.com/repos/";
 const GH_RAW: &str = "https://raw.githubusercontent.com/";
 const CONCURRENCY: usize = 14;
+const ATTEMPTS: usize = 3;
+const WAIT_BETWEEN_ATTEMPTS: Duration = Duration::from_secs(20);
 
 fn default_id() -> String {
     String::from("default")
@@ -53,6 +57,7 @@ macro_rules! add_headers {
     };
 }
 
+#[derive(Debug)]
 struct CachedResponse {
     resp: Response<AsyncBody>,
     bytes: Vec<u8>,
@@ -98,22 +103,36 @@ impl CachedHttpClient {
         }
     }
 
-    async fn get_async<T: Into<String>>(
+    async fn get_async<T: Into<String> + Clone>(
         &self,
         url: T,
     ) -> Result<Response<AsyncBody>, isahc::Error> {
-        let resp = get_cached(&self.http_client, url.into()).await;
-        match resp {
-            Ok(val) => Ok(val.resp),
-            Err(val) => Err(val),
+        let mut err = None;
+        for _ in 0..ATTEMPTS {
+            let resp = get_cached(&self.http_client, url.clone().into()).await;
+            match resp {
+                Ok(v) => return Ok(v.resp),
+                Err(v) => err = Some(v),
+            }
+            sleep(WAIT_BETWEEN_ATTEMPTS);
         }
+        Err(err.unwrap()) // unwrap can't fail
     }
 
-    async fn get_nocache<T: Into<String>>(
+    async fn get_nocache<T: Into<String> + Clone>(
         &self,
         url: T,
     ) -> Result<Response<AsyncBody>, isahc::Error> {
-        self.http_client.get_async(url.into()).await
+        let mut err = None;
+        for _ in 0..ATTEMPTS {
+            let resp = self.http_client.get_async(url.clone().into()).await;
+            match resp {
+                Ok(v) => return Ok(v),
+                Err(v) => err = Some(v),
+            }
+            sleep(WAIT_BETWEEN_ATTEMPTS);
+        }
+        Err(err.unwrap()) // unwrap can't fail
     }
 
     async fn with_headers<T: Into<String>>(
