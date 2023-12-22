@@ -16,6 +16,9 @@ body {
     background-image: url(https://cdn.discordapp.com/attachments/1070859814126747679/1117307483422208012/background_installer.png);
     background-size: cover;
     color: #fce8f6;
+    background-size: cover;
+    height: 88vh;
+    overflow: hidden;
 }
 
 button,

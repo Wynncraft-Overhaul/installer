@@ -1580,7 +1580,7 @@ fn main() {
         DioxusConfig::new()
             .with_window(
                 WindowBuilder::new()
-                    .with_resizable(false)
+                    .with_resizable(true)
                     .with_title("Majestic Overhaul Installer")
                     .with_inner_size(LogicalSize::new(960, 540)),
             )
