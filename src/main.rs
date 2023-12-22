@@ -643,11 +643,19 @@ async fn download_from_ddl<T: Downloadable + Debug>(
         let x = x.to_str().unwrap();
         if x.contains("attachment") {
             let re = Regex::new(r#"filename="(.*?)""#).unwrap();
-            (match re.captures(x) {
-                Some(v) => v,
-                None => return Err(DownloadError::MissingFilename(item.get_name().to_string())),
-            })[1]
-                .to_string()
+            match match re.captures(x) {
+                Some(v) => Ok(v),
+                None => Err(DownloadError::MissingFilename(item.get_name().to_string())),
+            } {
+                Ok(v) => v[1].to_string(),
+                Err(e) => match item.get_location().split('/').last() {
+                    Some(v) => v.to_string(),
+                    None => {
+                        return Err(e);
+                    }
+                }
+                .to_string(),
+            }
         } else {
             item.get_location()
                 .split('/')
