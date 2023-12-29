@@ -1612,6 +1612,15 @@ enum Launcher {
     MultiMC(PathBuf),
 }
 
+impl Display for Launcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Launcher::Vanilla(_) => write!(f, "Vanilla"),
+            Launcher::MultiMC(_) => write!(f, "MultiMC"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct InstallerProfile {
     manifest: Manifest,

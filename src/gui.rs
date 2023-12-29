@@ -334,9 +334,10 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                             \"userAction\": \"install\",
                             \"additionalData\": {{
                                 \"features\": {:?},
-                                \"version\": \"{}\"
+                                \"version\": \"{}\",
+                                \"launcher\": \"{}\"
                             }}
-                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.manifest.enabled_features.clone()), installer_profile.with(|profile| profile.manifest.modpack_version.clone())));}
+                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.manifest.enabled_features.clone()), installer_profile.with(|profile| profile.manifest.modpack_version.clone()), installer_profile.with(|profile| profile.launcher.clone().unwrap())));}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
                         }
