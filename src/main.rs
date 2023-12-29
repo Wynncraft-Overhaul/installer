@@ -1082,12 +1082,14 @@ macro_rules! validate_item_path {
 }
 
 fn uninstall(launcher: &Launcher, b64_id: &str) {
+    let mut data_source_id = String::new();
     match launcher {
         Launcher::Vanilla(root) => {
             let root = root.join(".WC_OVHL/");
             for instance in fs::read_dir(root).unwrap() {
                 let instance = instance.unwrap().path();
                 if instance.join(b64_id).is_file() {
+                    data_source_id = instance.file_name().unwrap().to_str().unwrap().to_owned();
                     fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
                     fs::create_dir(instance).unwrap();
                 }
@@ -1098,12 +1100,25 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
             for instance in fs::read_dir(root).unwrap() {
                 let instance = instance.unwrap().path();
                 if instance.join(format!(".minecraft/{}", b64_id)).is_file() {
+                    data_source_id = instance.file_name().unwrap().to_str().unwrap().to_owned();
                     fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
                     fs::create_dir_all(instance.join(".minecraft/")).unwrap();
                 }
             }
         }
     }
+    let _ = isahc::post(
+        "https://tracking.commander07.workers.dev/track",
+        format!(
+            "{{
+        \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+        \"dataSourceId\": \"{}\",
+        \"userAction\": \"uninstall\",
+        \"additionalData\": {{}}
+    }}",
+            data_source_id
+        ),
+    );
 }
 
 async fn download_helper<T: Downloadable + Debug>(

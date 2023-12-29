@@ -328,7 +328,15 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 if !installer_profile.with(|profile| profile.installed) {
                     spinner_status.set("Installing...");
                     match super::install(installer_profile.with(|profile| profile.clone())).await {
-                        Ok(_) => {}
+                        Ok(_) => {let _ = isahc::post("https://tracking.commander07.workers.dev/track", format!("{{
+                            \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                            \"dataSourceId\": \"{}\",
+                            \"userAction\": \"install\",
+                            \"additionalData\": {{
+                                \"features\": {:?},
+                                \"version\": \"{}\"
+                            }}
+                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.manifest.enabled_features.clone()), installer_profile.with(|profile| profile.manifest.modpack_version.clone())));}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
                         }
@@ -336,7 +344,15 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 } else if installer_profile.with(|profile| profile.update_available) {
                     spinner_status.set("Updating...");
                     match super::update(installer_profile.with(|profile| profile.clone())).await {
-                        Ok(_) => {}
+                        Ok(_) => {let _ = isahc::post("https://tracking.commander07.workers.dev/track", format!("{{
+                            \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                            \"dataSourceId\": \"{}\",
+                            \"userAction\": \"update\",
+                            \"additionalData\": {{
+                                \"old_version\": \"{}\",
+                                \"new_version\": \"{}\"
+                            }}
+                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.local_manifest.clone().unwrap().modpack_version), installer_profile.with(|profile| profile.manifest.modpack_version.clone())));}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
                         }
@@ -344,7 +360,14 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                 } else if *modify {
                     spinner_status.set("Modifying...");
                     match super::update(installer_profile.with(|profile| profile.clone())).await {
-                        Ok(_) => {}
+                        Ok(_) => {let _ = isahc::post("https://tracking.commander07.workers.dev/track", format!("{{
+                            \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                            \"dataSourceId\": \"{}\",
+                            \"userAction\": \"modify\",
+                            \"additionalData\": {{
+                                \"features\": {:?}
+                            }}
+                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.manifest.enabled_features.clone())));}
                         Err(e) => {
                             error.set(Some(format!("{:#?}", e) + " (Failed to modify modpack!)"));
                         }

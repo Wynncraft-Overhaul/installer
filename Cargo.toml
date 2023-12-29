@@ -10,6 +10,11 @@ build = "build.rs"
 opt-level = "s"
 lto = "fat"
 
+[profile.dev]
+opt-level = "s"
+lto = "fat"
+
+
 [dependencies]
 base64 = "0.21.0"
 chrono = "0.4.24"
