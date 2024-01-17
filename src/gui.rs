@@ -194,6 +194,91 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
     })
 }
 
+#[derive(Props, PartialEq)]
+struct LauncherProps<'a> {
+    config: &'a UseRef<super::Config>,
+    first_launch: &'a UseState<bool>,
+    config_path: &'a PathBuf,
+    error: &'a UseRef<Option<String>>,
+    b64_id: String,
+}
+
+fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
+    let mut vanilla = None;
+    let mut multimc = None;
+    let mut prism = None;
+    let launcher = cx.props.config.with(|cfg| cfg.launcher.clone());
+    match &*launcher {
+        "vanilla" => vanilla = Some("true"),
+        "multimc-MultiMC" => multimc = Some("true"),
+        "multimc-PrismLauncher" => prism = Some("true"),
+        _ => {}
+    }
+    cx.render(rsx! {
+        div {
+            class: "version-inner-container",
+            style: "width: 25.25vw;",
+            div {
+                class: "container",
+                style: "width: 24vw;",
+                form {
+                    id: "settings",
+                    onsubmit: move |event| {
+                        cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
+                        let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
+                        match res {
+                            Ok(_) => {},
+                            Err(e) => {
+                                cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                            },
+                        }
+                        cx.props.first_launch.set(false);
+                    },
+                    div {
+                        class: "label",
+                        span {
+                            "Launcher:"
+                        }
+                        select {
+                            name: "launcher-select",
+                            id: "launcher-select",
+                            form: "settings",
+                            class: "credits-button",
+                            if super::get_minecraft_folder().is_dir() {
+                                rsx!(option {
+                                    value: "vanilla",
+                                    selected: vanilla,
+                                    "Vanilla"
+                                })
+                            }
+                            if super::get_multimc_folder("MultiMC").is_ok() {
+                                rsx!(option {
+                                    value: "multimc-MultiMC",
+                                    selected: multimc,
+                                    "MultiMC"
+                                })
+                            }
+                            if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                rsx!(option {
+                                    value: "multimc-PrismLauncher",
+                                    selected: prism,
+                                    "Prism Launcher"
+                                })
+                            }
+                        }
+                    }
+                    input {
+                        r#type: "submit",
+                        value: "Continue",
+                        class: "install-button",
+                        id: "save"
+                    }
+                }
+            }
+        }
+    })
+}
+
 fn feature_change(
     installer_profile: &UseRef<InstallerProfile>,
     modify: &UseState<bool>,
@@ -585,6 +670,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
     let branches = &cx.props.branches;
     let config: &UseRef<super::Config> = use_ref(cx, || cx.props.config.clone());
     let settings: &UseState<bool> = use_state(cx, || false);
+    let first_launch: &UseState<bool> = use_state(cx, || config.with(|x| x.first_launch.unwrap_or(true)));
     let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
     let err: &UseRef<Option<String>> = use_ref(cx, || None);
     let name = use_ref(cx, || String::default());
@@ -622,7 +708,19 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                     }
                 }
             }
-        } else {
+        } else if **first_launch {
+            rsx!(div {
+                class: "fake-body",
+                Launcher {
+                    config: config,
+                    first_launch: first_launch,
+                    config_path: &cx.props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(modpack_source)
+                }
+            })
+        }
+        else {
             rsx!{
                 button {
                     class: "settings-button",

@@ -212,6 +212,7 @@ trait Downloadable {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct Config {
     launcher: String,
+    first_launch: Option<bool>, // option for backwars compatibiliy
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -1577,6 +1578,7 @@ fn main() {
     } else {
         config = Config {
             launcher: String::from("vanilla"),
+            first_launch: Some(true),
         };
         fs::create_dir_all(config_path.parent().unwrap()).expect("Failed to create config dir!");
         fs::write(&config_path, serde_json::to_vec(&config).unwrap())
