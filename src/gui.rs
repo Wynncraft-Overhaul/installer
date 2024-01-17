@@ -225,6 +225,7 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                     id: "settings",
                     onsubmit: move |event| {
                         cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
+                        cx.props.config.with_mut(|cfg| cfg.first_launch = Some(false));
                         let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
                         match res {
                             Ok(_) => {},
