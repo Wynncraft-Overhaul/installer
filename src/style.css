@@ -296,3 +296,8 @@ li {
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
+
+.custom-multimc-button {
+    margin-top: 1vh;
+    padding: 0.25em;
+}

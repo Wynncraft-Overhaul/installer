@@ -109,6 +109,7 @@ struct SettingsProps<'a> {
     config_path: &'a PathBuf,
     error: &'a UseRef<Option<String>>,
     b64_id: String,
+    first_launch: &'a UseState<bool>,
 }
 
 fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
@@ -186,6 +187,13 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                                 })
                             }
                         }
+                    }
+                    custom_multimc_button {
+                        config: cx.props.config,
+                        first_launch: cx.props.first_launch,
+                        config_path: cx.props.config_path,
+                        error: cx.props.error,
+                        b64_id: cx.props.b64_id.clone()
                     }
                     input {
                         r#type: "submit",
@@ -292,6 +300,13 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                                 }
                             }
                         }
+                        custom_multimc_button {
+                            config: cx.props.config,
+                            first_launch: cx.props.first_launch,
+                            config_path: cx.props.config_path,
+                            error: cx.props.error,
+                            b64_id: cx.props.b64_id.clone()
+                        }
                         input {
                             r#type: "submit",
                             value: "Continue",
@@ -306,7 +321,7 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
     
 }
 
-fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
+fn custom_multimc_button<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
     let custom_multimc = move |_evt| {
         let directory_dialog = rfd::FileDialog::new().set_title("Pick root directory of desired MultiMC based launcher.").set_directory(get_app_data());
         let directory = directory_dialog.pick_folder();
@@ -331,6 +346,17 @@ fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
             None => {}
         }
     };
+    cx.render(rsx!(
+        button {
+            class: "install-button custom-multimc-button",
+            onclick: custom_multimc,
+            r#type: "button", 
+            "Use custom MultiMC directory"
+        }
+    ))
+}
+
+fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
     cx.render(rsx! {
         div {
             class: "version-inner-container",
@@ -347,10 +373,12 @@ fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                     br {}
                     "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #👑modpack-help on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
                 }
-                button {
-                    class: "install-button",
-                    onclick: custom_multimc,
-                    "Add custom MultiMC directory"
+                custom_multimc_button {
+                    config: cx.props.config,
+                    first_launch: cx.props.first_launch,
+                    config_path: cx.props.config_path,
+                    error: cx.props.error,
+                    b64_id: cx.props.b64_id.clone()
                 }
             }
         }
@@ -782,6 +810,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                         config_path: &cx.props.config_path,
                         error: err,
                         b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(modpack_source)
+                        first_launch: first_launch
                     }
                 }
             }
