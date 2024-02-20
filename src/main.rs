@@ -163,7 +163,6 @@ async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedRespo
     }
 }
 
-#[cfg(debug_assertions)]
 fn build_http_client() -> HttpClient {
     HttpClient::builder()
         .redirect_policy(RedirectPolicy::Limit(5))
@@ -174,14 +173,7 @@ fn build_http_client() -> HttpClient {
         .build()
         .unwrap()
 }
-#[cfg(not(debug_assertions))]
-fn build_http_client() -> HttpClient {
-    HttpClient::builder()
-        .redirect_policy(RedirectPolicy::Limit(5))
-        .default_headers(&[("User-Agent", "wynncraft-overhaul/installer/0.1.0")])
-        .build()
-        .unwrap()
-}
+
 #[async_trait]
 trait Downloadable {
     async fn download(

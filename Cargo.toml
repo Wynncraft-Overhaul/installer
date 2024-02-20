@@ -9,10 +9,7 @@ build = "build.rs"
 [profile.release]
 opt-level = "s"
 lto = "fat"
-
-[profile.dev]
-opt-level = "s"
-lto = "fat"
+strip = true
 
 
 [dependencies]
