@@ -31,6 +31,7 @@ jobs:
     - name: Build
       run: cargo build --verbose --release
     - name: Strip debug info
+      if: ${{ matrix.os == 'ubuntu-22.04' }}
       run: strip target/release/installer
     - name: capture build artifacts windows
       if: ${{ matrix.os == 'windows-2022' }}
