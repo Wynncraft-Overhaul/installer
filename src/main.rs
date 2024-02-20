@@ -1569,7 +1569,7 @@ fn main() {
             .as_str(),
     )
     .expect("Failed to parse branches!");
-    let config_path = env::temp_dir().join(".WC_OVHL/config.json");
+    let config_path = get_app_data().join(".WC_OVHL/config.json");
     let config: Config;
     let style_css = include_str!("style.css");
     let style_css = style_css.replace(
