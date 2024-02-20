@@ -27,6 +27,7 @@ dioxus = { git = "https://github.com/DioxusLabs/dioxus", rev = "9b02b21" }
 dioxus-desktop = { git = "https://github.com/DioxusLabs/dioxus", rev = "9b02b21" }
 cached = "0.43.0"
 regex = "1.8.1"
+rfd = "0.14.0"
 
 [build-dependencies]
 winres = "0.1"

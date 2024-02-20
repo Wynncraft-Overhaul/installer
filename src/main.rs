@@ -843,10 +843,10 @@ fn get_multimc_folder(multimc: &str) -> Result<PathBuf, String> {
     };
     match path.metadata() {
         Ok(metadata) => {
-            if metadata.is_dir() {
+            if metadata.is_dir() && path.join("instances").is_dir() {
                 Ok(path)
             } else {
-                Err(String::from("MultiMC directory is not a directory!"))
+                Err(String::from("MultiMC directory is not a valid directory!"))
             }
         }
         Err(e) => Err(e.to_string()),
@@ -1528,7 +1528,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
 }
 
 fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
-    let launcher = string_representation.split('-').collect::<Vec<_>>();
+    let mut launcher = string_representation.split('-').collect::<Vec<_>>();
     match *launcher.first().unwrap() {
         "vanilla" => Ok(Launcher::Vanilla(get_app_data())),
         "multimc" => {
@@ -1541,6 +1541,18 @@ fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
                 Ok(path) => Ok(Launcher::MultiMC(path)),
                 Err(e) => Err(e),
             }
+        }
+        "custom" => {
+            let data_dir = PathBuf::from(launcher.split_off(1).join("-"));
+            match data_dir.metadata() {
+                Ok(metadata) => {
+                    if !metadata.is_dir() || !data_dir.join("instances").is_dir() {
+                        return Err(String::from("MultiMC directory is not a valid directory!"));
+                    }
+                }
+                Err(e) => return Err(e.to_string()),
+            }
+            Ok(Launcher::MultiMC(data_dir))
         }
         _ => Err(String::from("Invalid launcher!")),
     }

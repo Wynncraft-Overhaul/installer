@@ -5,7 +5,7 @@ use base64::{engine, Engine};
 use dioxus::prelude::*;
 use regex::Regex;
 
-use crate::{get_launcher, InstallerProfile};
+use crate::{get_app_data, get_launcher, InstallerProfile};
 
 
 fn Spinner(cx: Scope) -> Element {
@@ -115,6 +115,7 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
     let mut vanilla = None;
     let mut multimc = None;
     let mut prism = None;
+    let mut custom = None;
     let launcher = cx.props.config.with(|cfg| cfg.launcher.clone());
     match &*launcher {
         "vanilla" => vanilla = Some("true"),
@@ -122,6 +123,10 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
         "multimc-PrismLauncher" => prism = Some("true"),
         _ => {}
     }
+    if launcher.starts_with("custom") {
+        custom = Some("true")
+    }
+    let launcher_clone = launcher.clone();
     cx.render(rsx! {
         div {
             class: "version-inner-container",
@@ -173,6 +178,13 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                                     "Prism Launcher"
                                 })
                             }
+                            if custom.is_some() {
+                                rsx!(option {
+                                    value: "{launcher_clone}",
+                                    selected: custom,
+                                    "Custom MultiMC"
+                                })
+                            }
                         }
                     }
                     input {
@@ -214,66 +226,131 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
         "multimc-PrismLauncher" => prism = Some("true"),
         _ => {}
     }
+    let has_supported_launcher = super::get_minecraft_folder().is_dir() || super::get_multimc_folder("MultiMC").is_ok() || super::get_multimc_folder("PrismLauncher").is_ok();
+    if !has_supported_launcher {
+        cx.render(rsx!(
+            no_launcher_found {
+                config: cx.props.config,
+                first_launch: cx.props.first_launch,
+                config_path: cx.props.config_path,
+                error: cx.props.error,
+                b64_id: cx.props.b64_id.clone()
+            }
+        ))
+    } else {
+        cx.render(rsx! {
+            div {
+                class: "version-inner-container",
+                style: "width: 25.25vw;",
+                div {
+                    class: "container",
+                    style: "width: 24vw;",
+                    form {
+                        id: "settings",
+                        onsubmit: move |event| {
+                            cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
+                            cx.props.config.with_mut(|cfg| cfg.first_launch = Some(false));
+                            let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
+                            match res {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                                },
+                            }
+                            cx.props.first_launch.set(false);
+                        },
+                        div {
+                            class: "label",
+                            span {
+                                "Launcher:"
+                            }
+                            select {
+                                name: "launcher-select",
+                                id: "launcher-select",
+                                form: "settings",
+                                class: "credits-button",
+                                if super::get_minecraft_folder().is_dir() {
+                                    rsx!(option {
+                                        value: "vanilla",
+                                        selected: vanilla,
+                                        "Vanilla"
+                                    })
+                                }
+                                if super::get_multimc_folder("MultiMC").is_ok() {
+                                    rsx!(option {
+                                        value: "multimc-MultiMC",
+                                        selected: multimc,
+                                        "MultiMC"
+                                    })
+                                }
+                                if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                    rsx!(option {
+                                        value: "multimc-PrismLauncher",
+                                        selected: prism,
+                                        "Prism Launcher"
+                                    })
+                                }
+                            }
+                        }
+                        input {
+                            r#type: "submit",
+                            value: "Continue",
+                            class: "install-button",
+                            id: "save"
+                        }
+                    }
+                }
+            }
+        })
+    }
+    
+}
+
+fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
+    let custom_multimc = move |_evt| {
+        let directory_dialog = rfd::FileDialog::new().set_title("Pick root directory of desired MultiMC based launcher.").set_directory(get_app_data());
+        let directory = directory_dialog.pick_folder();
+        match directory {
+            Some(path) => {
+                if !path.join("instances").is_dir() { return; }
+                let path = path.to_str();
+                if path.is_none() {
+                    cx.props.error.set(Some(String::from("Could not get path to directory!")));
+                }
+                cx.props.config.with_mut(|cfg| cfg.launcher = format!("custom-{}", path.unwrap()));
+                cx.props.config.with_mut(|cfg| cfg.first_launch = Some(false));
+                let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
+                match res {
+                    Ok(_) => {},
+                    Err(e) => {
+                        cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                    },
+                }
+                cx.props.first_launch.set(false);
+            }
+            None => {}
+        }
+    };
     cx.render(rsx! {
         div {
             class: "version-inner-container",
-            style: "width: 25.25vw;",
+            style: "width: 50vw;height:70vh;",
             div {
                 class: "container",
-                style: "width: 24vw;",
-                form {
-                    id: "settings",
-                    onsubmit: move |event| {
-                        cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
-                        cx.props.config.with_mut(|cfg| cfg.first_launch = Some(false));
-                        let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
-                        match res {
-                            Ok(_) => {},
-                            Err(e) => {
-                                cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                            },
-                        }
-                        cx.props.first_launch.set(false);
-                    },
-                    div {
-                        class: "label",
-                        span {
-                            "Launcher:"
-                        }
-                        select {
-                            name: "launcher-select",
-                            id: "launcher-select",
-                            form: "settings",
-                            class: "credits-button",
-                            if super::get_minecraft_folder().is_dir() {
-                                rsx!(option {
-                                    value: "vanilla",
-                                    selected: vanilla,
-                                    "Vanilla"
-                                })
-                            }
-                            if super::get_multimc_folder("MultiMC").is_ok() {
-                                rsx!(option {
-                                    value: "multimc-MultiMC",
-                                    selected: multimc,
-                                    "MultiMC"
-                                })
-                            }
-                            if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                rsx!(option {
-                                    value: "multimc-PrismLauncher",
-                                    selected: prism,
-                                    "Prism Launcher"
-                                })
-                            }
-                        }
-                    }
-                    input {
-                        r#type: "submit",
-                        value: "Continue",
-                        class: "install-button",
-                        id: "save"
-                    }
+                style: "width: 48vw;",
+                h1 {
+                    "No supported launcher found!"
+                }
+                p {
+                    "Only Prism Launcher, MultiMC and the vanilla launcher are supported by default, other MultiMC launchers can be added using the button below."
+                    br {}
+                    br {}
+                    "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #👑modpack-help on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
+                }
+                button {
+                    class: "install-button",
+                    onclick: custom_multimc,
+                    "Add custom MultiMC directory"
                 }
             }
         }
@@ -683,8 +760,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
         Ok(val) => Some(val),
-        Err(e) => {
-            err.set(Some(format!("{:#?}", e) + " (Invalid launcher!)"));
+        Err(_) => {
             None
         }
     };
@@ -693,7 +769,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
             error: err.with(|e| e.clone().unwrap())
         }));
     }
-    let launcher = launcher.unwrap();
+
     cx.render(rsx! {
         style { cx.props.style_css }
         if **settings {
@@ -709,7 +785,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                     }
                 }
             }
-        } else if **first_launch {
+        } else if **first_launch || launcher.is_none() {
             rsx!(div {
                 class: "fake-body",
                 Launcher {
@@ -738,7 +814,7 @@ pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
                         Version {
                             modpack_source: modpack_source,
                             modpack_branch: branches[i].name.clone(),
-                            launcher: launcher.clone(),
+                            launcher: launcher.as_ref().unwrap().clone(),
                             error: err
                             name: &name
                         }
