@@ -7,7 +7,7 @@ The `manifest.json` file is a JSON-formatted file used to define the contents of
 The Header section contains metadata about the modpack, such as the name, subtitle and jvm arguments.
 
 - `manifest_version`: This field represents the manifest version the modpack was created for. (Current version is `3`)
-- `modpack_version`: This field is the modpack version.
+- `modpack_version`: This field is the modpack version. It has to change for the installer to know an update is available.
 - `name`: This field specifies the modpack name. This can be any string.
 - `subtitle`: Name of modpack version
 - `description`: This field is a html representation of the description show in the installer.
