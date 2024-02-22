@@ -38,6 +38,10 @@ const GH_RAW: &str = "https://raw.githubusercontent.com/";
 const CONCURRENCY: usize = 14;
 const ATTEMPTS: usize = 3;
 const WAIT_BETWEEN_ATTEMPTS: Duration = Duration::from_secs(20);
+#[cfg(not(debug_assertions))]
+const REPO: &str = "Wynncraft-Overhaul/majestic-overhaul/";
+#[cfg(debug_assertions)]
+const REPO: &str = "Wynncraft-Overhaul/majestic-overhaul-unstable/";
 
 fn default_id() -> String {
     String::from("default")
@@ -168,7 +172,17 @@ fn build_http_client() -> HttpClient {
         .redirect_policy(RedirectPolicy::Limit(5))
         .default_headers(&[
             ("User-Agent", "wynncraft-overhaul/installer/0.1.0"),
-            ("Authorization", &format!("Bearer {}", include_str!("pat"))),
+            (
+                "Authorization",
+                &format!(
+                    "Bearer {}",
+                    if cfg!(debug_assertions) {
+                        include_str!("pat_unstable")
+                    } else {
+                        include_str!("pat")
+                    }
+                ),
+            ),
         ])
         .build()
         .unwrap()
@@ -1562,7 +1576,7 @@ fn main() {
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
         build_http_client()
-            .get(GH_API.to_owned() + "Wynncraft-Overhaul/majestic-overhaul/" + "branches")
+            .get(GH_API.to_owned() + REPO + "branches")
             .expect("Failed to retrive branches!")
             .text()
             .unwrap()
@@ -1593,7 +1607,7 @@ fn main() {
         gui::App,
         gui::AppProps {
             branches,
-            modpack_source: String::from("Wynncraft-Overhaul/majestic-overhaul/"),
+            modpack_source: String::from(REPO),
             config,
             config_path,
             style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
