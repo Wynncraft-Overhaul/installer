@@ -16,11 +16,17 @@ use isahc::config::RedirectPolicy;
 use isahc::http::StatusCode;
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
+use log::{error, info, warn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use simplelog::{
+    ColorChoice, CombinedLogger, Config as LogConfig, LevelFilter, TermLogger, TerminalMode,
+    WriteLogger,
+};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::fs::File;
 use std::thread::sleep;
 use std::time::Duration;
 use std::{
@@ -107,7 +113,7 @@ impl CachedHttpClient {
         }
     }
 
-    async fn get_async<T: Into<String> + Clone>(
+    async fn get_async<T: Into<String> + Clone + Debug>(
         &self,
         url: T,
     ) -> Result<Response<AsyncBody>, isahc::Error> {
@@ -118,8 +124,10 @@ impl CachedHttpClient {
                 Ok(v) => return Ok(v.resp),
                 Err(v) => err = Some(v),
             }
+            warn!("Failed to get '{url:?}', returned '{err:#?}'. Retrying!");
             sleep(WAIT_BETWEEN_ATTEMPTS);
         }
+        error!("Failed to get '{url:?}', returned '{err:#?}'.");
         Err(err.unwrap()) // unwrap can't fail
     }
 
@@ -243,7 +251,8 @@ macro_rules! gen_downloadble_impl {
                 loader_type: &str,
                 http_client: &CachedHttpClient,
             ) -> Result<PathBuf, DownloadError> {
-                match self.source.as_str() {
+                info!("Downloading: {self:#?}");
+                let res = match self.source.as_str() {
                     "modrinth" => {
                         download_from_modrinth(self, modpack_root, loader_type, $type, http_client)
                             .await
@@ -253,7 +262,9 @@ macro_rules! gen_downloadble_impl {
                         download_from_mediafire(self, modpack_root, $type, http_client).await
                     }
                     _ => panic!("Unsupported source '{}'!", self.source.as_str()),
-                }
+                };
+                info!("Downloaded '{}' with result: {:#?}", self.get_name(), res);
+                res
             }
 
             fn new(
@@ -1089,6 +1100,7 @@ macro_rules! validate_item_path {
 }
 
 fn uninstall(launcher: &Launcher, b64_id: &str) {
+    info!("Uninstalling modpack!");
     let mut data_source_id = String::new();
     match launcher {
         Launcher::Vanilla(root) => {
@@ -1098,6 +1110,7 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
                 if instance.join(b64_id).is_file() {
                     data_source_id = instance.file_name().unwrap().to_str().unwrap().to_owned();
                     fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
+                    info!("Removed: {instance:#?}");
                     fs::create_dir(instance).unwrap();
                 }
             }
@@ -1109,6 +1122,7 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
                 if instance.join(format!(".minecraft/{}", b64_id)).is_file() {
                     data_source_id = instance.file_name().unwrap().to_str().unwrap().to_owned();
                     fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
+                    info!("Removed: {instance:#?}");
                     fs::create_dir_all(instance.join(".minecraft/")).unwrap();
                 }
             }
@@ -1126,6 +1140,7 @@ fn uninstall(launcher: &Launcher, b64_id: &str) {
             data_source_id
         ),
     );
+    info!("Uninstalled modpack!")
 }
 
 async fn download_helper<T: Downloadable + Debug>(
@@ -1184,6 +1199,8 @@ async fn download_helper<T: Downloadable + Debug>(
 }
 
 async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
+    info!("Installing modpack");
+    info!("installer_profile = {installer_profile:#?}");
     let modpack_root = &get_modpack_root(
         installer_profile
             .launcher
@@ -1433,6 +1450,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     if loader_future.is_some() {
         loader_future.unwrap().await;
     }
+    info!("Installed modpack!");
     Ok(())
 }
 
@@ -1481,6 +1499,8 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone>(
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
 async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
+    info!("Updating modpack");
+    info!("installer_profile = {installer_profile:#?}");
     let local_manifest: Manifest = match fs::read_to_string(
         get_modpack_root(
             installer_profile
@@ -1506,7 +1526,7 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         installer_profile.manifest.resourcepacks,
         &local_manifest.resourcepacks,
     );
-    install(InstallerProfile {
+    let e = install(InstallerProfile {
         manifest: Manifest {
             manifest_version: installer_profile.manifest.manifest_version,
             modpack_version: installer_profile.manifest.modpack_version.clone(),
@@ -1538,7 +1558,13 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         launcher: installer_profile.launcher,
         local_manifest: Some(local_manifest),
     })
-    .await
+    .await;
+    if e.is_ok() {
+        info!("Updated modpack");
+    } else {
+        error!("Failed to update modpack: {e:#?}")
+    }
+    e
 }
 
 fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
@@ -1573,6 +1599,21 @@ fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
 }
 
 fn main() {
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Info,
+            LogConfig::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Info,
+            LogConfig::default(),
+            File::create(get_app_data().join(".WC_OVHL/installer.log")).unwrap(),
+        ),
+    ])
+    .unwrap();
+
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
         build_http_client()
@@ -1586,10 +1627,15 @@ fn main() {
     let config_path = get_app_data().join(".WC_OVHL/config.json");
     let config: Config;
     let style_css = include_str!("style.css");
-    let style_css = style_css.replace(
-        "Wynncraft_Game_Font.woff2.base64",
-        include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
-    );
+    let style_css = style_css
+        .replace(
+            "Wynncraft_Game_Font.woff2.base64",
+            include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
+        )
+        .replace(
+            "background_installer.png.base64",
+            include_str!("assets/background_installer.png.base64"),
+        );
     if config_path.exists() {
         config = serde_json::from_slice(&fs::read(&config_path).expect("Failed to read config!"))
             .expect("Failed to load config!");
@@ -1602,7 +1648,7 @@ fn main() {
         fs::write(&config_path, serde_json::to_vec(&config).unwrap())
             .expect("Failed to write config!");
     }
-
+    info!("Running installer with config: {config:#?}");
     dioxus_desktop::launch_with_props(
         gui::App,
         gui::AppProps {
