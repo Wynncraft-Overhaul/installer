@@ -1599,6 +1599,7 @@ fn get_launcher(string_representation: &str) -> Result<Launcher, String> {
 }
 
 fn main() {
+    fs::create_dir_all(get_app_data().join(".WC_OVHL/")).expect("Failed to create config dir!");
     CombinedLogger::init(vec![
         TermLogger::new(
             LevelFilter::Info,
@@ -1644,7 +1645,6 @@ fn main() {
             launcher: String::from("vanilla"),
             first_launch: Some(true),
         };
-        fs::create_dir_all(config_path.parent().unwrap()).expect("Failed to create config dir!");
         fs::write(&config_path, serde_json::to_vec(&config).unwrap())
             .expect("Failed to write config!");
     }
