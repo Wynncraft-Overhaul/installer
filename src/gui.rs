@@ -705,7 +705,7 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                     div {
                         class: "version-inner-container",
                         div {
-                            class: "container",
+                            class: "container", 
                             div {
                                 class: "info-container",
                                 div {
@@ -719,50 +719,52 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                     }
                                 }
                                 div {
-                                    class: "feature-list",
-                                    for feat in installer_profile.with(|profile| profile.manifest.features.clone()) {
-                                        if !feat.hidden {
-                                            rsx!(
-                                                label {
-                                                    class: "tooltip",
-                                                    input {
-                                                        checked: if installer_profile.with(|profile| profile.installed) {
-                                                            if enabled_features.with(|x| x.contains(&feat.id)) {
-                                                                Some("true")
+                                    div {
+                                        class: "description",
+                                        dangerous_inner_html: "{description}"
+                                    }
+                                    div {
+                                        class: "feature-list",
+                                        for feat in installer_profile.with(|profile| profile.manifest.features.clone()) {
+                                            if !feat.hidden {
+                                                rsx!(
+                                                    label {
+                                                        class: "tooltip",
+                                                        input {
+                                                            checked: if installer_profile.with(|profile| profile.installed) {
+                                                                if enabled_features.with(|x| x.contains(&feat.id)) {
+                                                                    Some("true")
+                                                                } else {
+                                                                    None
+                                                                }
                                                             } else {
-                                                                None
-                                                            }
-                                                        } else {
-                                                            if feat.default {
-                                                                Some("true")
-                                                            } else {
-                                                                None
-                                                            }
-                                                        },
-                                                        name: "{feat.id}",
-                                                        onchange: move |evt| {
-                                                            feature_change(installer_profile, modify, evt, &feat, modify_count, enabled_features);
-                                                        },
-                                                        r#type: "checkbox",    
+                                                                if feat.default {
+                                                                    Some("true")
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            },
+                                                            name: "{feat.id}",
+                                                            onchange: move |evt| {
+                                                                feature_change(installer_profile, modify, evt, &feat, modify_count, enabled_features);
+                                                            },
+                                                            r#type: "checkbox",    
+                                                        }
+                                                        
+                                                        "{feat.name}"
+                                                        match feat.description {
+                                                            Some(ref desc) => rsx!(span {
+                                                                class: "tooltiptext",
+                                                                desc.to_owned()
+                                                            }),
+                                                            None => rsx!("")
+                                                        }
                                                     }
-                                                    
-                                                    "{feat.name}"
-                                                    match feat.description {
-                                                        Some(ref desc) => rsx!(span {
-                                                            class: "tooltiptext",
-                                                            desc.to_owned()
-                                                        }),
-                                                        None => rsx!("")
-                                                    }
-                                                }
-                                            )
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            div {
-                                class: "description",
-                                dangerous_inner_html: "{description}"
                             }
                             input {
                                 r#type: "submit",
