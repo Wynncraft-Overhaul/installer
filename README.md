@@ -3,3 +3,7 @@ A simple installer written in rust, it's used to install the Majestic Overhaul M
 For any kind of support with the installer, either write into the discord or better yet if you have found a bug create an issue right here on github.
 Also there will be a security warning on windows, because we sure as heck aren't going to pay for a code signing certificate.
 Also this is opensource but if you want to use it for anything make sure to read the license fully.
+## OSs
+- Windows
+- MacOS
+- Linux soon(TM) (on the horizon but not actively worked on, feel free to make a PR for this.)
