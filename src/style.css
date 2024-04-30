@@ -84,6 +84,36 @@ input {
     text-align: center;
 }
 
+.confirm-yes {
+    font-family: "wynncraft";
+    background-color: #d95248;
+    padding: 4%;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 100%;
+    margin-right: 2%;
+    margin-left: 2%;
+    margin-bottom: 2%;
+    cursor: pointer;
+    border: 0;
+}
+
+.confirm-no {
+    font-family: "wynncraft";
+    background-color: #073c17;
+    padding: 4%;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 100%;
+    margin-right: 2%;
+    margin-left: 2%;
+    margin-bottom: 2%;
+    cursor: pointer;
+    border: 0;
+}
+
 .install-button {
     font-family: "wynncraft";
     background-color: #073c17;

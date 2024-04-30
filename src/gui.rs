@@ -117,6 +117,7 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
     let mut multimc = None;
     let mut prism = None;
     let mut custom = None;
+    let uninstall_confirm = use_state(cx, || false);
     let launcher = cx.props.config.with(|cfg| cfg.launcher.clone());
     match &*launcher {
         "vanilla" => vanilla = Some("true"),
@@ -132,84 +133,110 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
         div {
             class: "version-inner-container",
             style: "width: 25.25vw;",
-            div {
-                class: "container",
-                style: "width: 24vw;",
-                form {
-                    id: "settings",
-                    onsubmit: move |event| {
-                        cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
-                        let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
-                        match res {
-                            Ok(_) => {},
-                            Err(e) => {
-                                cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+            if !&*uninstall_confirm {
+                rsx!(div {
+                    class: "container",
+                    style: "width: 24vw;",
+                    form {
+                        id: "settings",
+                        onsubmit: move |event| {
+                            cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
+                            let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
+                            match res {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                                },
+                            }
+                            cx.props.settings.set(false);
+                        },
+                        div {
+                            class: "label",
+                            span {
+                                "Launcher:"
+                            }
+                            select {
+                                name: "launcher-select",
+                                id: "launcher-select",
+                                form: "settings",
+                                class: "credits-button",
+                                if super::get_minecraft_folder().is_dir() {
+                                    rsx!(option {
+                                        value: "vanilla",
+                                        selected: vanilla,
+                                        "Vanilla"
+                                    })
+                                }
+                                if super::get_multimc_folder("MultiMC").is_ok() {
+                                    rsx!(option {
+                                        value: "multimc-MultiMC",
+                                        selected: multimc,
+                                        "MultiMC"
+                                    })
+                                }
+                                if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                    rsx!(option {
+                                        value: "multimc-PrismLauncher",
+                                        selected: prism,
+                                        "Prism Launcher"
+                                    })
+                                }
+                                if custom.is_some() {
+                                    rsx!(option {
+                                        value: "{launcher_clone}",
+                                        selected: custom,
+                                        "Custom MultiMC"
+                                    })
+                                }
+                            }
+                        }
+                        custom_multimc_button {
+                            config: cx.props.config,
+                            first_launch: cx.props.first_launch,
+                            config_path: cx.props.config_path,
+                            error: cx.props.error,
+                            b64_id: cx.props.b64_id.clone()
+                        }
+                        input {
+                            r#type: "submit",
+                            value: "Save",
+                            class: "install-button",
+                            id: "save"
+                        }
+                        button {
+                            class: "uninstall-button",
+                            onclick: move |_evt| {
+                                uninstall_confirm.set(true);
                             },
-                        }
-                        cx.props.settings.set(false);
-                    },
-                    div {
-                        class: "label",
-                        span {
-                            "Launcher:"
-                        }
-                        select {
-                            name: "launcher-select",
-                            id: "launcher-select",
-                            form: "settings",
-                            class: "credits-button",
-                            if super::get_minecraft_folder().is_dir() {
-                                rsx!(option {
-                                    value: "vanilla",
-                                    selected: vanilla,
-                                    "Vanilla"
-                                })
-                            }
-                            if super::get_multimc_folder("MultiMC").is_ok() {
-                                rsx!(option {
-                                    value: "multimc-MultiMC",
-                                    selected: multimc,
-                                    "MultiMC"
-                                })
-                            }
-                            if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                rsx!(option {
-                                    value: "multimc-PrismLauncher",
-                                    selected: prism,
-                                    "Prism Launcher"
-                                })
-                            }
-                            if custom.is_some() {
-                                rsx!(option {
-                                    value: "{launcher_clone}",
-                                    selected: custom,
-                                    "Custom MultiMC"
-                                })
-                            }
+                            "Uninstall Modpack"
                         }
                     }
-                    custom_multimc_button {
-                        config: cx.props.config,
-                        first_launch: cx.props.first_launch,
-                        config_path: cx.props.config_path,
-                        error: cx.props.error,
-                        b64_id: cx.props.b64_id.clone()
-                    }
-                    input {
-                        r#type: "submit",
-                        value: "Save",
-                        class: "install-button",
-                        id: "save"
+                })
+            } else {
+                rsx!(div {
+                    class: "container",
+                    style: "width: 24vw;",
+                    p {
+                        "Are you sure? This will delete all files from both the immersive and performance pack."
                     }
                     button {
-                        class: "uninstall-button",
+                        class: "confirm-yes",
                         onclick: move |_evt| {
                             super::uninstall(&get_launcher(&launcher).unwrap(), &cx.props.b64_id);
+                            uninstall_confirm.set(false);
                         },
-                        "Uninstall Modpack"
+                        "Yes"
                     }
-                }
+                    button {
+                        class: "confirm-no",
+                        onclick: move |_evt| {
+                            uninstall_confirm.set(false);
+                        },
+                        "No"
+                    }
+                })
             }
+            
         }
     })
 }

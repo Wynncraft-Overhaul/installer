@@ -699,6 +699,7 @@ async fn download_from_ddl<T: Downloadable + Debug>(
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
     }
     let final_dist = dist.join(filename);
+    info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
     match fs::write(&final_dist, resp.bytes().await.unwrap()) {
         Ok(_) => (),
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
@@ -768,6 +769,7 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
             .await
             .unwrap();
             let final_dist = dist.join(Path::new(&_mod.files[0].filename));
+            info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
             match fs::write(&final_dist, content) {
                 Ok(_) => (),
                 Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
@@ -843,6 +845,7 @@ async fn download_from_mediafire<T: Downloadable + Debug>(
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
     };
     let final_dist = dist.join(filename);
+    info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
     match fs::write(&final_dist, resp.bytes().await.unwrap()) {
         Ok(_) => (),
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
