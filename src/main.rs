@@ -179,18 +179,7 @@ fn build_http_client() -> HttpClient {
     HttpClient::builder()
         .redirect_policy(RedirectPolicy::Limit(5))
         .default_headers(&[
-            ("User-Agent", "wynncraft-overhaul/installer/0.1.0"),
-            (
-                "Authorization",
-                &format!(
-                    "Bearer {}",
-                    if cfg!(debug_assertions) {
-                        include_str!("pat_unstable")
-                    } else {
-                        include_str!("pat")
-                    }
-                ),
-            ),
+            ("User-Agent", "wynncraft-overhaul/installer/0.1.0")
         ])
         .build()
         .unwrap()
