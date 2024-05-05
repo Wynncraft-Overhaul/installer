@@ -27,6 +27,7 @@ use simplelog::{
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs::File;
+use std::panic;
 use std::thread::sleep;
 use std::time::Duration;
 use std::{
@@ -44,10 +45,7 @@ const GH_RAW: &str = "https://raw.githubusercontent.com/";
 const CONCURRENCY: usize = 14;
 const ATTEMPTS: usize = 3;
 const WAIT_BETWEEN_ATTEMPTS: Duration = Duration::from_secs(20);
-#[cfg(not(debug_assertions))]
 const REPO: &str = "Wynncraft-Overhaul/majestic-overhaul/";
-#[cfg(debug_assertions)]
-const REPO: &str = "Wynncraft-Overhaul/majestic-overhaul-unstable/";
 
 fn default_id() -> String {
     String::from("default")
@@ -178,9 +176,7 @@ async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedRespo
 fn build_http_client() -> HttpClient {
     HttpClient::builder()
         .redirect_policy(RedirectPolicy::Limit(5))
-        .default_headers(&[
-            ("User-Agent", "wynncraft-overhaul/installer/0.1.0")
-        ])
+        .default_headers(&[("User-Agent", "wynncraft-overhaul/installer/0.1.0")])
         .build()
         .unwrap()
 }
@@ -1321,7 +1317,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                     }
                     let mut files: Vec<String> = vec![];
                     // download and unzip in modpack root
-                    let content = http_client
+                    let content_resp = http_client
                         .with_headers(
                             format!(
                                 "{}{}releases/assets/{}",
@@ -1329,11 +1325,14 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                             ),
                             &[("Accept", "application/octet-stream")],
                         )
-                        .await
-                        .expect("Failed to download 'include.zip'")
-                        .bytes()
-                        .await
-                        .unwrap();
+                        .await;
+                    if content_resp.is_err() {
+                        return Err(format!(
+                            "Failed to download 'include.zip'\n {}",
+                            content_resp.err().unwrap().to_string()
+                        ));
+                    }
+                    let content = content_resp.unwrap().bytes().await.unwrap();
                     let zipfile_path = modpack_root.join(Path::new(&asset.name));
                     fs::write(&zipfile_path, content).expect("Failed to write 'include.zip'!");
                     let zipfile = fs::File::open(&zipfile_path).unwrap();
@@ -1606,7 +1605,9 @@ fn main() {
         ),
     ])
     .unwrap();
-
+    panic::set_hook(Box::new(|info| {
+        error!("Installer panicked this is a bug!\n{info:#?}")
+    }));
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
         build_http_client()
