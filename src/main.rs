@@ -27,9 +27,9 @@ use simplelog::{
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs::File;
-use std::panic;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{backtrace::Backtrace, panic};
 use std::{
     env, fs,
     io::Cursor,
@@ -1606,7 +1606,15 @@ fn main() {
     ])
     .unwrap();
     panic::set_hook(Box::new(|info| {
-        error!("Installer panicked this is a bug!\n{info:#?}")
+        let payload = if let Some(string) = info.payload().downcast_ref::<String>() {
+            format!("{string}")
+        } else if let Some(str) = info.payload().downcast_ref::<&'static str>() {
+            format!("{str}")
+        } else {
+            format!("{:?}", info.payload())
+        };
+        let backtrace = Backtrace::force_capture();
+        error!("The installer panicked! This is a bug.\n{info:#?}\nPayload: {payload}\nBacktrace: {backtrace}");
     }));
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
