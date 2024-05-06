@@ -30,6 +30,7 @@ regex = "1.8.1"
 rfd = "0.14.0"
 log = "0.4.21"
 simplelog = "0.12.2"
+platform-info = "2.0.3"
 
 [build-dependencies]
 winres = "0.1"

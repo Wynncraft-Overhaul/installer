@@ -17,6 +17,7 @@ use isahc::http::StatusCode;
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
 use log::{error, info, warn};
+use platform_info::{PlatformInfo, PlatformInfoAPI, UNameAPI};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -685,7 +686,11 @@ async fn download_from_ddl<T: Downloadable + Debug>(
     }
     let final_dist = dist.join(filename);
     info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
-    match fs::write(&final_dist, resp.bytes().await.unwrap()) {
+    let contents = match resp.bytes().await {
+        Ok(bytes) => bytes,
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
+    match fs::write(&final_dist, contents) {
         Ok(_) => (),
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
     };
@@ -746,13 +751,16 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
                 || _mod.loaders.contains(&String::from(loader_type))
                 || r#type == "shaderpack")
         {
-            let content = match http_client.get_nocache(&_mod.files[0].url).await {
+            let content = match match http_client.get_nocache(&_mod.files[0].url).await {
                 Ok(v) => v,
                 Err(e) => return Err(DownloadError::HttpError(item.get_name().to_string(), e)),
             }
             .bytes()
             .await
-            .unwrap();
+            {
+                Ok(bytes) => bytes,
+                Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+            };
             let final_dist = dist.join(Path::new(&_mod.files[0].filename));
             info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
             match fs::write(&final_dist, content) {
@@ -831,7 +839,11 @@ async fn download_from_mediafire<T: Downloadable + Debug>(
     };
     let final_dist = dist.join(filename);
     info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
-    match fs::write(&final_dist, resp.bytes().await.unwrap()) {
+    let contents = match resp.bytes().await {
+        Ok(bytes) => bytes,
+        Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
+    };
+    match fs::write(&final_dist, contents) {
         Ok(_) => (),
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
     };
@@ -1616,6 +1628,8 @@ fn main() {
         let backtrace = Backtrace::force_capture();
         error!("The installer panicked! This is a bug.\n{info:#?}\nPayload: {payload}\nBacktrace: {backtrace}");
     }));
+    let platform_info = PlatformInfo::new().expect("Unable to determine platform info");
+    info!("System information:\n\tSysname: {}\n\tRelease: {}\n\tVersion: {}\n\tArchitecture: {}\n\tOsname: {}",platform_info.sysname().to_string_lossy(), platform_info.release().to_string_lossy(), platform_info.version().to_string_lossy(), platform_info.machine().to_string_lossy(), platform_info.osname().to_string_lossy());
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
         build_http_client()
