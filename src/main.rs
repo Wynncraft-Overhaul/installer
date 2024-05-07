@@ -1329,24 +1329,39 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                     }
                     let mut files: Vec<String> = vec![];
                     // download and unzip in modpack root
-                    let content_resp = http_client
-                        .with_headers(
-                            format!(
-                                "{}{}releases/assets/{}",
-                                GH_API, installer_profile.modpack_source, asset.id
-                            ),
-                            &[("Accept", "application/octet-stream")],
-                        )
-                        .await;
+                    let mut tries = 0;
+                    let content_resp = loop {
+                        let content_resp = http_client
+                            .with_headers(
+                                format!(
+                                    "{}{}releases/assets/{}",
+                                    GH_API, installer_profile.modpack_source, asset.id
+                                ),
+                                &[("Accept", "application/octet-stream")],
+                            )
+                            .await;
+                        if content_resp.is_err() {
+                            tries += 1;
+                            if tries >= ATTEMPTS {
+                                break Err(format!(
+                                    "Failed to download 'include.zip'\n {:#?}",
+                                    content_resp.err().unwrap()
+                                ));
+                            }
+                        } else {
+                            break Ok(content_resp.unwrap());
+                        }
+                    };
                     if content_resp.is_err() {
-                        return Err(format!(
-                            "Failed to download 'include.zip'\n {}",
-                            content_resp.err().unwrap().to_string()
-                        ));
+                        return Err(content_resp.err().unwrap());
                     }
-                    let content = content_resp.unwrap().bytes().await.unwrap();
+                    let content_byte_resp = content_resp.unwrap().bytes().await;
+                    if content_byte_resp.is_err() {
+                        return Err(format!("{:#?}", content_byte_resp.err().unwrap()));
+                    }
                     let zipfile_path = modpack_root.join(Path::new(&asset.name));
-                    fs::write(&zipfile_path, content).expect("Failed to write 'include.zip'!");
+                    fs::write(&zipfile_path, content_byte_resp.unwrap())
+                        .expect("Failed to write 'include.zip'!");
                     let zipfile = fs::File::open(&zipfile_path).unwrap();
                     let mut archive = zip::ZipArchive::new(zipfile).unwrap();
                     // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
