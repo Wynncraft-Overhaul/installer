@@ -177,7 +177,10 @@ async fn get_cached(http_client: &HttpClient, url: String) -> Result<CachedRespo
 fn build_http_client() -> HttpClient {
     HttpClient::builder()
         .redirect_policy(RedirectPolicy::Limit(5))
-        .default_headers(&[("User-Agent", "wynncraft-overhaul/installer/0.1.0")])
+        .default_headers(&[(
+            "User-Agent",
+            concat!("wynncraft-overhaul/installer/", env!("CARGO_PKG_VERSION")),
+        )])
         .build()
         .unwrap()
 }
@@ -1643,6 +1646,7 @@ fn main() {
         let backtrace = Backtrace::force_capture();
         error!("The installer panicked! This is a bug.\n{info:#?}\nPayload: {payload}\nBacktrace: {backtrace}");
     }));
+    info!("Installer version: {}", env!("CARGO_PKG_VERSION"));
     let platform_info = PlatformInfo::new().expect("Unable to determine platform info");
     info!("System information:\n\tSysname: {}\n\tRelease: {}\n\tVersion: {}\n\tArchitecture: {}\n\tOsname: {}",platform_info.sysname().to_string_lossy(), platform_info.release().to_string_lossy(), platform_info.version().to_string_lossy(), platform_info.machine().to_string_lossy(), platform_info.osname().to_string_lossy());
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
