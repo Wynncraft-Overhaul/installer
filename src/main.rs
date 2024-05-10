@@ -1475,7 +1475,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
     Ok(())
 }
 
-fn remove_old_items<T: Downloadable + PartialEq + Clone>(
+fn remove_old_items<T: Downloadable + PartialEq + Clone + Debug>(
     items: Vec<T>,
     installed_items: &Vec<T>,
 ) -> Vec<T> {
@@ -1491,13 +1491,12 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone>(
                         if installed_item.get_version() == item.get_version() {
                             Some(installed_item.clone())
                         } else {
-                            let _ = fs::remove_file(installed_item.get_path().as_ref().expect(
-                                &format!(
-                                    "Missing 'path' field on installed {} '{}'!",
-                                    stringify!(installed_item),
-                                    installed_item.get_name()
-                                ),
-                            ));
+                            if let Some(path) = installed_item.get_path().as_ref() {
+                                let _ = fs::remove_file(path);
+                            } else {
+                                warn!("Missing 'path' field on {installed_item:#?}")
+                            }
+
                             Some(item.clone())
                         }
                     },
@@ -1508,11 +1507,11 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone>(
         .iter()
         .filter(|x| !new_items.contains(x))
         .for_each(|x| {
-            let _ = fs::remove_file(x.get_path().as_ref().expect(&format!(
-                "Missing 'path' field on installed {} '{}'!",
-                stringify!(x),
-                x.get_name()
-            )));
+            if let Some(path) = x.get_path().as_ref() {
+                let _ = fs::remove_file(path);
+            } else {
+                warn!("Missing 'path' field on {x:#?}")
+            }
         });
     new_items
 }
