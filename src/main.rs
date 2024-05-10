@@ -994,7 +994,27 @@ fn create_launcher_profile(
                     .get("profiles")
                     .ok_or(LauncherProfileError::NoProfiles)?
                 {
-                    JsonValue::Object(_) => lp_obj.get_mut("profiles").unwrap().as_object_mut().unwrap().insert(manifest.uuid.clone(), serde_json::to_value(profile)?),
+                    JsonValue::Object(_) => {
+                        let profiles = lp_obj.get_mut("profiles").unwrap().as_object_mut().unwrap();
+                        let profile = if profiles.contains_key(&manifest.uuid) {
+                            let mut profile: LauncherProfile = serde_json::from_value(profiles.get(&manifest.uuid).unwrap().clone())?;
+                            profile.lastVersionId = match &manifest.loader.r#type[..] {
+                                "fabric" => format!(
+                                    "fabric-loader-{}-{}",
+                                    &manifest.loader.version, &manifest.loader.minecraft_version
+                                ),
+                                "quilt" => format!(
+                                    "quilt-loader-{}-{}",
+                                    &manifest.loader.version, &manifest.loader.minecraft_version
+                                ),
+                                _ => panic!("Invalid loader"),
+                            };
+                            profile
+                        } else {
+                            profile
+                        };
+                        profiles.insert(manifest.uuid.clone(), serde_json::to_value(profile)?);
+                    },
                     _ => return Err(LauncherProfileError::ProfilesNotObject),
                 },
                 _ => return Err(LauncherProfileError::RootNotObject),
@@ -1005,6 +1025,10 @@ fn create_launcher_profile(
             )?;
         }
         Launcher::MultiMC(root) => {
+            let instance_cfg_path = root.join(Path::new(&format!(
+                "instances/{}/instance.cfg",
+                manifest.uuid
+            )));
             let pack = MMCPack {
                 components: vec![
                     MMCComponent {
@@ -1041,37 +1065,36 @@ fn create_launcher_profile(
                 ))),
                 serde_json::to_string(&pack)?,
             )?;
-            let jvm_args = match manifest.java_args.as_ref() {
-                Some(v) => format!("\nJvmArgs={}\nOverrideJavaArgs=true", v),
-                None => String::new(),
-            };
-            let max_mem = match manifest.max_mem {
-                Some(v) => format!("\nMaxMemAlloc={}", v),
-                None => String::new(),
-            };
-            let min_mem = match manifest.min_mem {
-                Some(v) => format!("\nMinMemAlloc={}", v),
-                None => String::new(),
-            };
-            let override_mem = if max_mem.is_empty() && min_mem.is_empty() {
-                ""
-            } else {
-                "\nOverrideMemory=true"
-            };
-            fs::write(
-                root.join(Path::new(&format!(
-                    "instances/{}/instance.cfg",
-                    manifest.uuid
-                ))),
-                format!(
-                    "iconKey={}\nname={}{}{}{}{}",
-                    manifest.uuid, manifest.name, max_mem, min_mem, override_mem, jvm_args
-                ),
-            )?;
-            if manifest.icon {
-                icon_img.ok_or(LauncherProfileError::IconNotFound)?
-                    .save(root.join(Path::new(&format!("icons/{}.png", manifest.uuid))))?;
-            }
+            if !instance_cfg_path.exists() {
+                let jvm_args = match manifest.java_args.as_ref() {
+                    Some(v) => format!("\nJvmArgs={}\nOverrideJavaArgs=true", v),
+                    None => String::new(),
+                };
+                let max_mem = match manifest.max_mem {
+                    Some(v) => format!("\nMaxMemAlloc={}", v),
+                    None => String::new(),
+                };
+                let min_mem = match manifest.min_mem {
+                    Some(v) => format!("\nMinMemAlloc={}", v),
+                    None => String::new(),
+                };
+                let override_mem = if max_mem.is_empty() && min_mem.is_empty() {
+                    ""
+                } else {
+                    "\nOverrideMemory=true"
+                };
+                fs::write(
+                    root.join(instance_cfg_path),
+                    format!(
+                        "iconKey={}\nname={}{}{}{}{}",
+                        manifest.uuid, manifest.name, max_mem, min_mem, override_mem, jvm_args
+                    ),
+                )?;
+                if manifest.icon {
+                    icon_img.ok_or(LauncherProfileError::IconNotFound)?
+                        .save(root.join(Path::new(&format!("icons/{}.png", manifest.uuid))))?;
+                }
+            }    
         }
     };
     Ok(())
