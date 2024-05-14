@@ -1,154 +1,208 @@
-#![allow(non_snake_case)]
 use std::path::PathBuf;
 
 use base64::{engine, Engine};
 use dioxus::prelude::*;
-use regex::Regex;
 
-use crate::{get_app_data, get_launcher, InstallerProfile};
+use crate::{get_app_data, get_launcher};
 
+#[derive(PartialEq, Props, Clone)]
+struct SpinnerViewProps {
+    title: String,
+    status: String,
+}
 
-fn Spinner(cx: Scope) -> Element {
-    cx.render(rsx! {
+#[component]
+fn SpinnerView(props: SpinnerViewProps) -> Element {
+    rsx! {
         div {
-            class: "lds-ring",
-            div {}
-            div {}
-            div {}
-            div {}
+            class: "version-container",
+            div {
+                class: "subtitle-container",
+                h1 {
+                    "{props.title}"
+                }
+            }
+            div {
+                class: "version-inner-container",
+                div {
+                    class: "container",
+                    style: "justify-items: center;",
+                    div {
+                        class: "lds-ring",
+                        div {}
+                        div {}
+                        div {}
+                        div {}
+                    }
+                    p {
+                        "{props.status}"
+                    }
+                }
+            }
         }
-    })
+    }
 }
 
-#[derive(Props, PartialEq)]
-struct CreditsProps<'a> {
+#[derive(PartialEq, Props, Clone)]
+struct CreditsProps {
     manifest: super::Manifest,
-    enabled: &'a UseRef<Vec<String>>,
+    enabled: Vec<String>,
+    credits: Signal<bool>,
 }
 
-fn Credits<'a>(cx: Scope<'a, CreditsProps>) -> Element<'a> {
-    cx.render(rsx! {
-        ul {
-            for r#mod in &cx.props.manifest.mods {
-                if cx.props.enabled.with(|x| x.contains(&r#mod.id)) {
-                    rsx!(li {
-                        "{r#mod.name} by "
-                        for author in &r#mod.authors {
-                            a {
-                                href: "{author.link}",
-                                if r#mod.authors.last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
-                                }
-                            }
-                        }
-                    })
+#[component]
+fn Credits(mut props: CreditsProps) -> Element {
+    rsx! {
+        div {
+            class: "version-container",
+            div {
+                class: "subtitle-container",
+                h1 {
+                    "{props.manifest.subtitle}"
                 }
             }
-            for shaderpack in &cx.props.manifest.shaderpacks {
-                if cx.props.enabled.with(|x| x.contains(&shaderpack.id)) {
-                    rsx!(li {
-                        "{shaderpack.name} by "
-                        for author in &shaderpack.authors {
-                            a {
-                                href: "{author.link}",
-                                if shaderpack.authors.last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
+            div {
+                class: "version-inner-container",
+                div {
+                    class: "container",
+                    div {
+                        class: "info-container",
+                        div {
+                            class: "button-container",
+                            button {
+                                class: "credits-button",
+                                onclick: move |evt| {
+                                    props.credits.set(false);
+                                    evt.stop_propagation();
+                                },
+                                "X"
+                            }
+                        }
+                        div {
+                            class: "credits",
+                            div {
+                                class: "credits-inner",
+                                ul {
+                                    for r#mod in props.manifest.mods {
+                                        if props.enabled.contains(&r#mod.id) {
+                                            li {
+                                                "{r#mod.name} by "
+                                                for author in &r#mod.authors {
+                                                    a {
+                                                        href: "{author.link}",
+                                                        if r#mod.authors.last().unwrap() == author {
+                                                            {author.name.to_string()}
+                                                        } else {
+                                                            {author.name.to_string() + ", "}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    for shaderpack in props.manifest.shaderpacks {
+                                        if props.enabled.contains(&shaderpack.id) {
+                                            li {
+                                                "{shaderpack.name} by "
+                                                for author in &shaderpack.authors {
+                                                    a {
+                                                        href: "{author.link}",
+                                                        if shaderpack.authors.last().unwrap() == author {
+                                                            {author.name.to_string()}
+                                                        } else {
+                                                            {author.name.to_string() + ", "}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    for resourcepack in props.manifest.resourcepacks {
+                                        if props.enabled.contains(&resourcepack.id) {
+                                            li {
+                                                "{resourcepack.name} by "
+                                                for author in &resourcepack.authors {
+                                                    a {
+                                                        href: "{author.link}",
+                                                        if resourcepack.authors.last().unwrap() == author {
+                                                            {author.name.to_string()}
+                                                        } else {
+                                                            {author.name.to_string() + ", "}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    for include in props.manifest.include {
+                                        if props.enabled.contains(&include.id) && include.authors.is_some() && include.name.is_some() {
+                                            li {
+                                                "{include.name.as_ref().unwrap()} by "
+                                                for author in &include.authors.as_ref().unwrap() {
+                                                    a {
+                                                        href: "{author.link}",
+                                                        if include.authors.as_ref().unwrap().last().unwrap() == author {
+                                                            {author.name.to_string()}
+                                                        } else {
+                                                            {author.name.to_string() + ", "}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                    })
-                }
-            }
-            for resourcepack in &cx.props.manifest.resourcepacks {
-                if cx.props.enabled.with(|x| x.contains(&resourcepack.id)) {
-                    rsx!(li {
-                        "{resourcepack.name} by "
-                        for author in &resourcepack.authors {
-                            a {
-                                href: "{author.link}",
-                                if resourcepack.authors.last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
-                                }
-                            }
-                        }
-                    })
-                }
-            }
-            for include in &cx.props.manifest.include {
-                if cx.props.enabled.with(|x| x.contains(&include.id)) && include.authors.is_some() && include.name.is_some() {
-                    let name = include.name.as_ref().unwrap();
-                    rsx!(li {
-                        "{name} by "
-                        for author in &include.authors.as_ref().unwrap() {
-                            a {
-                                href: "{author.link}",
-                                if include.authors.as_ref().unwrap().last().unwrap() == author {
-                                    author.name.to_string()
-                                } else {
-                                    author.name.to_string() + ", "
-                                }
-                            }
-                        }
-                    })
+                    }
                 }
             }
         }
-    })
+    }
 }
 
-#[derive(Props, PartialEq)]
-struct SettingsProps<'a> {
-    config: &'a UseRef<super::Config>,
-    settings: &'a UseState<bool>,
-    config_path: &'a PathBuf,
-    error: &'a UseRef<Option<String>>,
+#[derive(PartialEq, Props, Clone)]
+struct SettingsProps {
+    config: Signal<super::Config>,
+    settings: Signal<bool>,
+    config_path: PathBuf,
+    error: Signal<Option<String>>,
     b64_id: String,
-    first_launch: &'a UseState<bool>,
 }
 
-fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
+#[component]
+fn Settings(mut props: SettingsProps) -> Element {
     let mut vanilla = None;
     let mut multimc = None;
     let mut prism = None;
     let mut custom = None;
-    let uninstall_confirm = use_state(cx, || false);
-    let launcher = cx.props.config.with(|cfg| cfg.launcher.clone());
-    match &*launcher {
+    let mut uninstall_confirm = use_signal(|| false);
+    match &props.config.read().launcher[..] {
         "vanilla" => vanilla = Some("true"),
         "multimc-MultiMC" => multimc = Some("true"),
         "multimc-PrismLauncher" => prism = Some("true"),
         _ => {}
     }
-    if launcher.starts_with("custom") {
+    if props.config.read().launcher.starts_with("custom") {
         custom = Some("true")
     }
-    let launcher_clone = launcher.clone();
-    cx.render(rsx! {
+
+    rsx! {
         div {
             class: "version-inner-container",
             style: "width: 25.25vw;",
-            if !&*uninstall_confirm {
-                rsx!(div {
+            if !*uninstall_confirm.read() {
+                div {
                     class: "container",
                     style: "width: 24vw;",
                     form {
                         id: "settings",
                         onsubmit: move |event| {
-                            cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
-                            let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
-                            match res {
-                                Ok(_) => {},
-                                Err(e) => {
-                                    cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                                },
+                            props.config.write().launcher = event.data.values()["launcher-select"].as_value();
+                            if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
+                                props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
                             }
-                            cx.props.settings.set(false);
+                            props.settings.set(false);
                         },
                         div {
                             class: "label",
@@ -161,41 +215,40 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                                 form: "settings",
                                 class: "credits-button",
                                 if super::get_minecraft_folder().is_dir() {
-                                    rsx!(option {
+                                    option {
                                         value: "vanilla",
                                         selected: vanilla,
                                         "Vanilla"
-                                    })
+                                    }
                                 }
                                 if super::get_multimc_folder("MultiMC").is_ok() {
-                                    rsx!(option {
+                                    option {
                                         value: "multimc-MultiMC",
                                         selected: multimc,
                                         "MultiMC"
-                                    })
+                                    }
                                 }
                                 if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                    rsx!(option {
+                                    option {
                                         value: "multimc-PrismLauncher",
                                         selected: prism,
                                         "Prism Launcher"
-                                    })
+                                    }
                                 }
                                 if custom.is_some() {
-                                    rsx!(option {
-                                        value: "{launcher_clone}",
+                                    option {
+                                        value: "{props.config.read().launcher}",
                                         selected: custom,
                                         "Custom MultiMC"
-                                    })
+                                    }
                                 }
                             }
                         }
-                        custom_multimc_button {
-                            config: cx.props.config,
-                            first_launch: cx.props.first_launch,
-                            config_path: cx.props.config_path,
-                            error: cx.props.error,
-                            b64_id: cx.props.b64_id.clone()
+                        CustomMultiMCButton {
+                            config: props.config,
+                            config_path: props.config_path.clone(),
+                            error: props.error,
+                            b64_id: props.b64_id.clone()
                         }
                         input {
                             r#type: "submit",
@@ -205,15 +258,16 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                         }
                         button {
                             class: "uninstall-button",
-                            onclick: move |_evt| {
+                            onclick: move |evt| {
                                 uninstall_confirm.set(true);
+                                evt.stop_propagation();
                             },
                             "Uninstall Modpack"
                         }
                     }
-                })
+                }
             } else {
-                rsx!(div {
+                div {
                     class: "container",
                     style: "width: 24vw;",
                     p {
@@ -221,59 +275,59 @@ fn Settings<'a>(cx: Scope<'a, SettingsProps<'a>>) -> Element {
                     }
                     button {
                         class: "confirm-yes",
-                        onclick: move |_evt| {
-                            super::uninstall(&get_launcher(&launcher).unwrap(), &cx.props.b64_id);
+                        onclick: move |evt| {
+                            super::uninstall(&get_launcher(&props.config.read().launcher).unwrap(), &props.b64_id);
                             uninstall_confirm.set(false);
+                            evt.stop_propagation();
                         },
                         "Yes"
                     }
                     button {
                         class: "confirm-no",
-                        onclick: move |_evt| {
+                        onclick: move |evt| {
                             uninstall_confirm.set(false);
+                            evt.stop_propagation();
                         },
                         "No"
                     }
-                })
+                }
             }
-            
+
         }
-    })
+    }
 }
 
-#[derive(Props, PartialEq)]
-struct LauncherProps<'a> {
-    config: &'a UseRef<super::Config>,
-    first_launch: &'a UseState<bool>,
-    config_path: &'a PathBuf,
-    error: &'a UseRef<Option<String>>,
+#[derive(PartialEq, Props, Clone)]
+struct LauncherProps {
+    config: Signal<super::Config>,
+    config_path: PathBuf,
+    error: Signal<Option<String>>,
     b64_id: String,
 }
 
-fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
+#[component]
+fn Launcher(mut props: LauncherProps) -> Element {
     let mut vanilla = None;
     let mut multimc = None;
     let mut prism = None;
-    let launcher = cx.props.config.with(|cfg| cfg.launcher.clone());
-    match &*launcher {
+    match &props.config.read().launcher[..] {
         "vanilla" => vanilla = Some("true"),
         "multimc-MultiMC" => multimc = Some("true"),
         "multimc-PrismLauncher" => prism = Some("true"),
         _ => {}
     }
-    let has_supported_launcher = super::get_minecraft_folder().is_dir() || super::get_multimc_folder("MultiMC").is_ok() || super::get_multimc_folder("PrismLauncher").is_ok();
+    let has_supported_launcher = super::get_minecraft_folder().is_dir()
+        || super::get_multimc_folder("MultiMC").is_ok()
+        || super::get_multimc_folder("PrismLauncher").is_ok();
     if !has_supported_launcher {
-        cx.render(rsx!(
-            no_launcher_found {
-                config: cx.props.config,
-                first_launch: cx.props.first_launch,
-                config_path: cx.props.config_path,
-                error: cx.props.error,
-                b64_id: cx.props.b64_id.clone()
-            }
-        ))
+        rsx!(NoLauncherFound {
+            config: props.config,
+            config_path: props.config_path,
+            error: props.error,
+            b64_id: props.b64_id.clone()
+        })
     } else {
-        cx.render(rsx! {
+        rsx! {
             div {
                 class: "version-inner-container",
                 style: "width: 25.25vw;",
@@ -283,16 +337,11 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                     form {
                         id: "settings",
                         onsubmit: move |event| {
-                            cx.props.config.with_mut(|cfg| cfg.launcher = event.data.values["launcher-select"].clone());
-                            cx.props.config.with_mut(|cfg| cfg.first_launch = Some(false));
-                            let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
-                            match res {
-                                Ok(_) => {},
-                                Err(e) => {
-                                    cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                                },
+                            props.config.write().launcher = event.data.values()["launcher-select"].as_value();
+                            props.config.write().first_launch = Some(false);
+                            if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
+                                props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
                             }
-                            cx.props.first_launch.set(false);
                         },
                         div {
                             class: "label",
@@ -305,34 +354,33 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                                 form: "settings",
                                 class: "credits-button",
                                 if super::get_minecraft_folder().is_dir() {
-                                    rsx!(option {
+                                    option {
                                         value: "vanilla",
                                         selected: vanilla,
                                         "Vanilla"
-                                    })
+                                    }
                                 }
                                 if super::get_multimc_folder("MultiMC").is_ok() {
-                                    rsx!(option {
+                                    option {
                                         value: "multimc-MultiMC",
                                         selected: multimc,
                                         "MultiMC"
-                                    })
+                                    }
                                 }
                                 if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                    rsx!(option {
+                                    option {
                                         value: "multimc-PrismLauncher",
                                         selected: prism,
                                         "Prism Launcher"
-                                    })
+                                    }
                                 }
                             }
                         }
-                        custom_multimc_button {
-                            config: cx.props.config,
-                            first_launch: cx.props.first_launch,
-                            config_path: cx.props.config_path,
-                            error: cx.props.error,
-                            b64_id: cx.props.b64_id.clone()
+                        CustomMultiMCButton {
+                            config: props.config,
+                            config_path: props.config_path.clone(),
+                            error: props.error,
+                            b64_id: props.b64_id.clone()
                         }
                         input {
                             r#type: "submit",
@@ -343,48 +391,55 @@ fn Launcher<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                     }
                 }
             }
-        })
+        }
     }
-    
 }
 
-fn custom_multimc_button<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
+#[component]
+fn CustomMultiMCButton(mut props: LauncherProps) -> Element {
     let custom_multimc = move |_evt| {
-        let directory_dialog = rfd::FileDialog::new().set_title("Pick root directory of desired MultiMC based launcher.").set_directory(get_app_data());
+        let directory_dialog = rfd::FileDialog::new()
+            .set_title("Pick root directory of desired MultiMC based launcher.")
+            .set_directory(get_app_data());
         let directory = directory_dialog.pick_folder();
         match directory {
             Some(path) => {
-                if !path.join("instances").is_dir() { return; }
+                if !path.join("instances").is_dir() {
+                    return;
+                }
                 let path = path.to_str();
                 if path.is_none() {
-                    cx.props.error.set(Some(String::from("Could not get path to directory!")));
+                    props
+                        .error
+                        .set(Some(String::from("Could not get path to directory!")));
                 }
-                cx.props.config.with_mut(|cfg| cfg.launcher = format!("custom-{}", path.unwrap()));
-                cx.props.config.with_mut(|cfg| cfg.first_launch = Some(false));
-                let res = std::fs::write(cx.props.config_path, serde_json::to_vec(&*cx.props.config.read()).unwrap());
-                match res {
-                    Ok(_) => {},
-                    Err(e) => {
-                        cx.props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                    },
+                props.config.write().launcher = format!("custom-{}", path.unwrap());
+                props.config.write().first_launch = Some(false);
+                if let Err(e) = std::fs::write(
+                    &props.config_path,
+                    serde_json::to_vec(&*props.config.read()).unwrap(),
+                ) {
+                    props
+                        .error
+                        .set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
                 }
-                cx.props.first_launch.set(false);
             }
             None => {}
         }
     };
-    cx.render(rsx!(
+    rsx!(
         button {
             class: "install-button custom-multimc-button",
             onclick: custom_multimc,
-            r#type: "button", 
+            r#type: "button",
             "Use custom MultiMC directory"
         }
-    ))
+    )
 }
 
-fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
-    cx.render(rsx! {
+#[component]
+fn NoLauncherFound(props: LauncherProps) -> Element {
+    rsx! {
         div {
             class: "version-inner-container",
             style: "width: 50vw;height:70vh;",
@@ -400,27 +455,26 @@ fn no_launcher_found<'a>(cx: Scope<'a, LauncherProps<'a>>) -> Element {
                     br {}
                     "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #👑modpack-help on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
                 }
-                custom_multimc_button {
-                    config: cx.props.config,
-                    first_launch: cx.props.first_launch,
-                    config_path: cx.props.config_path,
-                    error: cx.props.error,
-                    b64_id: cx.props.b64_id.clone()
+                CustomMultiMCButton {
+                    config: props.config,
+                    config_path: props.config_path,
+                    error: props.error,
+                    b64_id: props.b64_id.clone()
                 }
             }
         }
-    })
+    }
 }
 
 fn feature_change(
-    installer_profile: &UseRef<InstallerProfile>,
-    modify: &UseState<bool>,
+    local_features: Signal<Option<Vec<String>>>,
+    mut modify: Signal<bool>,
     evt: FormEvent,
     feat: &super::Feature,
-    modify_count: &UseRef<i32>,
-    enabled_features: &UseRef<Vec<String>>,
+    mut modify_count: Signal<i32>,
+    mut enabled_features: Signal<Vec<String>>,
 ) {
-    let enabled = match &*evt.data.value {
+    let enabled = match &*evt.data.value() {
         "true" => true,
         "false" => false,
         _ => panic!("Invalid bool from feature"),
@@ -438,27 +492,10 @@ fn feature_change(
             }
         })
     }
-    if installer_profile.with(|profile| profile.installed) {
-        let modify_res = installer_profile.with(|profile| {
-            profile
-                .local_manifest
-                .as_ref()
-                .unwrap()
-                .enabled_features
-                .contains(&feat.id)
-                != enabled
-        });
+    if local_features.read().is_some() {
+        let modify_res = local_features.unwrap().contains(&feat.id) != enabled;
         if modify_count.with(|x| *x <= 1) {
-            modify.set(
-                installer_profile.with(|profile| {
-                    profile
-                        .local_manifest
-                        .as_ref()
-                        .unwrap()
-                        .enabled_features
-                        .contains(&feat.id)
-                }) != enabled,
-            );
+            modify.set(local_features.unwrap().contains(&feat.id) != enabled);
         }
         if modify_res {
             modify_count.with_mut(|x| *x += 1);
@@ -468,102 +505,116 @@ fn feature_change(
     }
 }
 
-#[derive(Props)]
-struct VersionProps<'a> {
-    modpack_source: &'a String,
+#[derive(PartialEq, Props, Clone)]
+struct VersionProps {
+    modpack_source: String,
     modpack_branch: String,
     launcher: super::Launcher,
-    error: &'a UseRef<Option<String>>,
-    name: &'a UseRef<String>,
+    error: Signal<Option<String>>,
+    name: Signal<String>,
 }
 
-fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
-    let modpack_source = (cx.props.modpack_source).to_owned();
-    let modpack_branch = (cx.props.modpack_branch).to_owned();
-    let launcher = (cx.props.launcher).to_owned();
-    // TODO(Remove weird clonage)
-    let error = cx.props.error.clone();
-    let err: UseRef<Option<String>> = error.clone();
-    let profile = use_future(cx, (), |_| async move {
-        super::init(modpack_source, modpack_branch, launcher).await
-    })
-    .value();
+#[component]
+fn Version(mut props: VersionProps) -> Element {
+    let profile = use_resource(move || {
+        let source = props.modpack_source.clone();
+        let branch = props.modpack_branch.clone();
+        let launcher = props.launcher.clone();
+        async move { super::init(source, branch, launcher).await }
+    });
+
     // 'use_future's will always be 'None' on components first render
-    if profile.is_none() {
-        return cx.render(rsx! {
+    if profile.read().is_none() {
+        return rsx! {
             div {
                 class: "container",
                 "Loading..."
             }
-        });
+        };
     };
-    match profile.unwrap() {
-        Ok(_) => (),
+
+    let installer_profile = match profile.unwrap() {
+        Ok(v) => v,
         Err(e) => {
-            err.set(Some(
+            props.error.set(Some(
                 format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
             ));
             return None;
         }
-    }
-    // states can be turned into an Rc using .current() and can be made into an owned value by using .as_ref().to_owned()
-    // TODO(Clean this up)
-    let installer_profile = use_ref(cx, || profile.unwrap().to_owned().unwrap());
-    let installing = use_state(cx, || false);
-    let spinner_status = use_state(cx, || "");
-    let modify = use_state(cx, || false);
-    let modify_count = use_ref(cx, || 0);
-    let enabled_features = use_ref(cx, || {
-        if installer_profile.with(|profile| profile.installed) {
-            installer_profile.with(|profile| {
-                profile
-                    .local_manifest
-                    .as_ref()
-                    .unwrap()
-                    .enabled_features
-                    .clone()
-            })
+    };
+    let mut installing = use_signal(|| false);
+    let mut spinner_status = use_signal(|| "");
+    let mut modify = use_signal(|| false);
+    let mut modify_count = use_signal(|| 0);
+    let enabled_features = use_signal(|| {
+        if installer_profile.installed {
+            installer_profile
+                .local_manifest
+                .as_ref()
+                .unwrap()
+                .enabled_features
+                .clone()
         } else {
-            installer_profile.with(|profile| profile.enabled_features.clone())
+            installer_profile.enabled_features.clone()
         }
     });
-    let credits = use_state(cx, || false);
-    let on_submit = move |_event: FormEvent| {
-        cx.spawn({
+    let mut credits = use_signal(|| false);
+    let mut installed = use_signal(|| installer_profile.installed);
+    let mut update_available = use_signal(|| installer_profile.update_available);
+    let local_features = use_signal(|| {
+        if let Some(manifest) = installer_profile.local_manifest.clone() {
+            Some(manifest.enabled_features)
+        } else {
+            None
+        }
+    });
+    let movable_profile = installer_profile.clone();
+    let on_submit = move |_| {
+        let mut installer_profile = movable_profile.clone();
+        async move {
             installing.set(true);
-            let installing = installing.clone();
-            let spinner_status = spinner_status.clone();
-            let installer_profile = installer_profile.clone();
-            let modify = modify.clone();
-            let modify_count = modify_count.clone();
-            let error = error.clone();
-            let enabled_features = enabled_features.clone();
-            async move {
-                installer_profile.with_mut(|profile| {
-                    profile.enabled_features = enabled_features.with(|x| x.clone());
-                    profile.manifest.enabled_features = enabled_features.with(|x| x.clone());
-                });
-                if !installer_profile.with(|profile| profile.installed) {
-                    spinner_status.set("Installing...");
-                    match super::install(installer_profile.with(|profile| profile.clone())).await {
-                        Ok(_) => {let _ = isahc::post("https://tracking.commander07.workers.dev/track", format!("{{
-                            \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                            \"dataSourceId\": \"{}\",
-                            \"userAction\": \"install\",
-                            \"additionalData\": {{
-                                \"features\": {:?},
-                                \"version\": \"{}\",
-                                \"launcher\": \"{}\"
-                            }}
-                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.manifest.enabled_features.clone()), installer_profile.with(|profile| profile.manifest.modpack_version.clone()), installer_profile.with(|profile| profile.launcher.clone().unwrap())));}
-                        Err(e) => {
-                            error.set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
-                        }
+            installer_profile.enabled_features = enabled_features.read().clone();
+            installer_profile.manifest.enabled_features = enabled_features.read().clone();
+
+            if !*installed.read() {
+                spinner_status.set("Installing...");
+                match super::install(&installer_profile).await {
+                    Ok(_) => {
+                        let _ = isahc::post(
+                            "https://tracking.commander07.workers.dev/track",
+                            format!(
+                                "{{
+                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                \"dataSourceId\": \"{}\",
+                                \"userAction\": \"install\",
+                                \"additionalData\": {{
+                                    \"features\": {:?},
+                                    \"version\": \"{}\",
+                                    \"launcher\": \"{}\"
+                                }}
+                            }}",
+                                installer_profile.manifest.uuid,
+                                installer_profile.manifest.enabled_features,
+                                installer_profile.manifest.modpack_version,
+                                installer_profile.launcher.unwrap(),
+                            ),
+                        );
                     }
-                } else if installer_profile.with(|profile| profile.update_available) {
-                    spinner_status.set("Updating...");
-                    match super::update(installer_profile.with(|profile| profile.clone())).await {
-                        Ok(_) => {let _ = isahc::post("https://tracking.commander07.workers.dev/track", format!("{{
+                    Err(e) => {
+                        props
+                            .error
+                            .set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
+                    }
+                }
+                installed.set(true);
+            } else if *update_available.read() {
+                spinner_status.set("Updating...");
+                match super::update(&installer_profile).await {
+                    Ok(_) => {
+                        let _ = isahc::post(
+                            "https://tracking.commander07.workers.dev/track",
+                            format!(
+                                "{{
                             \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
                             \"dataSourceId\": \"{}\",
                             \"userAction\": \"update\",
@@ -571,127 +622,76 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                 \"old_version\": \"{}\",
                                 \"new_version\": \"{}\"
                             }}
-                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.local_manifest.clone().unwrap().modpack_version), installer_profile.with(|profile| profile.manifest.modpack_version.clone())));}
-                        Err(e) => {
-                            error.set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
-                        }
+                        }}",
+                                installer_profile.manifest.uuid,
+                                installer_profile.local_manifest.unwrap().modpack_version,
+                                installer_profile.manifest.modpack_version
+                            ),
+                        );
                     }
-                } else if *modify {
-                    spinner_status.set("Modifying...");
-                    match super::update(installer_profile.with(|profile| profile.clone())).await {
-                        Ok(_) => {let _ = isahc::post("https://tracking.commander07.workers.dev/track", format!("{{
+                    Err(e) => {
+                        props
+                            .error
+                            .set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
+                    }
+                }
+                update_available.set(false);
+            } else if *modify.read() {
+                spinner_status.set("Modifying...");
+                match super::update(&installer_profile).await {
+                    Ok(_) => {
+                        let _ = isahc::post(
+                            "https://tracking.commander07.workers.dev/track",
+                            format!(
+                                "{{
                             \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
                             \"dataSourceId\": \"{}\",
                             \"userAction\": \"modify\",
                             \"additionalData\": {{
                                 \"features\": {:?}
                             }}
-                        }}", installer_profile.with(|profile| profile.manifest.uuid.clone()), installer_profile.with(|profile| profile.manifest.enabled_features.clone())));}
-                        Err(e) => {
-                            error.set(Some(format!("{:#?}", e) + " (Failed to modify modpack!)"));
-                        }
+                        }}",
+                                installer_profile.manifest.uuid,
+                                installer_profile.manifest.enabled_features
+                            ),
+                        );
                     }
-                    modify.with_mut(|x| *x = false);
-                    modify_count.with_mut(|x| *x = 0);
+                    Err(e) => {
+                        props
+                            .error
+                            .set(Some(format!("{:#?}", e) + " (Failed to modify modpack!)"));
+                    }
                 }
-                installer_profile.with_mut(|profile| {
-                    profile.local_manifest = Some(profile.manifest.clone());
-                    profile.installed = true;
-                    profile.update_available = false;
-                });
-                installing.set(false);
+                modify.with_mut(|x| *x = false);
+                modify_count.with_mut(|x| *x = 0);
+                update_available.set(false);
             }
-        });
+            installing.set(false);
+        }
     };
-    let re = Regex::new("on\\w*=\"").unwrap();
-    let description = installer_profile
-        .with(|profile| profile.manifest.clone())
-        .description
-        .replace("<script>", "<noscript>")
-        .replace("<script/>", "<noscript/>");
-    let description = re.replace_all(description.as_str(), "harmless=\"");
-    let install_disable = if installer_profile.with(|profile| profile.installed)
-        && installer_profile.with(|profile| !profile.update_available)
-        && !modify
-    {
+    let install_disable = if *installed.read() && !*update_available.read() && !*modify.read() {
         Some("true")
     } else {
         None
     };
 
-    if cx.props.name.with(|x| x == &String::default()) {
-        cx.props
-            .name
-            .set(installer_profile.with(|x| x.manifest.name.clone()));
+    if *props.name.read() == String::default() {
+        props.name.set(installer_profile.manifest.name.clone())
     }
 
-    // TODO(Split these renders into multiple components)
-    if **installing {
-        cx.render(rsx! {
-            div {
-                class: "version-container",
-                div {
-                    class: "subtitle-container",
-                    h1 {
-                        "{installer_profile.with(|profile| profile.manifest.subtitle.clone())}"
-                    }
-                }
-                div {
-                    class: "version-inner-container",
-                    div {
-                        class: "container",
-                        style: "justify-items: center;",
-                        Spinner {}
-                        p {
-                            "{spinner_status}"
-                        }
-                    }
-                }
-            }
+    if *installing.read() {
+        SpinnerView(SpinnerViewProps {
+            title: installer_profile.manifest.subtitle,
+            status: spinner_status.to_string(),
         })
-    } else if **credits {
-        cx.render(rsx! {
-            div {
-                class: "version-container",
-                div {
-                    class: "subtitle-container",
-                    h1 {
-                        "{installer_profile.with(|profile| profile.manifest.subtitle.clone())}"
-                    }
-                }
-                div {
-                    class: "version-inner-container",
-                    div {
-                        class: "container",
-                        div {
-                            class: "info-container",
-                            div {
-                                class: "button-container",
-                                button {
-                                    class: "credits-button",
-                                    onclick: move |_| {
-                                        credits.set(false);
-                                    },
-                                    "X"
-                                }
-                            }
-                            div {
-                                class: "credits",
-                                div {
-                                    class: "credits-inner",
-                                    Credits {
-                                        manifest: installer_profile.with(|profile| profile.manifest.clone())
-                                        enabled: enabled_features
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    } else if *credits.read() {
+        Credits(CreditsProps {
+            manifest: installer_profile.manifest,
+            enabled: installer_profile.enabled_features,
+            credits,
         })
     } else {
-        cx.render(rsx! {
+        rsx! {
             div {
                 class: "version-container",
                 form {
@@ -699,21 +699,22 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                     div {
                         class: "subtitle-container",
                         h1 {
-                            "{installer_profile.with(|profile| profile.manifest.subtitle.clone())}"
+                            "{installer_profile.manifest.subtitle}"
                         }
                     }
                     div {
                         class: "version-inner-container",
                         div {
-                            class: "container", 
+                            class: "container",
                             div {
                                 class: "info-container",
                                 div {
                                     class: "button-container",
                                     button {
                                         class: "credits-button",
-                                        onclick: move |_| {
+                                        onclick: move |evt| {
                                             credits.set(true);
+                                            evt.stop_propagation();
                                         },
                                         "i"
                                     }
@@ -721,46 +722,44 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                                 div {
                                     div {
                                         class: "description",
-                                        dangerous_inner_html: "{description}"
+                                        dangerous_inner_html: "{installer_profile.manifest.description}"
                                     }
                                     div {
                                         class: "feature-list",
-                                        for feat in installer_profile.with(|profile| profile.manifest.features.clone()) {
+                                        for feat in installer_profile.manifest.features {
                                             if !feat.hidden {
-                                                rsx!(
-                                                    label {
-                                                        class: "tooltip",
-                                                        input {
-                                                            checked: if installer_profile.with(|profile| profile.installed) {
-                                                                if enabled_features.with(|x| x.contains(&feat.id)) {
-                                                                    Some("true")
-                                                                } else {
-                                                                    None
-                                                                }
+                                                label {
+                                                    class: "tooltip",
+                                                    input {
+                                                        checked: if installer_profile.installed {
+                                                            if enabled_features.with(|x| x.contains(&feat.id)) {
+                                                                Some("true")
                                                             } else {
-                                                                if feat.default {
-                                                                    Some("true")
-                                                                } else {
-                                                                    None
-                                                                }
-                                                            },
-                                                            name: "{feat.id}",
-                                                            onchange: move |evt| {
-                                                                feature_change(installer_profile, modify, evt, &feat, modify_count, enabled_features);
-                                                            },
-                                                            r#type: "checkbox",    
-                                                        }
-                                                        
-                                                        "{feat.name}"
-                                                        match feat.description {
-                                                            Some(ref desc) => rsx!(span {
-                                                                class: "tooltiptext",
-                                                                desc.to_owned()
-                                                            }),
-                                                            None => rsx!("")
-                                                        }
+                                                                None
+                                                            }
+                                                        } else {
+                                                            if feat.default {
+                                                                Some("true")
+                                                            } else {
+                                                                None
+                                                            }
+                                                        },
+                                                        name: "{feat.id}",
+                                                        onchange: move |evt| {
+                                                            feature_change(local_features, modify, evt, &feat, modify_count, enabled_features)
+                                                        },
+                                                        r#type: "checkbox",
                                                     }
-                                                )
+
+                                                    "{feat.name}"
+                                                    match feat.description {
+                                                        Some(ref desc) => rsx!(span {
+                                                            class: "tooltiptext",
+                                                            "{desc}",
+                                                        }),
+                                                        None => rsx!("")
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -768,117 +767,113 @@ fn Version<'a>(cx: Scope<'a, VersionProps<'a>>) -> Element<'a> {
                             }
                             input {
                                 r#type: "submit",
-                                value: if !installer_profile.with(|profile| profile.installed) {"Install"} else {if !**modify {"Update"} else {"Modify"}},
+                                value: if !installer_profile.installed {"Install"} else {if !*modify.read() {"Update"} else {"Modify"}},
                                 class: "install-button",
                                 disabled: install_disable
                             }
-                        }    
-                    }
-                }
-            }
-        })
-    }
-}
-
-#[derive(Props, PartialEq)]
-struct ErrorProps {
-    error: String,
-}
-
-fn Error(cx: Scope<ErrorProps>) -> Element {
-    cx.render(rsx! {
-        "{cx.props.error}"
-    })
-}
-
-#[derive(Props, PartialEq)]
-pub(crate) struct AppProps<'a> {
-    pub branches: Vec<super::GithubBranch>,
-    pub modpack_source: String,
-    pub config: super::Config,
-    pub config_path: PathBuf,
-    pub style_css: &'a str,
-}
-
-pub(crate) fn App<'a>(cx: Scope<'a, AppProps>) -> Element<'a> {
-    let modpack_source = &cx.props.modpack_source;
-    let branches = &cx.props.branches;
-    let config: &UseRef<super::Config> = use_ref(cx, || cx.props.config.clone());
-    let settings: &UseState<bool> = use_state(cx, || false);
-    let first_launch: &UseState<bool> = use_state(cx, || config.with(|x| x.first_launch.unwrap_or(true)));
-    let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
-    let err: &UseRef<Option<String>> = use_ref(cx, || None);
-    let name = use_ref(cx, || String::default());
-    if err.with(|e| e.is_some()) {
-        return cx.render(rsx!(Error {
-            error: err.with(|e| e.clone().unwrap())
-        }));
-    }
-    let cfg = config.with(|cfg| cfg.clone());
-    let launcher = match super::get_launcher(&cfg.launcher) {
-        Ok(val) => Some(val),
-        Err(_) => {
-            None
-        }
-    };
-    if err.with(|e| e.is_some()) {
-        return cx.render(rsx!(Error {
-            error: err.with(|e| e.clone().unwrap())
-        }));
-    }
-
-    cx.render(rsx! {
-        style { cx.props.style_css }
-        if **settings {
-            rsx!{
-                div {
-                    class: "fake-body",
-                    Settings {
-                        config: config,
-                        settings: settings
-                        config_path: &cx.props.config_path,
-                        error: err,
-                        b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(modpack_source)
-                        first_launch: first_launch
-                    }
-                }
-            }
-        } else if **first_launch || launcher.is_none() {
-            rsx!(div {
-                class: "fake-body",
-                Launcher {
-                    config: config,
-                    first_launch: first_launch,
-                    config_path: &cx.props.config_path,
-                    error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(modpack_source)
-                }
-            })
-        }
-        else {
-            rsx!{
-                button {
-                    class: "settings-button",
-                    onclick: move |_| {
-                        settings.set(true);
-                    },
-                    img {
-                        src: "{cog}",
-                    }
-                }
-                div {
-                    class: "fake-body",
-                    for i in 0..branches.len() {
-                        Version {
-                            modpack_source: modpack_source,
-                            modpack_branch: branches[i].name.clone(),
-                            launcher: launcher.as_ref().unwrap().clone(),
-                            error: err
-                            name: &name
                         }
                     }
                 }
             }
         }
-    })
+    }
+}
+
+#[derive(PartialEq, Props, Clone)]
+struct ErrorProps {
+    error: String,
+}
+
+#[component]
+fn Error(props: ErrorProps) -> Element {
+    rsx! {
+        "{props.error}"
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct AppProps {
+    pub branches: Vec<super::GithubBranch>,
+    pub modpack_source: String,
+    pub config: super::Config,
+    pub config_path: PathBuf,
+    pub style_css: &'static str,
+}
+
+pub(crate) fn app() -> Element {
+    let props = use_context::<AppProps>();
+    let branches = props.branches;
+    let config = use_signal(|| props.config);
+    let mut settings = use_signal(|| false);
+    let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
+    let err = use_signal(|| None);
+    let name = use_signal(String::default);
+    if err.with(|e| e.is_some()) {
+        return rsx!(Error {
+            error: err.read().clone().unwrap()
+        });
+    }
+    let cfg = config.with(|cfg| cfg.clone());
+    let launcher = match super::get_launcher(&cfg.launcher) {
+        Ok(val) => Some(val),
+        Err(_) => None,
+    };
+    if err.with(|e| e.is_some()) {
+        return rsx!(Error {
+            error: err.with(|e| e.clone().unwrap())
+        });
+    }
+
+    rsx! {
+        style { "{props.style_css}" }
+        if *settings.read() {
+            div {
+                class: "fake-body",
+                onclick: |_| {},
+                Settings {
+                    config: config,
+                    settings: settings,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source),
+                }
+            }
+        } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
+            div {
+                class: "fake-body",
+                onclick: |_| {},
+                Launcher {
+                    config: config,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source),
+                }
+            }
+        }
+        else {
+            button {
+                class: "settings-button",
+                onclick: move |evt| {
+                    settings.set(true);
+                    evt.stop_propagation();
+                },
+                img {
+                    src: "{cog}",
+                }
+            }
+            div {
+                class: "fake-body",
+                onclick: |_| {},
+                for i in 0..branches.len() {
+                    Version {
+                        modpack_source: props.modpack_source.clone(),
+                        modpack_branch: branches[i].name.clone(),
+                        launcher: launcher.as_ref().unwrap().clone(),
+                        error: err,
+                        name,
+                    }
+                }
+            }
+        }
+    }
 }

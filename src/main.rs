@@ -7,8 +7,9 @@ use base64::{engine, Engine};
 use cached::proc_macro::cached;
 use cached::SizedCache;
 use chrono::{DateTime, Utc};
-use dioxus_desktop::tao::window::Icon;
-use dioxus_desktop::{Config as DioxusConfig, LogicalSize, WindowBuilder};
+use dioxus::desktop::tao::window::Icon;
+use dioxus::prelude::LaunchBuilder;
+use dioxus::desktop::{Config as DioxusConfig, LogicalSize, WindowBuilder};
 use futures::StreamExt;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageOutputFormat};
@@ -470,7 +471,7 @@ struct GithubRelease {
     assets: Vec<GithubAsset>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 struct GithubBranch {
     name: String,
 }
@@ -1224,7 +1225,7 @@ async fn download_helper<T: Downloadable + Debug>(
     Ok(return_vec)
 }
 
-async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
+async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
     info!("Installing modpack");
     info!("installer_profile = {installer_profile:#?}");
     let modpack_root = &get_modpack_root(
@@ -1339,6 +1340,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                         Some(local_inc) => {
                             if local_inc.md5 == md5 {
                                 included_files.insert(inc_zip_name, local_inc.to_owned());
+                                info!("Skipping '{}' as it is already downloaded", asset.name);
                                 break 'a;
                             } else {
                                 for file in &local_inc.files {
@@ -1353,6 +1355,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                         }
                         None => (),
                     }
+                    info!("Downloading '{}'", asset.name);
                     let mut files: Vec<String> = vec![];
                     // download and unzip in modpack root
                     let mut tries = 0;
@@ -1388,6 +1391,8 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                     let zipfile_path = modpack_root.join(Path::new(&asset.name));
                     fs::write(&zipfile_path, content_byte_resp.unwrap())
                         .expect("Failed to write 'include.zip'!");
+                    info!("Downloaded '{}'", asset.name);
+                    info!("Unzipping '{}'", asset.name);
                     let zipfile = fs::File::open(&zipfile_path).unwrap();
                     let mut archive = zip::ZipArchive::new(zipfile).unwrap();
                     // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
@@ -1412,6 +1417,8 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
                     }
                     fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'include.zip'!");
                     included_files.insert(inc_zip_name.clone(), Included { md5, files });
+                    info!("Unzipped '{}'", asset.name);
+                    info!("'{}' is now installed", asset.name);
                     break;
                 }
             }
@@ -1499,7 +1506,7 @@ async fn install(installer_profile: InstallerProfile) -> Result<(), String> {
 }
 
 fn remove_old_items<T: Downloadable + PartialEq + Clone + Debug>(
-    items: Vec<T>,
+    items: &[T],
     installed_items: &Vec<T>,
 ) -> Vec<T> {
     let new_items: Vec<T> = items
@@ -1541,7 +1548,7 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone + Debug>(
 
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
-async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
+async fn update(installer_profile: &InstallerProfile) -> Result<(), String> {
     info!("Updating modpack");
     info!("installer_profile = {installer_profile:#?}");
     let local_manifest: Manifest = match fs::read_to_string(
@@ -1560,48 +1567,20 @@ async fn update(installer_profile: InstallerProfile) -> Result<(), String> {
         },
         Err(err) => panic!("Failed to read local manifest: {}", err),
     };
-    let new_mods = remove_old_items(installer_profile.manifest.mods, &local_manifest.mods);
+    let new_mods = remove_old_items(&installer_profile.manifest.mods, &local_manifest.mods);
     let new_shaderpacks = remove_old_items(
-        installer_profile.manifest.shaderpacks,
+        &installer_profile.manifest.shaderpacks,
         &local_manifest.shaderpacks,
     );
     let new_resourcepacks = remove_old_items(
-        installer_profile.manifest.resourcepacks,
+        &installer_profile.manifest.resourcepacks,
         &local_manifest.resourcepacks,
     );
-    let e = install(InstallerProfile {
-        manifest: Manifest {
-            manifest_version: installer_profile.manifest.manifest_version,
-            modpack_version: installer_profile.manifest.modpack_version.clone(),
-            name: installer_profile.manifest.name.clone(),
-            icon: installer_profile.manifest.icon,
-            uuid: installer_profile.manifest.uuid.clone(),
-            loader: installer_profile.manifest.loader.clone(),
-            mods: new_mods,
-            shaderpacks: new_shaderpacks,
-            resourcepacks: new_resourcepacks,
-            include: installer_profile.manifest.include.clone(),
-            features: installer_profile.manifest.features.clone(),
-            description: installer_profile.manifest.description.clone(),
-            subtitle: installer_profile.manifest.subtitle.clone(),
-            enabled_features: installer_profile.manifest.enabled_features,
-            included_files: local_manifest.included_files.clone(),
-            source: local_manifest.source.clone(),
-            installer_path: local_manifest.installer_path.clone(),
-            max_mem: installer_profile.manifest.max_mem,
-            min_mem: installer_profile.manifest.min_mem,
-            java_args: installer_profile.manifest.java_args,
-        },
-        http_client: installer_profile.http_client,
-        installed: installer_profile.installed,
-        update_available: installer_profile.update_available,
-        modpack_source: installer_profile.modpack_source,
-        modpack_branch: installer_profile.modpack_branch,
-        enabled_features: installer_profile.enabled_features,
-        launcher: installer_profile.launcher,
-        local_manifest: Some(local_manifest),
-    })
-    .await;
+    let mut update_profile = installer_profile.clone();
+    update_profile.manifest.mods = new_mods;
+    update_profile.manifest.shaderpacks = new_shaderpacks;
+    update_profile.manifest.resourcepacks = new_resourcepacks;
+    let e = install(&update_profile).await;
     if e.is_ok() {
         info!("Updated modpack");
     } else {
@@ -1705,27 +1684,24 @@ fn main() {
             .expect("Failed to write config!");
     }
     info!("Running installer with config: {config:#?}");
-    dioxus_desktop::launch_with_props(
-        gui::App,
-        gui::AppProps {
+    LaunchBuilder::desktop().with_cfg(
+        DioxusConfig::new().with_window(
+                WindowBuilder::new()
+                    .with_resizable(true)
+                    .with_title("Majestic Overhaul Installer")
+                    .with_inner_size(LogicalSize::new(960, 540))
+            ).with_icon(
+                Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
+            ).with_data_directory(
+                env::temp_dir().join(".WC_OVHL")
+            ).with_menu(None)
+        ).with_context(gui::AppProps {
             branches,
             modpack_source: String::from(REPO),
             config,
             config_path,
             style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
-        },
-        DioxusConfig::new()
-            .with_window(
-                WindowBuilder::new()
-                    .with_resizable(true)
-                    .with_title("Majestic Overhaul Installer")
-                    .with_inner_size(LogicalSize::new(960, 540)),
-            )
-            .with_icon(
-                Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
-            )
-            .with_data_directory(env::temp_dir().join(".WC_OVHL")),
-    );
+        }).launch(gui::app);
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1761,11 +1737,9 @@ async fn init(
     modpack_branch: String,
     launcher: Launcher,
 ) -> Result<InstallerProfile, String> {
-    let modpack_source = &modpack_source;
-    let modpack_branch = &modpack_branch;
     let http_client = CachedHttpClient::new();
     let mut manifest_resp = match http_client
-        .get_async(GH_RAW.to_owned() + modpack_source + modpack_branch + "/manifest.json")
+        .get_async(GH_RAW.to_owned() + &modpack_source + &modpack_branch + "/manifest.json")
         .await
     {
         Ok(val) => val,
@@ -1818,8 +1792,8 @@ async fn init(
         http_client,
         installed,
         update_available,
-        modpack_source: modpack_source.to_owned(),
-        modpack_branch: modpack_branch.to_owned(),
+        modpack_source,
+        modpack_branch,
         enabled_features,
         launcher: Some(launcher),
         local_manifest: if local_manifest.is_some() && local_manifest.as_ref().unwrap().is_ok() {

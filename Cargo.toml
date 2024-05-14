@@ -1,15 +1,19 @@
 [package]
 name = "installer"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2021"
 build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [profile.release]
-opt-level = "s"
-lto = "fat"
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
 strip = true
+incremental = false
 
 
 [dependencies]
@@ -23,8 +27,7 @@ async-trait = "0.1.68"
 futures = "0.3.28"
 isahc = "1.7.2"
 zip = "0.6.4"
-dioxus = { git = "https://github.com/DioxusLabs/dioxus", rev = "9b02b21" }
-dioxus-desktop = { git = "https://github.com/DioxusLabs/dioxus", rev = "9b02b21" }
+dioxus = { version = "0.5.1", features = ["desktop"] }
 cached = "0.43.0"
 regex = "1.8.1"
 rfd = "0.14.0"
