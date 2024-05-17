@@ -561,7 +561,7 @@ fn Version(mut props: VersionProps) -> Element {
     let mut credits = use_signal(|| false);
     let mut installed = use_signal(|| installer_profile.installed);
     let mut update_available = use_signal(|| installer_profile.update_available);
-    let local_features = use_signal(|| {
+    let mut local_features = use_signal(|| {
         if let Some(manifest) = installer_profile.local_manifest.clone() {
             Some(manifest.enabled_features)
         } else {
@@ -575,6 +575,7 @@ fn Version(mut props: VersionProps) -> Element {
             installing.set(true);
             installer_profile.enabled_features = enabled_features.read().clone();
             installer_profile.manifest.enabled_features = enabled_features.read().clone();
+            local_features.set(Some(enabled_features.read().clone()));
 
             if !*installed.read() {
                 spinner_status.set("Installing...");
