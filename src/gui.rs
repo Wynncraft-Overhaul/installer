@@ -866,6 +866,9 @@ pub(crate) fn app() -> Element {
         style { "{props.style_css}" }
         if *settings.read() {
             div {
+                class: "toolbar",
+            }
+            div {
                 class: "fake-body",
                 Settings {
                     config: config,
