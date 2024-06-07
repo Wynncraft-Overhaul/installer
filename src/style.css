@@ -16,7 +16,6 @@ body {
     background-image: url(data:image/png;base64,background_installer.png.base64);
     background-size: cover;
     color: #fce8f6;
-    background-size: cover;
     height: 88vh;
     overflow: hidden;
 }
@@ -242,16 +241,12 @@ input {
     cursor: pointer;
     border: 0.16vw solid black;
     height: 3vw;
-    justify-content: space-around;
     align-items: center;
-    position: absolute;
-    right: 0.5%;
-    top: 0.5%;
     justify-content: center;
 }
 
 img {
-    height: 100%;
+    height: inherit;
 }
 
 .button-container {
@@ -335,4 +330,45 @@ li {
 .custom-multimc-button {
     margin-top: 1vh;
     padding: 0.25em;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: .25em;
+}
+
+.toolbar>* {
+    margin-left: 1em;
+}
+
+.toolbar-button {
+    font-family: "wynncraft";
+    width: 3vw;
+    background-color: #073c17;
+    padding: 1%;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    font-size: 100%;
+    cursor: pointer;
+    border: 0.16vw solid black;
+    height: 3vw;
+    align-items: center;
+    justify-content: center;
+}
+
+.toolbar-button:disabled {
+    cursor: default;
+    color: gray;
+}
+
+.pagination {
+    display: flex;
+}
+
+.pagination>* {
+    margin-left: .25em;
+    width: 100%;
 }

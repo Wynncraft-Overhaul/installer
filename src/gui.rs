@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use base64::{engine, Engine};
 use dioxus::prelude::*;
@@ -512,6 +512,8 @@ struct VersionProps {
     launcher: super::Launcher,
     error: Signal<Option<String>>,
     name: Signal<String>,
+    page: Signal<usize>,
+    pages: Signal<HashMap<usize, String>>,
 }
 
 #[component]
@@ -542,6 +544,17 @@ fn Version(mut props: VersionProps) -> Element {
             return None;
         }
     };
+    let tab_group = if let Some(tab_group) = installer_profile.manifest.tab_group {
+        tab_group
+    } else {
+        0
+    };
+    let tab_title = if let Some(ref tab_title) = installer_profile.manifest.tab_title {
+        tab_title.clone()
+    } else {
+        String::from("Default")
+    };
+    props.pages.with_mut(|x| x.insert(tab_group, tab_title));
     let mut installing = use_signal(|| false);
     let mut spinner_status = use_signal(|| "");
     let mut modify = use_signal(|| false);
@@ -679,20 +692,22 @@ fn Version(mut props: VersionProps) -> Element {
     if *props.name.read() == String::default() {
         props.name.set(installer_profile.manifest.name.clone())
     }
-
-    if *installing.read() {
-        SpinnerView(SpinnerViewProps {
-            title: installer_profile.manifest.subtitle,
-            status: spinner_status.to_string(),
-        })
-    } else if *credits.read() {
-        Credits(CreditsProps {
-            manifest: installer_profile.manifest,
-            enabled: installer_profile.enabled_features,
-            credits,
-        })
-    } else {
-        rsx! {
+    if (props.page)() != tab_group {
+        return None;
+    }
+    rsx! {
+        if *installing.read() {
+            SpinnerView {
+                title: installer_profile.manifest.subtitle,
+                status: spinner_status.to_string(),
+            }
+        } else if *credits.read() {
+            Credits {
+                manifest: installer_profile.manifest,
+                enabled: installer_profile.enabled_features,
+                credits,
+            }
+        } else {
             div {
                 class: "version-container",
                 form {
@@ -780,6 +795,26 @@ fn Version(mut props: VersionProps) -> Element {
     }
 }
 
+#[component]
+fn Pagination(mut page: Signal<usize>, mut pages: Signal<HashMap<usize, String>>) -> Element {
+    rsx!(
+        div {
+            class: "pagination",
+            for (index, name) in pages() {
+                button {
+                    class: "toolbar-button",
+                    disabled: index == page(),
+                    onclick: move |evt| {
+                        *page.write() = index;
+                        evt.stop_propagation();
+                    },
+                    "{name}"
+                }
+            }
+        }
+    )
+}
+
 #[derive(PartialEq, Props, Clone)]
 struct ErrorProps {
     error: String,
@@ -814,6 +849,8 @@ pub(crate) fn app() -> Element {
             error: err.read().clone().unwrap()
         });
     }
+    let page = use_signal(|| 0);
+    let pages = use_signal(|| HashMap::new());
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
         Ok(val) => Some(val),
@@ -830,7 +867,6 @@ pub(crate) fn app() -> Element {
         if *settings.read() {
             div {
                 class: "fake-body",
-                onclick: |_| {},
                 Settings {
                     config: config,
                     settings: settings,
@@ -842,7 +878,6 @@ pub(crate) fn app() -> Element {
         } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
             div {
                 class: "fake-body",
-                onclick: |_| {},
                 Launcher {
                     config: config,
                     config_path: props.config_path,
@@ -852,19 +887,25 @@ pub(crate) fn app() -> Element {
             }
         }
         else {
-            button {
-                class: "settings-button",
-                onclick: move |evt| {
-                    settings.set(true);
-                    evt.stop_propagation();
-                },
-                img {
-                    src: "{cog}",
+            div {
+                class: "toolbar",
+                Pagination {
+                    page,
+                    pages
+                }
+                button {
+                    class: "toolbar-button",
+                    onclick: move |evt| {
+                        settings.set(true);
+                        evt.stop_propagation();
+                    },
+                    img {
+                        src: "{cog}",
+                    }
                 }
             }
             div {
                 class: "fake-body",
-                onclick: |_| {},
                 for i in 0..branches.len() {
                     Version {
                         modpack_source: props.modpack_source.clone(),
@@ -872,6 +913,8 @@ pub(crate) fn app() -> Element {
                         launcher: launcher.as_ref().unwrap().clone(),
                         error: err,
                         name,
+                        page,
+                        pages
                     }
                 }
             }
