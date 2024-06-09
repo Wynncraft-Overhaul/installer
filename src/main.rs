@@ -12,7 +12,7 @@ use dioxus::prelude::LaunchBuilder;
 use dioxus::desktop::{Config as DioxusConfig, LogicalSize, WindowBuilder};
 use futures::StreamExt;
 use image::io::Reader as ImageReader;
-use image::{DynamicImage, ImageOutputFormat};
+use image::{DynamicImage, ImageFormat};
 use isahc::config::RedirectPolicy;
 use isahc::http::StatusCode;
 use isahc::prelude::Configurable;
@@ -163,7 +163,7 @@ impl CachedHttpClient {
 }
 
 #[cached(
-    type = "SizedCache<String, Result<CachedResponse, isahc::Error>>",
+    ty = "SizedCache<String, Result<CachedResponse, isahc::Error>>",
     create = "{ SizedCache::with_size(100) }",
     convert = r#"{ format!("{}", url) }"#
 )]
@@ -909,7 +909,7 @@ fn get_modpack_root(launcher: &Launcher, uuid: &str) -> PathBuf {
 
 fn image_to_base64(img: &DynamicImage) -> String {
     let mut image_data: Vec<u8> = Vec::new();
-    img.write_to(&mut Cursor::new(&mut image_data), ImageOutputFormat::Png)
+    img.write_to(&mut Cursor::new(&mut image_data), ImageFormat::Png)
         .unwrap();
     let res_base64 = engine::general_purpose::STANDARD.encode(image_data);
     format!("data:image/png;base64,{}", res_base64)
