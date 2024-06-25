@@ -519,15 +519,15 @@ impl Display for DownloadError {
 
             DownloadError::FailedToParseResponse(item, e) => write!(
                 f,
-                "Failed to parse download response: '{e}' when attempting to download: '{item}'"
+                "Failed to parse download response: '{e:#?}' when attempting to download: '{item}'"
             ),
             DownloadError::IoError(item, e) => write!(
                 f,
-                "Encountered io error: '{e}' when attempting to download: '{item}'"
+                "Encountered io error: '{e:#?}' when attempting to download: '{item}'"
             ),
             DownloadError::HttpError(item, e) => write!(
                 f,
-                "Encountered http error: '{e}' when attempting to download: '{item}'"
+                "Encountered http error: '{e:#?}' when attempting to download: '{item}'"
             ),
             DownloadError::MissingFilename(item) => {
                 write!(f, "Could not get filename for: '{item}'")

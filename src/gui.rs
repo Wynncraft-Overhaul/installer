@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use base64::{engine, Engine};
 use dioxus::prelude::*;
@@ -513,7 +513,7 @@ struct VersionProps {
     error: Signal<Option<String>>,
     name: Signal<String>,
     page: Signal<usize>,
-    pages: Signal<HashMap<usize, String>>,
+    pages: Signal<BTreeMap<usize, String>>,
 }
 
 #[component]
@@ -796,7 +796,7 @@ fn Version(mut props: VersionProps) -> Element {
 }
 
 #[component]
-fn Pagination(mut page: Signal<usize>, mut pages: Signal<HashMap<usize, String>>) -> Element {
+fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, String>>) -> Element {
     rsx!(
         div {
             class: "pagination",
@@ -850,7 +850,7 @@ pub(crate) fn app() -> Element {
         });
     }
     let page = use_signal(|| 0);
-    let pages = use_signal(|| HashMap::new());
+    let pages = use_signal(|| BTreeMap::new());
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
         Ok(val) => Some(val),
