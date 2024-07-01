@@ -309,6 +309,7 @@ li {
     align-items: center;
     justify-content: flex-end;
     padding: .25em;
+    height: 6vh;
 }
 
 .toolbar>* {
@@ -328,11 +329,13 @@ li {
     align-items: center;
     justify-content: center;
     height: 1.5em;
+    transition: height 0.2s;
 }
 
 .toolbar-button:disabled {
     cursor: default;
-    color: gray;
+    height: 2em;
+    background-color: #007d26;
 }
 
 .pagination {
