@@ -711,7 +711,7 @@ fn Version(mut props: VersionProps) -> Element {
             }}
 
             .container {{
-                border: 4px solid color-mix(in srgb, {tab_color}, black 40%);
+                border: .2em solid color-mix(in srgb, {tab_color}, black 40%);
             }}
             
             body {{
@@ -762,7 +762,7 @@ fn Version(mut props: VersionProps) -> Element {
                                     dangerous_inner_html: "{installer_profile.manifest.description}"
                                 }
                                 p {
-                                    style: "font-size: 1.2em;",
+                                    style: "font-size: 1.2em;margin-bottom: .5em;",
                                     "Optional features:"
                                 }
                                 div {

@@ -34,27 +34,12 @@ input {
     margin-top: 1em;
 }
 
-.header {
-    display: flex;
-    justify-content: center;
-    margin-top: 1em;
-}
-
-.header-inner {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 4%;
-    background-color: #7edaf7;
-    border: 1px solid black;
-    width: 80%;
-}
-
 .container {
     background-color: #320625;
     border: 0;
     padding: .25em;
     display: grid;
-    border: 4px solid #1c0314;
+    border: .2em solid #1c0314;
 }
 
 .version-container {
@@ -142,15 +127,45 @@ input {
     color: gray;
 }
 
+.feature-list {
+    margin-bottom: 1em;
+}
+
 .feature-list input[type="checkbox"] {
-    margin-right: 5px;
-    width: 1rem;
-    height: 1rem;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: #d95248;
+    font: inherit;
+    width: 1.15em;
+    height: 1.15em;
+    border: .015em solid black;
+    display: grid;
+    place-content: center;
+}
+
+.feature-list input[type="checkbox"]::before {
+    content: "";
+    width: .8em;
+    height: .8em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    background-color: currentColor;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.feature-list input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+.feature-list input[type="checkbox"]:checked {
+    background-color: #073c17;
 }
 
 .feature-list label {
-    display: block;
-    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: 1em auto;
+    align-items: center;
+    column-gap: 1em;
 }
 
 .feature-list {
@@ -220,7 +235,7 @@ input {
     font-size: 100%;
     margin-bottom: 2%;
     cursor: pointer;
-    border: 1px solid black;
+    border: .015em solid black;
     height: 2vw;
     margin-right: 2%;
 }
@@ -325,7 +340,7 @@ li {
     display: flex;
     font-size: 100%;
     cursor: pointer;
-    border: 1px solid black;
+    border: .1em solid black;
     align-items: center;
     justify-content: center;
     height: 1.5em;
