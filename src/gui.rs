@@ -442,7 +442,7 @@ fn NoLauncherFound(props: LauncherProps) -> Element {
                 "Only Prism Launcher, MultiMC and the vanilla launcher are supported by default, other MultiMC launchers can be added using the button below."
                 br {}
                 br {}
-                "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #👑modpack-help on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
+                "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #📂modpack-issues on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
             }
             CustomMultiMCButton {
                 config: props.config,
@@ -626,6 +626,8 @@ fn Version(mut props: VersionProps) -> Element {
                         props
                             .error
                             .set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
+                        installing.set(false);
+                        return;
                     }
                 }
                 installed.set(true);
@@ -655,6 +657,8 @@ fn Version(mut props: VersionProps) -> Element {
                         props
                             .error
                             .set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
+                        installing.set(false);
+                        return;
                     }
                 }
                 update_available.set(false);
@@ -682,6 +686,8 @@ fn Version(mut props: VersionProps) -> Element {
                         props
                             .error
                             .set(Some(format!("{:#?}", e) + " (Failed to modify modpack!)"));
+                        installing.set(false);
+                        return;
                     }
                 }
                 modify.with_mut(|x| *x = false);
@@ -839,16 +845,45 @@ fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo
     )
 }
 
-#[derive(PartialEq, Props, Clone)]
-struct ErrorProps {
-    error: String,
-}
-
 #[component]
-fn Error(props: ErrorProps) -> Element {
-    rsx! {
-        "{props.error}"
-    }
+fn Modal(
+    title: String,
+    contents: Element,
+    is_open: Signal<bool>,
+    callback: Option<UseCallback<()>>,
+) -> Element {
+    let open = is_open();
+    let close = move |_| {
+        if let Some(callback) = callback {
+            callback.call();
+        }
+        is_open.set(false)
+    };
+    rsx!(
+        div {
+            class: "modal-backdrop",
+            hidden: !open,
+            onclick: close,
+        }
+        dialog {
+            class: "modal",
+            open: open,
+            h1 {
+                class: "modal-title",
+                "{title}"
+            }
+            div {
+                class: "modal-contents",
+                {contents}
+            }
+            button {
+                class: "modal-button",
+                onclick: close,
+                autofocus: true,
+                "OK"
+            }
+        }
+    )
 }
 
 #[derive(Clone)]
@@ -862,31 +897,62 @@ pub(crate) struct AppProps {
 
 pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
+
     let branches = props.branches;
     let config = use_signal(|| props.config);
     let mut settings = use_signal(|| false);
-    let err = use_signal(|| None);
+    let err: Signal<Option<String>> = use_signal(|| None);
+
     let name = use_signal(String::default);
-    if err.with(|e| e.is_some()) {
-        return rsx!(Error {
-            error: err.read().clone().unwrap()
-        });
-    }
+
     let page = use_signal(|| 0);
     let pages = use_signal(|| BTreeMap::new());
+
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
         Ok(val) => Some(val),
         Err(_) => None,
     };
-    if err.with(|e| e.is_some()) {
-        return rsx!(Error {
-            error: err.with(|e| e.clone().unwrap())
-        });
+
+    let mut modal_open = use_signal(|| false);
+    let mut modal_title = use_signal(|| String::new());
+    let mut modal_contents = use_signal(|| None);
+    let mut modal_callback = use_signal(|| None);
+
+    if !modal_open() {
+        if let Some(e) = err() {
+            modal_title.set(String::from("Error"));
+
+            modal_contents.set(rsx! {
+                p {
+                    "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
+                }
+                textarea {
+                    class: "error-area",
+                    readonly: true,
+                    "{e}"
+                }
+            });
+
+            {
+                let mut err = err.clone();
+                modal_callback.set(Some(use_callback(move || err.set(None))));
+            }
+
+            modal_open.set(true);
+        }
     }
 
     rsx! {
         style { "{props.style_css}" }
+
+        Modal {
+            title: modal_title(),
+            contents: modal_contents(),
+            is_open: modal_open,
+            callback: modal_callback(),
+        }
+
         if *settings.read() {
             div {
                 class: "toolbar",

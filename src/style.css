@@ -36,10 +36,9 @@ input {
 
 .container {
     background-color: #320625;
-    border: 0;
     padding: .25em;
     display: grid;
-    border: .2em solid #1c0314;
+    border: .2em solid color-mix(in srgb, #320625, black 40%);
 }
 
 .version-container {
@@ -365,4 +364,54 @@ li {
 
 img {
     height: inherit;
+}
+
+.modal {
+    transform: translateY(-50%);
+    top: 50%;
+    background-color: #320625;
+    color: #fce8f6;
+    border: .2em solid color-mix(in srgb, #320625, black 40%);
+    padding: 1em;
+    z-index: 2;
+    max-width: 50%;
+}
+
+.modal-backdrop {
+    position: absolute;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background-color: #8f8f8f;
+    opacity: .5;
+    z-index: 1;
+}
+
+.modal-title {
+    margin: 0;
+}
+
+.modal-button {
+    font-family: "wynncraft";
+    background-color: #073c17;
+    padding: .25em;
+    text-align: center;
+    text-decoration: none;
+    font-size: 100%;
+    cursor: pointer;
+    border: .1em solid black;
+    height: 1.5em;
+    width: 50%;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.modal-contents {
+    padding: 1em;
+}
+
+.error-area {
+    resize: none;
+    width: 100%;
 }
