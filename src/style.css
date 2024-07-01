@@ -1,6 +1,6 @@
 @font-face {
     font-family: "wynncraft";
-    src: url(data:font/woff2;charset=utf-8;base64,Wynncraft_Game_Font.woff2.base64) format('woff2');
+    src: url(https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2) format('woff2');
     font-weight: normal;
     font-style: normal;
 }
@@ -14,7 +14,7 @@ body {
 
 body {
     font-family: "wynncraft";
-    background-image: url(data:image/png;base64,background_installer.png.base64);
+    background-image: url(https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png);
     background-size: cover;
     background-position: bottom;
     color: #fce8f6;
@@ -337,6 +337,7 @@ li {
 
 .pagination {
     display: flex;
+    align-items: center;
 }
 
 .pagination>* {

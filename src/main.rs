@@ -406,6 +406,8 @@ struct Manifest {
     subtitle: String,
     tab_group: Option<usize>,
     tab_title: Option<String>,
+    tab_color: Option<String>,
+    tab_background: Option<String>,
     description: String,
     icon: bool,
     uuid: String,
@@ -1433,6 +1435,8 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
         subtitle: manifest.subtitle.clone(),
         tab_group: manifest.tab_group.clone(),
         tab_title: manifest.tab_title.clone(),
+        tab_color: manifest.tab_color.clone(),
+        tab_background: manifest.tab_background.clone(),
         description: manifest.subtitle.clone(),
         icon: manifest.icon,
         uuid: manifest.uuid.clone(),
@@ -1666,16 +1670,6 @@ fn main() {
     .expect("Failed to parse branches!");
     let config_path = get_app_data().join(".WC_OVHL/config.json");
     let config: Config;
-    let style_css = include_str!("style.css");
-    let style_css = style_css
-        .replace(
-            "Wynncraft_Game_Font.woff2.base64",
-            include_str!("assets/Wynncraft_Game_Font.woff2.base64"),
-        )
-        .replace(
-            "background_installer.png.base64",
-            include_str!("assets/background_installer.png.base64"),
-        );
     if config_path.exists() {
         config = serde_json::from_slice(&fs::read(&config_path).expect("Failed to read config!"))
             .expect("Failed to load config!");
@@ -1704,7 +1698,7 @@ fn main() {
             modpack_source: String::from(REPO),
             config,
             config_path,
-            style_css: Box::leak(style_css.into_boxed_str()), // this stops a memory leak from happening when switching between settings and start menu
+            style_css: include_str!("style.css"),
         }).launch(gui::app);
 }
 

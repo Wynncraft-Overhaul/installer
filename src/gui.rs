@@ -5,6 +5,13 @@ use dioxus::prelude::*;
 
 use crate::{get_app_data, get_launcher};
 
+#[derive(Clone)]
+struct TabInfo {
+    pub color: String,
+    pub title: String,
+    pub background: String,
+}
+
 #[derive(PartialEq, Props, Clone)]
 struct SpinnerViewProps {
     title: String,
@@ -494,7 +501,7 @@ struct VersionProps {
     error: Signal<Option<String>>,
     name: Signal<String>,
     page: Signal<usize>,
-    pages: Signal<BTreeMap<usize, String>>,
+    pages: Signal<BTreeMap<usize, TabInfo>>,
 }
 
 #[component]
@@ -535,7 +542,27 @@ fn Version(mut props: VersionProps) -> Element {
     } else {
         String::from("Default")
     };
-    props.pages.with_mut(|x| x.insert(tab_group, tab_title));
+    let tab_color = if let Some(ref tab_color) = installer_profile.manifest.tab_color {
+        tab_color.clone()
+    } else {
+        String::from("#320625")
+    };
+    let tab_background = if let Some(ref tab_background) = installer_profile.manifest.tab_background
+    {
+        tab_background.clone()
+    } else {
+        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png")
+    };
+    props.pages.with_mut(|x| {
+        x.insert(
+            tab_group,
+            TabInfo {
+                color: tab_color.clone(),
+                title: tab_title,
+                background: tab_background.clone(),
+            },
+        )
+    });
     let mut installing = use_signal(|| false);
     let mut spinner_status = use_signal(|| "");
     let mut modify = use_signal(|| false);
@@ -677,6 +704,21 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
     rsx! {
+        style {
+            "
+            .container, .subtitle-container {{
+                background-color: {tab_color};
+            }}
+
+            .container {{
+                border: 4px solid color-mix(in srgb, {tab_color}, black 40%);
+            }}
+            
+            body {{
+                background-image: url({tab_background});
+            }}
+            "
+        }
         if *installing.read() {
             SpinnerView {
                 title: installer_profile.manifest.subtitle,
@@ -718,6 +760,10 @@ fn Version(mut props: VersionProps) -> Element {
                                 div {
                                     class: "description",
                                     dangerous_inner_html: "{installer_profile.manifest.description}"
+                                }
+                                p {
+                                    style: "font-size: 1.2em;",
+                                    "Optional features:"
                                 }
                                 div {
                                     class: "feature-list",
@@ -774,11 +820,11 @@ fn Version(mut props: VersionProps) -> Element {
 }
 
 #[component]
-fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, String>>) -> Element {
+fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
         div {
             class: "pagination",
-            for (index, name) in pages() {
+            for (index, info) in pages() {
                 button {
                     class: "toolbar-button",
                     disabled: index == page(),
@@ -786,7 +832,7 @@ fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, String>
                         *page.write() = index;
                         evt.stop_propagation();
                     },
-                    "{name}"
+                    "{info.title}"
                 }
             }
         }
@@ -819,7 +865,6 @@ pub(crate) fn app() -> Element {
     let branches = props.branches;
     let config = use_signal(|| props.config);
     let mut settings = use_signal(|| false);
-    let cog = String::from("data:image/png;base64,") + include_str!("assets/cog_icon.png.base64");
     let err = use_signal(|| None);
     let name = use_signal(String::default);
     if err.with(|e| e.is_some()) {
@@ -882,7 +927,7 @@ pub(crate) fn app() -> Element {
                         evt.stop_propagation();
                     },
                     img {
-                        src: "{cog}",
+                        src: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/cog_icon.png",
                     }
                 }
             }

@@ -12,6 +12,8 @@ The Header section contains metadata about the modpack, such as the name, subtit
 - `subtitle`: Name of modpack version
 - `tab_group`: The id of the tab the version will appear in. The id can be any non negative number. `0` is the default tab.
 - `tab_title`: The name of the tab.
+- `tab_color`: The background color of the boxes containing the modpack versions. In `#rrbbgg` format.
+- `tab_background`: The url of the background image for the tab.
 - `description`: This field is a html representation of the description show in the installer.
 - `uuid`: This field is a [UUID4](https://www.uuidgenerator.net/) and should be the same across all modpack versions. But different across branches/alt versions.
 - `icon`: If this field is set to `true` the installer will look for an `icon.png` in the modpack root.
