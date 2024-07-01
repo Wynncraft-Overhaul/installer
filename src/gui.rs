@@ -23,8 +23,6 @@ fn SpinnerView(props: SpinnerViewProps) -> Element {
                 }
             }
             div {
-                class: "version-inner-container",
-                div {
                     class: "container",
                     style: "justify-items: center;",
                     div {
@@ -38,7 +36,6 @@ fn SpinnerView(props: SpinnerViewProps) -> Element {
                         "{props.status}"
                     }
                 }
-            }
         }
     }
 }
@@ -62,90 +59,87 @@ fn Credits(mut props: CreditsProps) -> Element {
                 }
             }
             div {
-                class: "version-inner-container",
+                class: "container",
                 div {
-                    class: "container",
+                    class: "info-container",
                     div {
-                        class: "info-container",
-                        div {
-                            class: "button-container",
-                            button {
-                                class: "credits-button",
-                                onclick: move |evt| {
-                                    props.credits.set(false);
-                                    evt.stop_propagation();
-                                },
-                                "X"
-                            }
+                        class: "button-container",
+                        button {
+                            class: "credits-button",
+                            onclick: move |evt| {
+                                props.credits.set(false);
+                                evt.stop_propagation();
+                            },
+                            "X"
                         }
+                    }
+                    div {
+                        class: "credits",
                         div {
-                            class: "credits",
-                            div {
-                                class: "credits-inner",
-                                ul {
-                                    for r#mod in props.manifest.mods {
-                                        if props.enabled.contains(&r#mod.id) {
-                                            li {
-                                                "{r#mod.name} by "
-                                                for author in &r#mod.authors {
-                                                    a {
-                                                        href: "{author.link}",
-                                                        if r#mod.authors.last().unwrap() == author {
-                                                            {author.name.to_string()}
-                                                        } else {
-                                                            {author.name.to_string() + ", "}
-                                                        }
+                            class: "credits-inner",
+                            ul {
+                                for r#mod in props.manifest.mods {
+                                    if props.enabled.contains(&r#mod.id) {
+                                        li {
+                                            "{r#mod.name} by "
+                                            for author in &r#mod.authors {
+                                                a {
+                                                    href: "{author.link}",
+                                                    if r#mod.authors.last().unwrap() == author {
+                                                        {author.name.to_string()}
+                                                    } else {
+                                                        {author.name.to_string() + ", "}
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    for shaderpack in props.manifest.shaderpacks {
-                                        if props.enabled.contains(&shaderpack.id) {
-                                            li {
-                                                "{shaderpack.name} by "
-                                                for author in &shaderpack.authors {
-                                                    a {
-                                                        href: "{author.link}",
-                                                        if shaderpack.authors.last().unwrap() == author {
-                                                            {author.name.to_string()}
-                                                        } else {
-                                                            {author.name.to_string() + ", "}
-                                                        }
+                                }
+                                for shaderpack in props.manifest.shaderpacks {
+                                    if props.enabled.contains(&shaderpack.id) {
+                                        li {
+                                            "{shaderpack.name} by "
+                                            for author in &shaderpack.authors {
+                                                a {
+                                                    href: "{author.link}",
+                                                    if shaderpack.authors.last().unwrap() == author {
+                                                        {author.name.to_string()}
+                                                    } else {
+                                                        {author.name.to_string() + ", "}
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    for resourcepack in props.manifest.resourcepacks {
-                                        if props.enabled.contains(&resourcepack.id) {
-                                            li {
-                                                "{resourcepack.name} by "
-                                                for author in &resourcepack.authors {
-                                                    a {
-                                                        href: "{author.link}",
-                                                        if resourcepack.authors.last().unwrap() == author {
-                                                            {author.name.to_string()}
-                                                        } else {
-                                                            {author.name.to_string() + ", "}
-                                                        }
+                                }
+                                for resourcepack in props.manifest.resourcepacks {
+                                    if props.enabled.contains(&resourcepack.id) {
+                                        li {
+                                            "{resourcepack.name} by "
+                                            for author in &resourcepack.authors {
+                                                a {
+                                                    href: "{author.link}",
+                                                    if resourcepack.authors.last().unwrap() == author {
+                                                        {author.name.to_string()}
+                                                    } else {
+                                                        {author.name.to_string() + ", "}
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    for include in props.manifest.include {
-                                        if props.enabled.contains(&include.id) && include.authors.is_some() && include.name.is_some() {
-                                            li {
-                                                "{include.name.as_ref().unwrap()} by "
-                                                for author in &include.authors.as_ref().unwrap() {
-                                                    a {
-                                                        href: "{author.link}",
-                                                        if include.authors.as_ref().unwrap().last().unwrap() == author {
-                                                            {author.name.to_string()}
-                                                        } else {
-                                                            {author.name.to_string() + ", "}
-                                                        }
+                                }
+                                for include in props.manifest.include {
+                                    if props.enabled.contains(&include.id) && include.authors.is_some() && include.name.is_some() {
+                                        li {
+                                            "{include.name.as_ref().unwrap()} by "
+                                            for author in &include.authors.as_ref().unwrap() {
+                                                a {
+                                                    href: "{author.link}",
+                                                    if include.authors.as_ref().unwrap().last().unwrap() == author {
+                                                        {author.name.to_string()}
+                                                    } else {
+                                                        {author.name.to_string() + ", "}
                                                     }
                                                 }
                                             }
@@ -188,111 +182,106 @@ fn Settings(mut props: SettingsProps) -> Element {
     }
 
     rsx! {
-        div {
-            class: "version-inner-container",
-            style: "width: 25.25vw;",
-            if !*uninstall_confirm.read() {
-                div {
-                    class: "container",
-                    style: "width: 24vw;",
-                    form {
-                        id: "settings",
-                        onsubmit: move |event| {
-                            props.config.write().launcher = event.data.values()["launcher-select"].as_value();
-                            if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
-                                props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                            }
-                            props.settings.set(false);
-                        },
-                        div {
-                            class: "label",
-                            span {
-                                "Launcher:"
-                            }
-                            select {
-                                name: "launcher-select",
-                                id: "launcher-select",
-                                form: "settings",
-                                class: "credits-button",
-                                if super::get_minecraft_folder().is_dir() {
-                                    option {
-                                        value: "vanilla",
-                                        selected: vanilla,
-                                        "Vanilla"
-                                    }
-                                }
-                                if super::get_multimc_folder("MultiMC").is_ok() {
-                                    option {
-                                        value: "multimc-MultiMC",
-                                        selected: multimc,
-                                        "MultiMC"
-                                    }
-                                }
-                                if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                    option {
-                                        value: "multimc-PrismLauncher",
-                                        selected: prism,
-                                        "Prism Launcher"
-                                    }
-                                }
-                                if custom.is_some() {
-                                    option {
-                                        value: "{props.config.read().launcher}",
-                                        selected: custom,
-                                        "Custom MultiMC"
-                                    }
+        if !*uninstall_confirm.read() {
+            div {
+                class: "container",
+                style: "width: 24vw;",
+                form {
+                    id: "settings",
+                    onsubmit: move |event| {
+                        props.config.write().launcher = event.data.values()["launcher-select"].as_value();
+                        if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
+                            props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                        }
+                        props.settings.set(false);
+                    },
+                    div {
+                        class: "label",
+                        span {
+                            "Launcher:"
+                        }
+                        select {
+                            name: "launcher-select",
+                            id: "launcher-select",
+                            form: "settings",
+                            class: "credits-button",
+                            if super::get_minecraft_folder().is_dir() {
+                                option {
+                                    value: "vanilla",
+                                    selected: vanilla,
+                                    "Vanilla"
                                 }
                             }
-                        }
-                        CustomMultiMCButton {
-                            config: props.config,
-                            config_path: props.config_path.clone(),
-                            error: props.error,
-                            b64_id: props.b64_id.clone()
-                        }
-                        input {
-                            r#type: "submit",
-                            value: "Save",
-                            class: "install-button",
-                            id: "save"
-                        }
-                        button {
-                            class: "uninstall-button",
-                            onclick: move |evt| {
-                                uninstall_confirm.set(true);
-                                evt.stop_propagation();
-                            },
-                            "Uninstall Modpack"
+                            if super::get_multimc_folder("MultiMC").is_ok() {
+                                option {
+                                    value: "multimc-MultiMC",
+                                    selected: multimc,
+                                    "MultiMC"
+                                }
+                            }
+                            if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                option {
+                                    value: "multimc-PrismLauncher",
+                                    selected: prism,
+                                    "Prism Launcher"
+                                }
+                            }
+                            if custom.is_some() {
+                                option {
+                                    value: "{props.config.read().launcher}",
+                                    selected: custom,
+                                    "Custom MultiMC"
+                                }
+                            }
                         }
                     }
-                }
-            } else {
-                div {
-                    class: "container",
-                    style: "width: 24vw;",
-                    p {
-                        "Are you sure? This will delete all files from both the immersive and performance pack."
+                    CustomMultiMCButton {
+                        config: props.config,
+                        config_path: props.config_path.clone(),
+                        error: props.error,
+                        b64_id: props.b64_id.clone()
+                    }
+                    input {
+                        r#type: "submit",
+                        value: "Save",
+                        class: "install-button",
+                        id: "save"
                     }
                     button {
-                        class: "confirm-yes",
+                        class: "uninstall-button",
                         onclick: move |evt| {
-                            super::uninstall(&get_launcher(&props.config.read().launcher).unwrap(), &props.b64_id);
-                            uninstall_confirm.set(false);
+                            uninstall_confirm.set(true);
                             evt.stop_propagation();
                         },
-                        "Yes"
-                    }
-                    button {
-                        class: "confirm-no",
-                        onclick: move |evt| {
-                            uninstall_confirm.set(false);
-                            evt.stop_propagation();
-                        },
-                        "No"
+                        "Uninstall Modpack"
                     }
                 }
             }
-
+        } else {
+            div {
+                class: "container",
+                style: "width: 24vw;",
+                p {
+                    "Are you sure? This will delete all files from both the immersive and performance pack."
+                }
+                button {
+                    class: "confirm-yes",
+                    onclick: move |evt| {
+                        super::uninstall(&get_launcher(&props.config.read().launcher).unwrap(), &props.b64_id);
+                        uninstall_confirm.set(false);
+                        evt.stop_propagation();
+                    },
+                    "Yes"
+                }
+                button {
+                    class: "confirm-no",
+                    onclick: move |evt| {
+                        uninstall_confirm.set(false);
+                        evt.stop_propagation();
+                    },
+                    "No"
+                }
+            }
         }
     }
 }
@@ -329,65 +318,61 @@ fn Launcher(mut props: LauncherProps) -> Element {
     } else {
         rsx! {
             div {
-                class: "version-inner-container",
-                style: "width: 25.25vw;",
-                div {
-                    class: "container",
-                    style: "width: 24vw;",
-                    form {
-                        id: "settings",
-                        onsubmit: move |event| {
-                            props.config.write().launcher = event.data.values()["launcher-select"].as_value();
-                            props.config.write().first_launch = Some(false);
-                            if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
-                                props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                            }
-                        },
-                        div {
-                            class: "label",
-                            span {
-                                "Launcher:"
-                            }
-                            select {
-                                name: "launcher-select",
-                                id: "launcher-select",
-                                form: "settings",
-                                class: "credits-button",
-                                if super::get_minecraft_folder().is_dir() {
-                                    option {
-                                        value: "vanilla",
-                                        selected: vanilla,
-                                        "Vanilla"
-                                    }
+                class: "container",
+                style: "width: 24vw;",
+                form {
+                    id: "settings",
+                    onsubmit: move |event| {
+                        props.config.write().launcher = event.data.values()["launcher-select"].as_value();
+                        props.config.write().first_launch = Some(false);
+                        if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
+                            props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                        }
+                    },
+                    div {
+                        class: "label",
+                        span {
+                            "Launcher:"
+                        }
+                        select {
+                            name: "launcher-select",
+                            id: "launcher-select",
+                            form: "settings",
+                            class: "credits-button",
+                            if super::get_minecraft_folder().is_dir() {
+                                option {
+                                    value: "vanilla",
+                                    selected: vanilla,
+                                    "Vanilla"
                                 }
-                                if super::get_multimc_folder("MultiMC").is_ok() {
-                                    option {
-                                        value: "multimc-MultiMC",
-                                        selected: multimc,
-                                        "MultiMC"
-                                    }
+                            }
+                            if super::get_multimc_folder("MultiMC").is_ok() {
+                                option {
+                                    value: "multimc-MultiMC",
+                                    selected: multimc,
+                                    "MultiMC"
                                 }
-                                if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                    option {
-                                        value: "multimc-PrismLauncher",
-                                        selected: prism,
-                                        "Prism Launcher"
-                                    }
+                            }
+                            if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                option {
+                                    value: "multimc-PrismLauncher",
+                                    selected: prism,
+                                    "Prism Launcher"
                                 }
                             }
                         }
-                        CustomMultiMCButton {
-                            config: props.config,
-                            config_path: props.config_path.clone(),
-                            error: props.error,
-                            b64_id: props.b64_id.clone()
-                        }
-                        input {
-                            r#type: "submit",
-                            value: "Continue",
-                            class: "install-button",
-                            id: "save"
-                        }
+                    }
+                    CustomMultiMCButton {
+                        config: props.config,
+                        config_path: props.config_path.clone(),
+                        error: props.error,
+                        b64_id: props.b64_id.clone()
+                    }
+                    input {
+                        r#type: "submit",
+                        value: "Continue",
+                        class: "install-button",
+                        id: "save"
                     }
                 }
             }
@@ -441,26 +426,22 @@ fn CustomMultiMCButton(mut props: LauncherProps) -> Element {
 fn NoLauncherFound(props: LauncherProps) -> Element {
     rsx! {
         div {
-            class: "version-inner-container",
-            style: "width: 50vw;height:70vh;",
-            div {
-                class: "container",
-                style: "width: 48vw;",
-                h1 {
-                    "No supported launcher found!"
-                }
-                p {
-                    "Only Prism Launcher, MultiMC and the vanilla launcher are supported by default, other MultiMC launchers can be added using the button below."
-                    br {}
-                    br {}
-                    "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #👑modpack-help on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
-                }
-                CustomMultiMCButton {
-                    config: props.config,
-                    config_path: props.config_path,
-                    error: props.error,
-                    b64_id: props.b64_id.clone()
-                }
+            class: "container",
+            style: "width: 48vw;",
+            h1 {
+                "No supported launcher found!"
+            }
+            p {
+                "Only Prism Launcher, MultiMC and the vanilla launcher are supported by default, other MultiMC launchers can be added using the button below."
+                br {}
+                br {}
+                "If you have any of these installed then please make sure you are on the latest version of the installer, if you are, open a thread in #👑modpack-help on the discord. Please make sure your thread contains the following information: Launcher your having issues with, directory of the launcher and your OS."
+            }
+            CustomMultiMCButton {
+                config: props.config,
+                config_path: props.config_path,
+                error: props.error,
+                b64_id: props.b64_id.clone()
             }
         }
     }
@@ -719,74 +700,71 @@ fn Version(mut props: VersionProps) -> Element {
                         }
                     }
                     div {
-                        class: "version-inner-container",
+                        class: "container",
                         div {
-                            class: "container",
+                            class: "info-container",
                             div {
-                                class: "info-container",
+                                class: "button-container",
+                                button {
+                                    class: "credits-button",
+                                    onclick: move |evt| {
+                                        credits.set(true);
+                                        evt.stop_propagation();
+                                    },
+                                    "i"
+                                }
+                            }
+                            div {
                                 div {
-                                    class: "button-container",
-                                    button {
-                                        class: "credits-button",
-                                        onclick: move |evt| {
-                                            credits.set(true);
-                                            evt.stop_propagation();
-                                        },
-                                        "i"
-                                    }
+                                    class: "description",
+                                    dangerous_inner_html: "{installer_profile.manifest.description}"
                                 }
                                 div {
-                                    div {
-                                        class: "description",
-                                        dangerous_inner_html: "{installer_profile.manifest.description}"
-                                    }
-                                    div {
-                                        class: "feature-list",
-                                        for feat in installer_profile.manifest.features {
-                                            if !feat.hidden {
-                                                label {
-                                                    class: "tooltip",
-                                                    input {
-                                                        checked: if installer_profile.installed {
-                                                            if enabled_features.with(|x| x.contains(&feat.id)) {
-                                                                Some("true")
-                                                            } else {
-                                                                None
-                                                            }
+                                    class: "feature-list",
+                                    for feat in installer_profile.manifest.features {
+                                        if !feat.hidden {
+                                            label {
+                                                class: "tooltip",
+                                                input {
+                                                    checked: if installer_profile.installed {
+                                                        if enabled_features.with(|x| x.contains(&feat.id)) {
+                                                            Some("true")
                                                         } else {
-                                                            if feat.default {
-                                                                Some("true")
-                                                            } else {
-                                                                None
-                                                            }
-                                                        },
-                                                        name: "{feat.id}",
-                                                        onchange: move |evt| {
-                                                            feature_change(local_features, modify, evt, &feat, modify_count, enabled_features)
-                                                        },
-                                                        r#type: "checkbox",
-                                                    }
+                                                            None
+                                                        }
+                                                    } else {
+                                                        if feat.default {
+                                                            Some("true")
+                                                        } else {
+                                                            None
+                                                        }
+                                                    },
+                                                    name: "{feat.id}",
+                                                    onchange: move |evt| {
+                                                        feature_change(local_features, modify, evt, &feat, modify_count, enabled_features)
+                                                    },
+                                                    r#type: "checkbox",
+                                                }
 
-                                                    "{feat.name}"
-                                                    match feat.description {
-                                                        Some(ref desc) => rsx!(span {
-                                                            class: "tooltiptext",
-                                                            "{desc}",
-                                                        }),
-                                                        None => rsx!("")
-                                                    }
+                                                "{feat.name}"
+                                                match feat.description {
+                                                    Some(ref desc) => rsx!(span {
+                                                        class: "tooltiptext",
+                                                        "{desc}",
+                                                    }),
+                                                    None => rsx!("")
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                            input {
-                                r#type: "submit",
-                                value: if !installer_profile.installed {"Install"} else {if !*modify.read() {"Update"} else {"Modify"}},
-                                class: "install-button",
-                                disabled: install_disable
-                            }
+                        }
+                        input {
+                            r#type: "submit",
+                            value: if !installer_profile.installed {"Install"} else {if !*modify.read() {"Update"} else {"Modify"}},
+                            class: "install-button",
+                            disabled: install_disable
                         }
                     }
                 }
@@ -898,6 +876,7 @@ pub(crate) fn app() -> Element {
                 }
                 button {
                     class: "toolbar-button",
+                    style: "padding: 0;margin-right: 0;",
                     onclick: move |evt| {
                         settings.set(true);
                         evt.stop_propagation();

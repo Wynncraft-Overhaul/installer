@@ -9,14 +9,16 @@ html,
 body {
     margin: 0;
     padding: 0;
+    font-size: 3vh;
 }
 
 body {
     font-family: "wynncraft";
     background-image: url(data:image/png;base64,background_installer.png.base64);
     background-size: cover;
+    background-position: bottom;
     color: #fce8f6;
-    height: 88vh;
+    height: 100vh;
     overflow: hidden;
 }
 
@@ -29,13 +31,13 @@ input {
     display: flex;
     justify-content: center;
     height: 50vh;
-    margin-top: 10vw;
+    margin-top: 1em;
 }
 
 .header {
     display: flex;
     justify-content: center;
-    margin-top: 1vh;
+    margin-top: 1em;
 }
 
 .header-inner {
@@ -43,15 +45,16 @@ input {
     justify-content: center;
     margin-bottom: 4%;
     background-color: #7edaf7;
-    border: 0.16vw solid black;
+    border: 1px solid black;
     width: 80%;
 }
 
 .container {
     background-color: #320625;
     border: 0;
-    padding: 2%;
+    padding: .25em;
     display: grid;
+    border: 4px solid #1c0314;
 }
 
 .version-container {
@@ -60,15 +63,6 @@ input {
     margin-left: 10%;
     margin-bottom: 4%;
     width: 25%;
-}
-
-.version-inner-container {
-    margin-right: 2%;
-    margin-left: 2%;
-    background-color: #1c0314;
-    border: 0;
-    padding: 0.5vw;
-    display: grid;
 }
 
 .subtitle-container {
@@ -150,6 +144,8 @@ input {
 
 .feature-list input[type="checkbox"] {
     margin-right: 5px;
+    width: 1rem;
+    height: 1rem;
 }
 
 .feature-list label {
@@ -224,38 +220,14 @@ input {
     font-size: 100%;
     margin-bottom: 2%;
     cursor: pointer;
-    border: 0.16vw solid black;
+    border: 1px solid black;
     height: 2vw;
     margin-right: 2%;
-}
-
-.settings-button {
-    font-family: "wynncraft";
-    width: 3vw;
-    background-color: #073c17;
-    padding: 1%;
-    text-align: center;
-    text-decoration: none;
-    display: flex;
-    font-size: 100%;
-    cursor: pointer;
-    border: 0.16vw solid black;
-    height: 3vw;
-    align-items: center;
-    justify-content: center;
-}
-
-img {
-    height: inherit;
 }
 
 .button-container {
     display: flex;
     justify-content: flex-end;
-}
-
-.settings-button img {
-    height: 3vw;
 }
 
 .info-container {
@@ -328,8 +300,8 @@ li {
 }
 
 .custom-multimc-button {
-    margin-top: 1vh;
-    padding: 0.25em;
+    margin-top: .25em;
+    padding: .25em;
 }
 
 .toolbar {
@@ -340,23 +312,22 @@ li {
 }
 
 .toolbar>* {
-    margin-left: 1em;
+    margin-right: 1em;
 }
 
 .toolbar-button {
     font-family: "wynncraft";
-    width: 3vw;
     background-color: #073c17;
-    padding: 1%;
+    padding: .25em;
     text-align: center;
     text-decoration: none;
     display: flex;
     font-size: 100%;
     cursor: pointer;
-    border: 0.16vw solid black;
-    height: 3vw;
+    border: 1px solid black;
     align-items: center;
     justify-content: center;
+    height: 1.5em;
 }
 
 .toolbar-button:disabled {
@@ -371,4 +342,8 @@ li {
 .pagination>* {
     margin-left: .25em;
     width: 100%;
+}
+
+img {
+    height: inherit;
 }
