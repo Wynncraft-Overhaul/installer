@@ -10,11 +10,15 @@ body {
     margin: 0;
     padding: 0;
     font-size: 3vh;
+    user-select: none;
+    overflow-wrap: break-word;
+    --bg-color: <BG_COLOR>;
+    --bg-image: url(<BG_IMAGE>);
 }
 
 body {
     font-family: "wynncraft";
-    background-image: url(https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png);
+    background-image: var(--bg-image);
     background-size: cover;
     background-position: bottom;
     color: #fce8f6;
@@ -35,10 +39,10 @@ input {
 }
 
 .container {
-    background-color: #320625;
+    background-color: var(--bg-color);
     padding: .25em;
     display: grid;
-    border: .2em solid color-mix(in srgb, #320625, black 40%);
+    border: .2em solid color-mix(in srgb, var(--bg-color), black 40%);
 }
 
 .version-container {
@@ -50,7 +54,7 @@ input {
 }
 
 .subtitle-container {
-    background-color: #320625;
+    background-color: var(--bg-color);
     border: 0;
     padding: 2%;
     justify-content: center;
@@ -59,6 +63,8 @@ input {
     height: 11vh;
     align-items: center;
     text-align: center;
+    font-size: min(1.4vw, 3vh);
+    overflow-wrap: anywhere;
 }
 
 .confirm-yes {
@@ -137,7 +143,7 @@ input {
     font: inherit;
     width: 1.15em;
     height: 1.15em;
-    border: .015em solid black;
+    border: .1em solid black;
     display: grid;
     place-content: center;
 }
@@ -215,7 +221,7 @@ input {
 
 .credits {
     overflow: auto;
-    max-height: 31.1vh;
+    max-height: 60vh;
     direction: rtl;
 }
 
@@ -234,7 +240,7 @@ input {
     font-size: 100%;
     margin-bottom: 2%;
     cursor: pointer;
-    border: .015em solid black;
+    border: .1em solid black;
     height: 2vw;
     margin-right: 2%;
 }
@@ -370,9 +376,9 @@ img {
     transform: translate(-50%, -50%);
     top: 50%;
     left: 50%;
-    background-color: #320625;
+    background-color: var(--bg-color);
     color: #fce8f6;
-    border: .2em solid color-mix(in srgb, #320625, black 40%);
+    border: .2em solid color-mix(in srgb, var(--bg-color), black 40%);
     z-index: 2;
     max-width: 50%;
     margin: 0;

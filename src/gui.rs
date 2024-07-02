@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use base64::{engine, Engine};
 use dioxus::prelude::*;
-use log::info;
 use modal::{Modal, ModalContext};
 
 use crate::{get_app_data, get_launcher};
@@ -739,21 +738,6 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
     rsx! {
-        style {
-            "
-            .container, .subtitle-container {{
-                background-color: {tab_color};
-            }}
-
-            .container {{
-                border: .2em solid color-mix(in srgb, {tab_color}, black 40%);
-            }}
-            
-            body {{
-                background-image: url({tab_background});
-            }}
-            "
-        }
         if *installing.read() {
             SpinnerView {
                 title: installer_profile.manifest.subtitle,
@@ -792,6 +776,7 @@ fn Version(mut props: VersionProps) -> Element {
                                 }
                             }
                             div {
+                                style: "width: 21vw",
                                 div {
                                     class: "description",
                                     dangerous_inner_html: "{installer_profile.manifest.description}"
@@ -885,7 +870,6 @@ pub(crate) struct AppProps {
 pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
     let css = include_str!("style.css");
-
     let branches = props.branches;
     let config = use_signal(|| props.config);
     let mut settings = use_signal(|| false);
@@ -894,7 +878,22 @@ pub(crate) fn app() -> Element {
     let name = use_signal(String::default);
 
     let page = use_signal(|| 0);
-    let pages = use_signal(|| BTreeMap::new());
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    let css = css
+        .replace(
+            "<BG_COLOR>",
+            match pages().get(&page()) {
+                Some(x) => &x.color,
+                None => "#320625",
+            },
+        )
+        .replace(
+            "<BG_IMAGE>",
+            match pages().get(&page()) {
+                Some(x) => &x.background,
+                None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png",
+            },
+        );
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
