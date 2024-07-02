@@ -2,14 +2,18 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use base64::{engine, Engine};
 use dioxus::prelude::*;
+use log::info;
+use modal::{Modal, ModalContext};
 
 use crate::{get_app_data, get_launcher};
 
+mod modal;
+
 #[derive(Clone)]
 struct TabInfo {
-    pub color: String,
-    pub title: String,
-    pub background: String,
+    color: String,
+    title: String,
+    background: String,
 }
 
 #[derive(PartialEq, Props, Clone)]
@@ -532,6 +536,7 @@ fn Version(mut props: VersionProps) -> Element {
             return None;
         }
     };
+
     let tab_group = if let Some(tab_group) = installer_profile.manifest.tab_group {
         tab_group
     } else {
@@ -563,6 +568,7 @@ fn Version(mut props: VersionProps) -> Element {
             },
         )
     });
+
     let mut installing = use_signal(|| false);
     let mut spinner_status = use_signal(|| "");
     let mut modify = use_signal(|| false);
@@ -591,112 +597,135 @@ fn Version(mut props: VersionProps) -> Element {
     });
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
-        let mut installer_profile = movable_profile.clone();
+        let movable_profile = movable_profile.clone();
+        let movable_profile2 = movable_profile.clone();
         async move {
-            installing.set(true);
-            installer_profile.enabled_features = enabled_features.read().clone();
-            installer_profile.manifest.enabled_features = enabled_features.read().clone();
-            local_features.set(Some(enabled_features.read().clone()));
+            let install = move |canceled| {
+                let mut installer_profile = movable_profile.clone();
+                spawn(async move {
+                    if canceled {
+                        return;
+                    }
+                    installing.set(true);
+                    installer_profile.enabled_features = enabled_features.read().clone();
+                    installer_profile.manifest.enabled_features = enabled_features.read().clone();
+                    local_features.set(Some(enabled_features.read().clone()));
 
-            if !*installed.read() {
-                spinner_status.set("Installing...");
-                match super::install(&installer_profile).await {
-                    Ok(_) => {
-                        let _ = isahc::post(
-                            "https://tracking.commander07.workers.dev/track",
-                            format!(
-                                "{{
-                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                \"dataSourceId\": \"{}\",
-                                \"userAction\": \"install\",
-                                \"additionalData\": {{
-                                    \"features\": {:?},
-                                    \"version\": \"{}\",
-                                    \"launcher\": \"{}\"
-                                }}
-                            }}",
-                                installer_profile.manifest.uuid,
-                                installer_profile.manifest.enabled_features,
-                                installer_profile.manifest.modpack_version,
-                                installer_profile.launcher.unwrap(),
-                            ),
-                        );
+                    if !*installed.read() {
+                        spinner_status.set("Installing...");
+                        match super::install(&installer_profile).await {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
+                                        \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                        \"dataSourceId\": \"{}\",
+                                        \"userAction\": \"install\",
+                                        \"additionalData\": {{
+                                            \"features\": {:?},
+                                            \"version\": \"{}\",
+                                            \"launcher\": \"{}\"
+                                        }}
+                                    }}",
+                                        installer_profile.manifest.uuid,
+                                        installer_profile.manifest.enabled_features,
+                                        installer_profile.manifest.modpack_version,
+                                        installer_profile.launcher.unwrap(),
+                                    ),
+                                );
+                            }
+                            Err(e) => {
+                                props.error.set(Some(
+                                    format!("{:#?}", e) + " (Failed to install modpack!)",
+                                ));
+                                installing.set(false);
+                                return;
+                            }
+                        }
+                        installed.set(true);
+                    } else if *update_available.read() {
+                        spinner_status.set("Updating...");
+                        match super::update(&installer_profile).await {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"update\",
+                                    \"additionalData\": {{
+                                        \"old_version\": \"{}\",
+                                        \"new_version\": \"{}\"
+                                    }}
+                                }}",
+                                        installer_profile.manifest.uuid,
+                                        installer_profile.local_manifest.unwrap().modpack_version,
+                                        installer_profile.manifest.modpack_version
+                                    ),
+                                );
+                            }
+                            Err(e) => {
+                                props.error.set(Some(
+                                    format!("{:#?}", e) + " (Failed to update modpack!)",
+                                ));
+                                installing.set(false);
+                                return;
+                            }
+                        }
+                        update_available.set(false);
+                    } else if *modify.read() {
+                        spinner_status.set("Modifying...");
+                        match super::update(&installer_profile).await {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"modify\",
+                                    \"additionalData\": {{
+                                        \"features\": {:?}
+                                    }}
+                                }}",
+                                        installer_profile.manifest.uuid,
+                                        installer_profile.manifest.enabled_features
+                                    ),
+                                );
+                            }
+                            Err(e) => {
+                                props.error.set(Some(
+                                    format!("{:#?}", e) + " (Failed to modify modpack!)",
+                                ));
+                                installing.set(false);
+                                return;
+                            }
+                        }
+                        modify.with_mut(|x| *x = false);
+                        modify_count.with_mut(|x| *x = 0);
+                        update_available.set(false);
                     }
-                    Err(e) => {
-                        props
-                            .error
-                            .set(Some(format!("{:#?}", e) + " (Failed to install modpack!)"));
-                        installing.set(false);
-                        return;
-                    }
-                }
-                installed.set(true);
-            } else if *update_available.read() {
-                spinner_status.set("Updating...");
-                match super::update(&installer_profile).await {
-                    Ok(_) => {
-                        let _ = isahc::post(
-                            "https://tracking.commander07.workers.dev/track",
-                            format!(
-                                "{{
-                            \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                            \"dataSourceId\": \"{}\",
-                            \"userAction\": \"update\",
-                            \"additionalData\": {{
-                                \"old_version\": \"{}\",
-                                \"new_version\": \"{}\"
-                            }}
-                        }}",
-                                installer_profile.manifest.uuid,
-                                installer_profile.local_manifest.unwrap().modpack_version,
-                                installer_profile.manifest.modpack_version
-                            ),
-                        );
-                    }
-                    Err(e) => {
-                        props
-                            .error
-                            .set(Some(format!("{:#?}", e) + " (Failed to update modpack!)"));
-                        installing.set(false);
-                        return;
-                    }
-                }
-                update_available.set(false);
-            } else if *modify.read() {
-                spinner_status.set("Modifying...");
-                match super::update(&installer_profile).await {
-                    Ok(_) => {
-                        let _ = isahc::post(
-                            "https://tracking.commander07.workers.dev/track",
-                            format!(
-                                "{{
-                            \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                            \"dataSourceId\": \"{}\",
-                            \"userAction\": \"modify\",
-                            \"additionalData\": {{
-                                \"features\": {:?}
-                            }}
-                        }}",
-                                installer_profile.manifest.uuid,
-                                installer_profile.manifest.enabled_features
-                            ),
-                        );
-                    }
-                    Err(e) => {
-                        props
-                            .error
-                            .set(Some(format!("{:#?}", e) + " (Failed to modify modpack!)"));
-                        installing.set(false);
-                        return;
-                    }
-                }
-                modify.with_mut(|x| *x = false);
-                modify_count.with_mut(|x| *x = 0);
-                update_available.set(false);
+                    installing.set(false);
+                });
+            };
+
+            if let Some(contents) = movable_profile2.manifest.popup_contents {
+                use_context::<ModalContext>().open(
+                    movable_profile2.manifest.popup_title.unwrap_or_default(),
+                    rsx!(div {
+                        dangerous_inner_html: "{contents}"
+                    }),
+                    true,
+                    Some(install),
+                )
+            } else {
+                install(false);
             }
-            installing.set(false);
         }
     };
+
     let install_disable = if *installed.read() && !*update_available.read() && !*modify.read() {
         Some("true")
     } else {
@@ -845,63 +874,22 @@ fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo
     )
 }
 
-#[component]
-fn Modal(
-    title: String,
-    contents: Element,
-    is_open: Signal<bool>,
-    callback: Option<UseCallback<()>>,
-) -> Element {
-    let open = is_open();
-    let close = move |_| {
-        if let Some(callback) = callback {
-            callback.call();
-        }
-        is_open.set(false)
-    };
-    rsx!(
-        div {
-            class: "modal-backdrop",
-            hidden: !open,
-            onclick: close,
-        }
-        dialog {
-            class: "modal",
-            open: open,
-            h1 {
-                class: "modal-title",
-                "{title}"
-            }
-            div {
-                class: "modal-contents",
-                {contents}
-            }
-            button {
-                class: "modal-button",
-                onclick: close,
-                autofocus: true,
-                "OK"
-            }
-        }
-    )
-}
-
 #[derive(Clone)]
 pub(crate) struct AppProps {
     pub branches: Vec<super::GithubBranch>,
     pub modpack_source: String,
     pub config: super::Config,
     pub config_path: PathBuf,
-    pub style_css: &'static str,
 }
 
 pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
+    let css = include_str!("style.css");
 
     let branches = props.branches;
     let config = use_signal(|| props.config);
     let mut settings = use_signal(|| false);
-    let err: Signal<Option<String>> = use_signal(|| None);
+    let mut err: Signal<Option<String>> = use_signal(|| None);
 
     let name = use_signal(String::default);
 
@@ -914,44 +902,24 @@ pub(crate) fn app() -> Element {
         Err(_) => None,
     };
 
-    let mut modal_open = use_signal(|| false);
-    let mut modal_title = use_signal(|| String::new());
-    let mut modal_contents = use_signal(|| None);
-    let mut modal_callback = use_signal(|| None);
-
-    if !modal_open() {
-        if let Some(e) = err() {
-            modal_title.set(String::from("Error"));
-
-            modal_contents.set(rsx! {
-                p {
-                    "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
-                }
-                textarea {
-                    class: "error-area",
-                    readonly: true,
-                    "{e}"
-                }
-            });
-
-            {
-                let mut err = err.clone();
-                modal_callback.set(Some(use_callback(move || err.set(None))));
+    let mut modal_context = use_context_provider(|| ModalContext::default());
+    if let Some(e) = err() {
+        modal_context.open("Error", rsx! {
+            p {
+                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
             }
-
-            modal_open.set(true);
-        }
+            textarea {
+                class: "error-area",
+                readonly: true,
+                "{e}"
+            }
+        }, false, Some(move |_| err.set(None)));
     }
 
     rsx! {
-        style { "{props.style_css}" }
+        style { "{css}" }
 
-        Modal {
-            title: modal_title(),
-            contents: modal_contents(),
-            is_open: modal_open,
-            callback: modal_callback(),
-        }
+        Modal {}
 
         if *settings.read() {
             div {

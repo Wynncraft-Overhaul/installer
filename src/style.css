@@ -367,14 +367,22 @@ img {
 }
 
 .modal {
-    transform: translateY(-50%);
+    transform: translate(-50%, -50%);
     top: 50%;
+    left: 50%;
     background-color: #320625;
     color: #fce8f6;
     border: .2em solid color-mix(in srgb, #320625, black 40%);
-    padding: 1em;
     z-index: 2;
     max-width: 50%;
+    margin: 0;
+    padding: 1em;
+}
+
+.modal-button-layout {
+    display: flex;
+    gap: 5%;
+    justify-content: center;
 }
 
 .modal-backdrop {
@@ -401,10 +409,7 @@ img {
     cursor: pointer;
     border: .1em solid black;
     height: 1.5em;
-    width: 50%;
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
+    width: 45%;
 }
 
 .modal-contents {
@@ -414,4 +419,8 @@ img {
 .error-area {
     resize: none;
     width: 100%;
+}
+
+.cancel {
+    background-color: #d95248;
 }

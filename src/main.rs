@@ -408,6 +408,8 @@ struct Manifest {
     tab_title: Option<String>,
     tab_color: Option<String>,
     tab_background: Option<String>,
+    popup_title: Option<String>,
+    popup_contents: Option<String>,
     description: String,
     icon: bool,
     uuid: String,
@@ -1429,23 +1431,9 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
         }
     }
     let local_manifest = Manifest {
-        manifest_version: manifest.manifest_version,
-        modpack_version: manifest.modpack_version.clone(),
-        name: manifest.name.clone(),
-        subtitle: manifest.subtitle.clone(),
-        tab_group: manifest.tab_group.clone(),
-        tab_title: manifest.tab_title.clone(),
-        tab_color: manifest.tab_color.clone(),
-        tab_background: manifest.tab_background.clone(),
-        description: manifest.subtitle.clone(),
-        icon: manifest.icon,
-        uuid: manifest.uuid.clone(),
-        loader: manifest.loader.clone(),
         mods: mods_w_path,
         shaderpacks: shaderpacks_w_path,
         resourcepacks: resourcepacks_w_path,
-        include: manifest.include.clone(),
-        features: manifest.features.clone(),
         enabled_features: installer_profile.enabled_features.clone(),
         included_files: Some(included_files),
         source: Some(format!(
@@ -1462,9 +1450,7 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
                 .to_owned()
                 .replace("\\\\?\\", ""),
         ),
-        max_mem: manifest.max_mem,
-        min_mem: manifest.min_mem,
-        java_args: manifest.java_args.clone(),
+        ..manifest.clone()
     };
     fs::write(
         modpack_root.join(
@@ -1698,7 +1684,6 @@ fn main() {
             modpack_source: String::from(REPO),
             config,
             config_path,
-            style_css: include_str!("style.css"),
         }).launch(gui::app);
 }
 
