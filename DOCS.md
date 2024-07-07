@@ -14,6 +14,8 @@ The Header section contains metadata about the modpack, such as the name, subtit
 - `tab_title`: The name of the tab.
 - `tab_color`: The background color of the boxes containing the modpack versions. In `#rrbbgg` format.
 - `tab_background`: The url of the background image for the tab.
+- `tab_primary_font`: Url to the primary font for the tab.
+- `tab_secondary_font`: Url to the secondary font for the tab (subtitle, install/modify/update, uninstall and save buttons).
 - `popup_title`: Adds a title to the pre install popup.
 - `popup_contents`: If specified a popup will appear before install with an option to cancel. This field contains the contents of that popup.
 - `description`: This field is a html representation of the description show in the installer.

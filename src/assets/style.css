@@ -1,6 +1,13 @@
 @font-face {
-    font-family: "wynncraft";
-    src: url(https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2) format('woff2');
+    font-family: "PRIMARY_FONT";
+    src: url(<PRIMARY_FONT>);
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "SECONDARY_FONT";
+    src: url(<SECONDARY_FONT>);
     font-weight: normal;
     font-style: normal;
 }
@@ -17,7 +24,7 @@ body {
 }
 
 body {
-    font-family: "wynncraft";
+    font-family: "PRIMARY_FONT";
     background-image: var(--bg-image);
     background-size: cover;
     background-position: bottom;
@@ -63,12 +70,18 @@ input {
     height: 11vh;
     align-items: center;
     text-align: center;
-    font-size: min(1.4vw, 3vh);
     overflow-wrap: anywhere;
+    font-family: "SECONDARY_FONT";
+}
+
+.subtitle-container h1 {
+    font-size: min(4vw, 4vh);
+    font-weight: normal;
 }
 
 .confirm-yes {
-    font-family: "wynncraft";
+    font-family: "SECONDARY_FONT";
+    font-weight: normal;
     background-color: #d95248;
     padding: 4%;
     text-align: center;
@@ -83,7 +96,8 @@ input {
 }
 
 .confirm-no {
-    font-family: "wynncraft";
+    font-family: "SECONDARY_FONT";
+    font-weight: normal;
     background-color: #073c17;
     padding: 4%;
     text-align: center;
@@ -98,7 +112,8 @@ input {
 }
 
 .install-button {
-    font-family: "wynncraft";
+    font-family: "SECONDARY_FONT";
+    font-weight: normal;
     background-color: #073c17;
     padding: 4%;
     text-align: center;
@@ -113,7 +128,8 @@ input {
 }
 
 .uninstall-button {
-    font-family: "wynncraft";
+    font-family: "SECONDARY_FONT";
+    font-weight: normal;
     background-color: #d95248;
     padding: 4%;
     text-align: center;
@@ -230,7 +246,7 @@ input {
 }
 
 .credits-button {
-    font-family: "wynncraft";
+    font-family: "PRIMARY_FONT";
     width: 2vw;
     background-color: #073c17;
     padding: 1%;
@@ -258,7 +274,7 @@ input {
 
 select,
 option {
-    font-family: "wynncraft";
+    font-family: "PRIMARY_FONT";
 }
 
 #settings {
@@ -322,6 +338,7 @@ li {
 .custom-multimc-button {
     margin-top: .25em;
     padding: .25em;
+    font-family: "PRIMARY_FONT";
 }
 
 .toolbar {
@@ -337,7 +354,7 @@ li {
 }
 
 .toolbar-button {
-    font-family: "wynncraft";
+    font-family: "PRIMARY_FONT";
     background-color: #073c17;
     padding: .25em;
     text-align: center;
@@ -406,7 +423,7 @@ img {
 }
 
 .modal-button {
-    font-family: "wynncraft";
+    font-family: "PRIMARY_FONT";
     background-color: #073c17;
     padding: .25em;
     text-align: center;

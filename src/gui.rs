@@ -13,6 +13,8 @@ struct TabInfo {
     color: String,
     title: String,
     background: String,
+    primary_font: String,
+    secondary_font: String,
 }
 
 #[derive(PartialEq, Props, Clone)]
@@ -24,28 +26,19 @@ struct SpinnerViewProps {
 #[component]
 fn SpinnerView(props: SpinnerViewProps) -> Element {
     rsx! {
-        div {
-            class: "version-container",
-            div {
-                class: "subtitle-container",
-                h1 {
-                    "{props.title}"
-                }
+        div { class: "version-container",
+            div { class: "subtitle-container",
+                h1 { "{props.title}" }
             }
-            div {
-                    class: "container",
-                    style: "justify-items: center;",
-                    div {
-                        class: "lds-ring",
-                        div {}
-                        div {}
-                        div {}
-                        div {}
-                    }
-                    p {
-                        "{props.status}"
-                    }
+            div { class: "container", style: "justify-items: center;",
+                div { class: "lds-ring",
+                    div {}
+                    div {}
+                    div {}
+                    div {}
                 }
+                p { "{props.status}" }
+            }
         }
     }
 }
@@ -60,20 +53,13 @@ struct CreditsProps {
 #[component]
 fn Credits(mut props: CreditsProps) -> Element {
     rsx! {
-        div {
-            class: "version-container",
-            div {
-                class: "subtitle-container",
-                h1 {
-                    "{props.manifest.subtitle}"
-                }
+        div { class: "version-container",
+            div { class: "subtitle-container",
+                h1 { "{props.manifest.subtitle}" }
             }
-            div {
-                class: "container",
-                div {
-                    class: "info-container",
-                    div {
-                        class: "button-container",
+            div { class: "container",
+                div { class: "info-container",
+                    div { class: "button-container",
                         button {
                             class: "credits-button",
                             onclick: move |evt| {
@@ -83,18 +69,15 @@ fn Credits(mut props: CreditsProps) -> Element {
                             "X"
                         }
                     }
-                    div {
-                        class: "credits",
-                        div {
-                            class: "credits-inner",
+                    div { class: "credits",
+                        div { class: "credits-inner",
                             ul {
                                 for r#mod in props.manifest.mods {
                                     if props.enabled.contains(&r#mod.id) {
                                         li {
                                             "{r#mod.name} by "
                                             for author in &r#mod.authors {
-                                                a {
-                                                    href: "{author.link}",
+                                                a { href: "{author.link}",
                                                     if r#mod.authors.last().unwrap() == author {
                                                         {author.name.to_string()}
                                                     } else {
@@ -110,8 +93,7 @@ fn Credits(mut props: CreditsProps) -> Element {
                                         li {
                                             "{shaderpack.name} by "
                                             for author in &shaderpack.authors {
-                                                a {
-                                                    href: "{author.link}",
+                                                a { href: "{author.link}",
                                                     if shaderpack.authors.last().unwrap() == author {
                                                         {author.name.to_string()}
                                                     } else {
@@ -127,8 +109,7 @@ fn Credits(mut props: CreditsProps) -> Element {
                                         li {
                                             "{resourcepack.name} by "
                                             for author in &resourcepack.authors {
-                                                a {
-                                                    href: "{author.link}",
+                                                a { href: "{author.link}",
                                                     if resourcepack.authors.last().unwrap() == author {
                                                         {author.name.to_string()}
                                                     } else {
@@ -140,12 +121,13 @@ fn Credits(mut props: CreditsProps) -> Element {
                                     }
                                 }
                                 for include in props.manifest.include {
-                                    if props.enabled.contains(&include.id) && include.authors.is_some() && include.name.is_some() {
+                                    if props.enabled.contains(&include.id) && include.authors.is_some()
+                                        && include.name.is_some()
+                                    {
                                         li {
                                             "{include.name.as_ref().unwrap()} by "
                                             for author in &include.authors.as_ref().unwrap() {
-                                                a {
-                                                    href: "{author.link}",
+                                                a { href: "{author.link}",
                                                     if include.authors.as_ref().unwrap().last().unwrap() == author {
                                                         {author.name.to_string()}
                                                     } else {
@@ -193,34 +175,31 @@ fn Settings(mut props: SettingsProps) -> Element {
 
     rsx! {
         if !*uninstall_confirm.read() {
-            div {
-                class: "container",
-                style: "width: 24vw;",
+            div { class: "container", style: "width: 24vw;",
                 form {
                     id: "settings",
                     onsubmit: move |event| {
-                        props.config.write().launcher = event.data.values()["launcher-select"].as_value();
-                        if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
+                        props
+                            .config
+                            .write()
+                            .launcher = event.data.values()["launcher-select"].as_value();
+                        if let Err(e) = std::fs::write(
+                            &props.config_path,
+                            serde_json::to_vec(&*props.config.read()).unwrap(),
+                        ) {
                             props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
                         }
                         props.settings.set(false);
                     },
-                    div {
-                        class: "label",
-                        span {
-                            "Launcher:"
-                        }
+                    div { class: "label",
+                        span { "Launcher:" }
                         select {
                             name: "launcher-select",
                             id: "launcher-select",
                             form: "settings",
                             class: "credits-button",
                             if super::get_minecraft_folder().is_dir() {
-                                option {
-                                    value: "vanilla",
-                                    selected: vanilla,
-                                    "Vanilla"
-                                }
+                                option { value: "vanilla", selected: vanilla, "Vanilla" }
                             }
                             if super::get_multimc_folder("MultiMC").is_ok() {
                                 option {
@@ -268,16 +247,17 @@ fn Settings(mut props: SettingsProps) -> Element {
                 }
             }
         } else {
-            div {
-                class: "container",
-                style: "width: 24vw;",
+            div { class: "container", style: "width: 24vw;",
                 p {
                     "Are you sure? This will delete all files from both the immersive and performance pack."
                 }
                 button {
                     class: "confirm-yes",
                     onclick: move |evt| {
-                        super::uninstall(&get_launcher(&props.config.read().launcher).unwrap(), &props.b64_id);
+                        super::uninstall(
+                            &get_launcher(&props.config.read().launcher).unwrap(),
+                            &props.b64_id,
+                        );
                         uninstall_confirm.set(false);
                         evt.stop_propagation();
                     },
@@ -327,34 +307,31 @@ fn Launcher(mut props: LauncherProps) -> Element {
         })
     } else {
         rsx! {
-            div {
-                class: "container",
-                style: "width: 24vw;",
+            div { class: "container", style: "width: 24vw;",
                 form {
                     id: "settings",
                     onsubmit: move |event| {
-                        props.config.write().launcher = event.data.values()["launcher-select"].as_value();
+                        props
+                            .config
+                            .write()
+                            .launcher = event.data.values()["launcher-select"].as_value();
                         props.config.write().first_launch = Some(false);
-                        if let Err(e) = std::fs::write(&props.config_path, serde_json::to_vec(&*props.config.read()).unwrap()) {
+                        if let Err(e) = std::fs::write(
+                            &props.config_path,
+                            serde_json::to_vec(&*props.config.read()).unwrap(),
+                        ) {
                             props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
                         }
                     },
-                    div {
-                        class: "label",
-                        span {
-                            "Launcher:"
-                        }
+                    div { class: "label",
+                        span { "Launcher:" }
                         select {
                             name: "launcher-select",
                             id: "launcher-select",
                             form: "settings",
                             class: "credits-button",
                             if super::get_minecraft_folder().is_dir() {
-                                option {
-                                    value: "vanilla",
-                                    selected: vanilla,
-                                    "Vanilla"
-                                }
+                                option { value: "vanilla", selected: vanilla, "Vanilla" }
                             }
                             if super::get_multimc_folder("MultiMC").is_ok() {
                                 option {
@@ -435,12 +412,8 @@ fn CustomMultiMCButton(mut props: LauncherProps) -> Element {
 #[component]
 fn NoLauncherFound(props: LauncherProps) -> Element {
     rsx! {
-        div {
-            class: "container",
-            style: "width: 48vw;",
-            h1 {
-                "No supported launcher found!"
-            }
+        div { class: "container", style: "width: 48vw;",
+            h1 { "No supported launcher found!" }
             p {
                 "Only Prism Launcher, MultiMC and the vanilla launcher are supported by default, other MultiMC launchers can be added using the button below."
                 br {}
@@ -519,10 +492,7 @@ fn Version(mut props: VersionProps) -> Element {
     // 'use_future's will always be 'None' on components first render
     if profile.read().is_none() {
         return rsx! {
-            div {
-                class: "container",
-                "Loading..."
-            }
+            div { class: "container", "Loading..." }
         };
     };
 
@@ -557,13 +527,29 @@ fn Version(mut props: VersionProps) -> Element {
     } else {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png")
     };
+    let tab_secondary_font = if let Some(ref tab_secondary_font) =
+        installer_profile.manifest.tab_secondary_font
+    {
+        tab_secondary_font.clone()
+    } else {
+        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
+    };
+    let tab_primary_font = if let Some(ref tab_primary_font) =
+        installer_profile.manifest.tab_primary_font
+    {
+        tab_primary_font.clone()
+    } else {
+        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
+    };
     props.pages.with_mut(|x| {
         x.insert(
             tab_group,
             TabInfo {
-                color: tab_color.clone(),
+                color: tab_color,
                 title: tab_title,
-                background: tab_background.clone(),
+                background: tab_background,
+                primary_font: tab_primary_font,
+                secondary_font: tab_secondary_font,
             },
         )
     });
@@ -741,31 +727,23 @@ fn Version(mut props: VersionProps) -> Element {
         if *installing.read() {
             SpinnerView {
                 title: installer_profile.manifest.subtitle,
-                status: spinner_status.to_string(),
+                status: spinner_status.to_string()
             }
         } else if *credits.read() {
             Credits {
                 manifest: installer_profile.manifest,
                 enabled: installer_profile.enabled_features,
-                credits,
+                credits
             }
         } else {
-            div {
-                class: "version-container",
-                form {
-                    onsubmit: on_submit,
-                    div {
-                        class: "subtitle-container",
-                        h1 {
-                            "{installer_profile.manifest.subtitle}"
-                        }
+            div { class: "version-container",
+                form { onsubmit: on_submit,
+                    div { class: "subtitle-container",
+                        h1 { "{installer_profile.manifest.subtitle}" }
                     }
-                    div {
-                        class: "container",
-                        div {
-                            class: "info-container",
-                            div {
-                                class: "button-container",
+                    div { class: "container",
+                        div { class: "info-container",
+                            div { class: "button-container",
                                 button {
                                     class: "credits-button",
                                     onclick: move |evt| {
@@ -775,41 +753,36 @@ fn Version(mut props: VersionProps) -> Element {
                                     "i"
                                 }
                             }
-                            div {
-                                style: "width: 21vw",
+                            div { style: "width: 21vw",
                                 div {
                                     class: "description",
                                     dangerous_inner_html: "{installer_profile.manifest.description}"
                                 }
-                                p {
-                                    style: "font-size: 1.2em;margin-bottom: .5em;",
+                                p { style: "font-size: 1.2em;margin-bottom: .5em;",
                                     "Optional features:"
                                 }
-                                div {
-                                    class: "feature-list",
+                                div { class: "feature-list",
                                     for feat in installer_profile.manifest.features {
                                         if !feat.hidden {
-                                            label {
-                                                class: "tooltip",
+                                            label { class: "tooltip",
                                                 input {
                                                     checked: if installer_profile.installed {
-                                                        if enabled_features.with(|x| x.contains(&feat.id)) {
-                                                            Some("true")
-                                                        } else {
-                                                            None
-                                                        }
+                                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
                                                     } else {
-                                                        if feat.default {
-                                                            Some("true")
-                                                        } else {
-                                                            None
-                                                        }
+                                                        if feat.default { Some("true") } else { None }
                                                     },
                                                     name: "{feat.id}",
                                                     onchange: move |evt| {
-                                                        feature_change(local_features, modify, evt, &feat, modify_count, enabled_features)
+                                                        feature_change(
+                                                            local_features,
+                                                            modify,
+                                                            evt,
+                                                            &feat,
+                                                            modify_count,
+                                                            enabled_features,
+                                                        )
                                                     },
-                                                    r#type: "checkbox",
+                                                    r#type: "checkbox"
                                                 }
 
                                                 "{feat.name}"
@@ -828,7 +801,11 @@ fn Version(mut props: VersionProps) -> Element {
                         }
                         input {
                             r#type: "submit",
-                            value: if !installer_profile.installed {"Install"} else {if !*modify.read() {"Update"} else {"Modify"}},
+                            value: if !installer_profile.installed {
+                                "Install"
+                            } else {
+                                if !*modify.read() { "Update" } else { "Modify" }
+                            },
                             class: "install-button",
                             disabled: install_disable
                         }
@@ -842,9 +819,8 @@ fn Version(mut props: VersionProps) -> Element {
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
-        div {
-            class: "pagination",
-            for (index, info) in pages() {
+        div { class: "pagination",
+            for (index , info) in pages() {
                 button {
                     class: "toolbar-button",
                     disabled: index == page(),
@@ -869,7 +845,7 @@ pub(crate) struct AppProps {
 
 pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
-    let css = include_str!("style.css");
+    let css = include_str!("assets/style.css");
     let branches = props.branches;
     let config = use_signal(|| props.config);
     let mut settings = use_signal(|| false);
@@ -893,7 +869,13 @@ pub(crate) fn app() -> Element {
                 Some(x) => &x.background,
                 None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png",
             },
-        );
+        ).replace("<SECONDARY_FONT>", match pages().get(&page()) {
+            Some(x) => &x.secondary_font,
+            None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2",
+        }).replace("<PRIMARY_FONT>", match pages().get(&page()) {
+            Some(x) => &x.primary_font,
+            None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2",
+        });
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
@@ -907,11 +889,7 @@ pub(crate) fn app() -> Element {
             p {
                 "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
             }
-            textarea {
-                class: "error-area",
-                readonly: true,
-                "{e}"
-            }
+            textarea { class: "error-area", readonly: true, "{e}" }
         }, false, Some(move |_| err.set(None)));
     }
 
@@ -921,37 +899,28 @@ pub(crate) fn app() -> Element {
         Modal {}
 
         if *settings.read() {
-            div {
-                class: "toolbar",
-            }
-            div {
-                class: "fake-body",
+            div { class: "toolbar" }
+            div { class: "fake-body",
                 Settings {
-                    config: config,
-                    settings: settings,
+                    config,
+                    settings,
                     config_path: props.config_path,
                     error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source),
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
             }
         } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
-            div {
-                class: "fake-body",
+            div { class: "fake-body",
                 Launcher {
-                    config: config,
+                    config,
                     config_path: props.config_path,
                     error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source),
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
             }
-        }
-        else {
-            div {
-                class: "toolbar",
-                Pagination {
-                    page,
-                    pages
-                }
+        } else {
+            div { class: "toolbar",
+                Pagination { page, pages }
                 button {
                     class: "toolbar-button",
                     style: "padding: 0;margin-right: 0;",
@@ -959,13 +928,10 @@ pub(crate) fn app() -> Element {
                         settings.set(true);
                         evt.stop_propagation();
                     },
-                    img {
-                        src: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/cog_icon.png",
-                    }
+                    img { src: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/cog_icon.png" }
                 }
             }
-            div {
-                class: "fake-body",
+            div { class: "fake-body",
                 for i in 0..branches.len() {
                     Version {
                         modpack_source: props.modpack_source.clone(),
