@@ -1473,13 +1473,6 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
         ..manifest.clone()
     };
     fs::write(
-        modpack_root.join(
-            engine::general_purpose::URL_SAFE_NO_PAD.encode(&installer_profile.modpack_source),
-        ),
-        "",
-    )
-    .expect("Failed to save b64_id");
-    fs::write(
         modpack_root.join(Path::new("manifest.json")),
         serde_json::to_string(&local_manifest).expect("Failed to parse 'manifest.json'!"),
     )
