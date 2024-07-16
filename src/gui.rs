@@ -17,30 +17,19 @@ struct TabInfo {
     secondary_font: String,
 }
 
-#[derive(PartialEq, Props, Clone)]
-struct SpinnerViewProps {
-    title: String,
-    status: String,
-}
-
 #[component]
-fn SpinnerView(props: SpinnerViewProps) -> Element {
-    rsx! {
+fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
+    rsx!(
         div { class: "version-container",
             div { class: "subtitle-container",
-                h1 { "{props.title}" }
+                h1 { "{title}" }
             }
             div { class: "container", style: "justify-items: center;",
-                div { class: "lds-ring",
-                    div {}
-                    div {}
-                    div {}
-                    div {}
-                }
-                p { "{props.status}" }
+                progress { max, value: "{value}" }
+                p { class: "progress-status", "{status}" }
             }
         }
-    }
+    )
 }
 
 #[derive(PartialEq, Props, Clone)]
@@ -563,7 +552,8 @@ fn Version(mut props: VersionProps) -> Element {
     });
 
     let mut installing = use_signal(|| false);
-    let mut spinner_status = use_signal(|| "");
+    let mut progress_status = use_signal(|| "");
+    let mut install_progress = use_signal(|| 0);
     let mut modify = use_signal(|| false);
     let mut modify_count = use_signal(|| 0);
     let enabled_features = use_signal(|| {
@@ -578,6 +568,7 @@ fn Version(mut props: VersionProps) -> Element {
             installer_profile.enabled_features.clone()
         }
     });
+    let mut install_item_amount = use_signal(|| 0);
     let mut credits = use_signal(|| false);
     let mut installed = use_signal(|| installer_profile.installed);
     let mut update_available = use_signal(|| installer_profile.update_available);
@@ -590,6 +581,11 @@ fn Version(mut props: VersionProps) -> Element {
     });
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
+        // TODO: Don't do naive item amount calculation
+        *install_item_amount.write() = movable_profile.manifest.mods.len()
+            + movable_profile.manifest.resourcepacks.len()
+            + movable_profile.manifest.shaderpacks.len()
+            + movable_profile.manifest.include.len();
         let movable_profile = movable_profile.clone();
         let movable_profile2 = movable_profile.clone();
         async move {
@@ -605,8 +601,12 @@ fn Version(mut props: VersionProps) -> Element {
                     local_features.set(Some(enabled_features.read().clone()));
 
                     if !*installed.read() {
-                        spinner_status.set("Installing...");
-                        match super::install(&installer_profile).await {
+                        progress_status.set("Installing");
+                        match super::install(&installer_profile, move || {
+                            install_progress.with_mut(|x| *x += 1);
+                        })
+                        .await
+                        {
                             Ok(_) => {
                                 let _ = isahc::post(
                                     "https://tracking.commander07.workers.dev/track",
@@ -638,8 +638,12 @@ fn Version(mut props: VersionProps) -> Element {
                         }
                         installed.set(true);
                     } else if *update_available.read() {
-                        spinner_status.set("Updating...");
-                        match super::update(&installer_profile).await {
+                        progress_status.set("Updating");
+                        match super::update(&installer_profile, move || {
+                            install_progress.with_mut(|x| *x += 1);
+                        })
+                        .await
+                        {
                             Ok(_) => {
                                 let _ = isahc::post(
                                     "https://tracking.commander07.workers.dev/track",
@@ -669,8 +673,12 @@ fn Version(mut props: VersionProps) -> Element {
                         }
                         update_available.set(false);
                     } else if *modify.read() {
-                        spinner_status.set("Modifying...");
-                        match super::update(&installer_profile).await {
+                        progress_status.set("Modifying");
+                        match super::update(&installer_profile, move || {
+                            *install_progress.write() += 1
+                        })
+                        .await
+                        {
                             Ok(_) => {
                                 let _ = isahc::post(
                                     "https://tracking.commander07.workers.dev/track",
@@ -733,9 +741,11 @@ fn Version(mut props: VersionProps) -> Element {
     }
     rsx! {
         if *installing.read() {
-            SpinnerView {
+            ProgressView {
+                value: install_progress(),
+                max: install_item_amount() as i64,
                 title: installer_profile.manifest.subtitle,
-                status: spinner_status.to_string()
+                status: progress_status.to_string()
             }
         } else if *credits.read() {
             Credits {

@@ -1196,18 +1196,20 @@ fn uninstall(launcher: &Launcher, uuid: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-async fn download_helper<T: Downloadable + Debug>(
+async fn download_helper<T: Downloadable + Debug, F: FnMut() -> () + Clone>(
     items: Vec<T>,
     enabled_features: &Vec<String>,
     modpack_root: &Path,
     loader_type: &str,
     http_client: &CachedHttpClient,
+    progress_callback: F
 ) -> Result<Vec<T>, DownloadError> {
     let results = futures::stream::iter(items.into_iter().map(|item| async {
         if item.get_path().is_none() && enabled_features.contains(item.get_id()) {
             let path = item
                 .download(modpack_root, loader_type, http_client)
                 .await?;
+            (progress_callback.clone())();
             Ok(T::new(
                 item.get_name().to_owned(),
                 item.get_source().to_owned(),
@@ -1251,7 +1253,7 @@ async fn download_helper<T: Downloadable + Debug>(
     Ok(return_vec)
 }
 
-async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
+async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile, mut progress_callback: F) -> Result<(), String> {
     info!("Installing modpack");
     info!("installer_profile = {installer_profile:#?}");
     let modpack_root = &get_modpack_root(
@@ -1278,6 +1280,7 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
         modpack_root.as_path(),
         &manifest.loader.r#type,
         http_client,
+        progress_callback.clone()
     )
     .await
     {
@@ -1290,6 +1293,7 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
         modpack_root.as_path(),
         &manifest.loader.r#type,
         http_client,
+        progress_callback.clone()
     )
     .await
     {
@@ -1302,6 +1306,7 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
         modpack_root.as_path(),
         &manifest.loader.r#type,
         http_client,
+        progress_callback.clone()
     )
     .await
     {
@@ -1445,6 +1450,7 @@ async fn install(installer_profile: &InstallerProfile) -> Result<(), String> {
                     included_files.insert(inc_zip_name.clone(), Included { md5, files });
                     info!("Unzipped '{}'", asset.name);
                     info!("'{}' is now installed", asset.name);
+                    progress_callback();
                     break;
                 }
             }
@@ -1555,7 +1561,7 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone + Debug>(
 
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
-async fn update(installer_profile: &InstallerProfile) -> Result<(), String> {
+async fn update<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile, progress_callback: F)-> Result<(), String> {
     info!("Updating modpack");
     info!("installer_profile = {installer_profile:#?}");
     let local_manifest: Manifest = match fs::read_to_string(
@@ -1587,7 +1593,7 @@ async fn update(installer_profile: &InstallerProfile) -> Result<(), String> {
     update_profile.manifest.mods = new_mods;
     update_profile.manifest.shaderpacks = new_shaderpacks;
     update_profile.manifest.resourcepacks = new_resourcepacks;
-    let e = install(&update_profile).await;
+    let e = install(&update_profile, progress_callback).await;
     if e.is_ok() {
         info!("Updated modpack");
     } else {
