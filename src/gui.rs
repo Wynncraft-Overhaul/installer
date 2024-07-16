@@ -4,7 +4,7 @@ use base64::{engine, Engine};
 use dioxus::prelude::*;
 use modal::{Modal, ModalContext};
 
-use crate::{get_app_data, get_launcher};
+use crate::{get_app_data, get_installed_packs, get_launcher, uninstall, Launcher, PackName};
 
 mod modal;
 
@@ -147,6 +147,24 @@ fn Credits(mut props: CreditsProps) -> Element {
     }
 }
 
+#[component]
+fn PackUninstallButton(launcher: Launcher, pack: PackName) -> Element {
+    // TODO: Handle uninstall error
+    let mut hidden = use_signal(|| false);
+    rsx!(
+        li { hidden,
+            button {
+                class: "pack-uninstall",
+                onclick: move |_| {
+                    uninstall(&launcher, &pack.uuid).unwrap();
+                    *hidden.write() = true;
+                },
+                "{pack.name}"
+            }
+        }
+    )
+}
+
 #[derive(PartialEq, Props, Clone)]
 struct SettingsProps {
     config: Signal<super::Config>,
@@ -162,7 +180,14 @@ fn Settings(mut props: SettingsProps) -> Element {
     let mut multimc = None;
     let mut prism = None;
     let mut custom = None;
-    let mut uninstall_confirm = use_signal(|| false);
+    let launcher = get_launcher(&props.config.read().launcher).unwrap();
+    let packs = match get_installed_packs(&launcher) {
+        Ok(v) => v,
+        Err(err) => {
+            *props.error.write() = Some(err.to_string());
+            return None;
+        }
+    };
     match &props.config.read().launcher[..] {
         "vanilla" => vanilla = Some("true"),
         "multimc-MultiMC" => multimc = Some("true"),
@@ -174,102 +199,85 @@ fn Settings(mut props: SettingsProps) -> Element {
     }
 
     rsx! {
-        if !*uninstall_confirm.read() {
-            div { class: "container", style: "width: 24vw;",
-                form {
-                    id: "settings",
-                    onsubmit: move |event| {
-                        props
-                            .config
-                            .write()
-                            .launcher = event.data.values()["launcher-select"].as_value();
-                        if let Err(e) = std::fs::write(
-                            &props.config_path,
-                            serde_json::to_vec(&*props.config.read()).unwrap(),
-                        ) {
-                            props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+        div { class: "container", style: "width: 24vw;",
+            form {
+                id: "settings",
+                onsubmit: move |event| {
+                    props
+                        .config
+                        .write()
+                        .launcher = event.data.values()["launcher-select"].as_value();
+                    if let Err(e) = std::fs::write(
+                        &props.config_path,
+                        serde_json::to_vec(&*props.config.read()).unwrap(),
+                    ) {
+                        props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                    }
+                    props.settings.set(false);
+                },
+                div { class: "label",
+                    span { "Launcher:" }
+                    select {
+                        name: "launcher-select",
+                        id: "launcher-select",
+                        form: "settings",
+                        class: "credits-button",
+                        if super::get_minecraft_folder().is_dir() {
+                            option { value: "vanilla", selected: vanilla, "Vanilla" }
                         }
-                        props.settings.set(false);
-                    },
-                    div { class: "label",
-                        span { "Launcher:" }
-                        select {
-                            name: "launcher-select",
-                            id: "launcher-select",
-                            form: "settings",
-                            class: "credits-button",
-                            if super::get_minecraft_folder().is_dir() {
-                                option { value: "vanilla", selected: vanilla, "Vanilla" }
+                        if super::get_multimc_folder("MultiMC").is_ok() {
+                            option { value: "multimc-MultiMC", selected: multimc, "MultiMC" }
+                        }
+                        if super::get_multimc_folder("PrismLauncher").is_ok() {
+                            option {
+                                value: "multimc-PrismLauncher",
+                                selected: prism,
+                                "Prism Launcher"
                             }
-                            if super::get_multimc_folder("MultiMC").is_ok() {
-                                option {
-                                    value: "multimc-MultiMC",
-                                    selected: multimc,
-                                    "MultiMC"
-                                }
-                            }
-                            if super::get_multimc_folder("PrismLauncher").is_ok() {
-                                option {
-                                    value: "multimc-PrismLauncher",
-                                    selected: prism,
-                                    "Prism Launcher"
-                                }
-                            }
-                            if custom.is_some() {
-                                option {
-                                    value: "{props.config.read().launcher}",
-                                    selected: custom,
-                                    "Custom MultiMC"
-                                }
+                        }
+                        if custom.is_some() {
+                            option {
+                                value: "{props.config.read().launcher}",
+                                selected: custom,
+                                "Custom MultiMC"
                             }
                         }
                     }
-                    CustomMultiMCButton {
-                        config: props.config,
-                        config_path: props.config_path.clone(),
-                        error: props.error,
-                        b64_id: props.b64_id.clone()
-                    }
-                    input {
-                        r#type: "submit",
-                        value: "Save",
-                        class: "install-button",
-                        id: "save"
-                    }
-                    button {
-                        class: "uninstall-button",
-                        onclick: move |evt| {
-                            uninstall_confirm.set(true);
-                            evt.stop_propagation();
-                        },
-                        "Uninstall Modpack"
-                    }
                 }
-            }
-        } else {
-            div { class: "container", style: "width: 24vw;",
-                p {
-                    "Are you sure? This will delete all files from both the immersive and performance pack."
+                CustomMultiMCButton {
+                    config: props.config,
+                    config_path: props.config_path.clone(),
+                    error: props.error,
+                    b64_id: props.b64_id.clone()
+                }
+                input {
+                    r#type: "submit",
+                    value: "Save",
+                    class: "install-button",
+                    id: "save"
                 }
                 button {
-                    class: "confirm-yes",
+                    class: "uninstall-button",
+                    r#type: "button",
+                    disabled: packs.is_empty(),
                     onclick: move |evt| {
-                        super::uninstall(
-                            &get_launcher(&props.config.read().launcher).unwrap(),
-                            &props.b64_id,
-                        );
-                        uninstall_confirm.set(false);
+                        let mut modal = use_context::<ModalContext>();
+                        modal
+                            .open(
+                                "Select modpack to uninstall.",
+                                rsx! {
+                                    ul {
+                                        for pack in packs.clone() {
+                                            PackUninstallButton { launcher: launcher.clone(), pack }
+                                        }
+                                    }
+                                },
+                                false,
+                                Some(|_| {}),
+                            );
                         evt.stop_propagation();
                     },
-                    "Yes"
-                }
-                button {
-                    class: "confirm-no",
-                    onclick: move |evt| {
-                        uninstall_confirm.set(false);
-                        evt.stop_propagation();
-                    },
-                    "No"
+                    "Uninstall"
                 }
             }
         }

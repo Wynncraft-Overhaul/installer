@@ -49,6 +49,12 @@ const ATTEMPTS: usize = 3;
 const WAIT_BETWEEN_ATTEMPTS: Duration = Duration::from_secs(20);
 const REPO: &str = "Wynncraft-Overhaul/majestic-overhaul/";
 
+#[derive(Debug, Clone, PartialEq)]
+struct PackName {
+    name: String,
+    uuid: String,
+}
+
 fn default_id() -> String {
     String::from("default")
 }
@@ -1134,48 +1140,60 @@ macro_rules! validate_item_path {
     };
 }
 
-fn uninstall(launcher: &Launcher, b64_id: &str) {
-    info!("Uninstalling modpack!");
-    let mut data_source_id = String::new();
-    match launcher {
+fn get_installed_packs(launcher: &Launcher) -> Result<Vec<PackName>, std::io::Error> {
+    let mut packs = vec![];
+    let manifest_paths: Vec<PathBuf> = match launcher {
         Launcher::Vanilla(root) => {
-            let root = root.join(".WC_OVHL/");
-            for instance in fs::read_dir(root).unwrap() {
-                let instance = instance.unwrap().path();
-                if instance.join(b64_id).is_file() {
-                    data_source_id = instance.file_name().unwrap().to_str().unwrap().to_owned();
-                    fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
-                    info!("Removed: {instance:#?}");
-                    fs::create_dir(instance).unwrap();
-                }
-            }
+            fs::read_dir(root.join(".WC_OVHL/"))?.filter_map(|entry| {
+                let path = entry.ok()?.path().join("manifest.json");
+                if path.exists() {Some(path)} else {None}
+            }).collect()
+        },
+        Launcher::MultiMC(root) => {
+            fs::read_dir(root.join("instances/"))?.filter_map(|entry| {
+                let path = entry.ok()?.path().join(".minecraft/manifest.json");
+                if path.exists() {Some(path)} else {None}
+            }).collect()
+        },
+    };
+    for path in manifest_paths {
+        let manifest: Result<Manifest, serde_json::Error> = serde_json::from_str(&fs::read_to_string(path).unwrap());
+        if let Ok(manifest) = manifest {
+            packs.push(PackName { name: manifest.subtitle, uuid: manifest.uuid })
+        }
+    }
+    
+    Ok(packs)
+}
+
+fn uninstall(launcher: &Launcher, uuid: &str) -> Result<(), std::io::Error> {
+    info!("Uninstalling modpack: '{uuid}'!");
+    let instance = match launcher {
+        Launcher::Vanilla(root) => {
+            root.join(format!(".WC_OVHL/{uuid}"))
         }
         Launcher::MultiMC(root) => {
-            let root = root.join("instances/");
-            for instance in fs::read_dir(root).unwrap() {
-                let instance = instance.unwrap().path();
-                if instance.join(format!(".minecraft/{}", b64_id)).is_file() {
-                    data_source_id = instance.file_name().unwrap().to_str().unwrap().to_owned();
-                    fs::remove_dir_all(&instance).expect("Failed to uninstall modpack!");
-                    info!("Removed: {instance:#?}");
-                    fs::create_dir_all(instance.join(".minecraft/")).unwrap();
-                }
-            }
+            root.join(format!("instances/{uuid}/.minecraft"))
         }
+    };
+    if instance.is_dir() {
+        fs::remove_dir_all(&instance)?;
+        info!("Removed: {instance:#?}");
+        fs::create_dir(instance)?;
+    } else {
+        error!("Failed to uninstall '{uuid}'");
     }
     let _ = isahc::post(
         "https://tracking.commander07.workers.dev/track",
         format!(
             "{{
         \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-        \"dataSourceId\": \"{}\",
+        \"dataSourceId\": \"{uuid}\",
         \"userAction\": \"uninstall\",
         \"additionalData\": {{}}
-    }}",
-            data_source_id
-        ),
-    );
-    info!("Uninstalled modpack!")
+    }}"));
+    info!("Uninstalled modpack!");
+    Ok(())
 }
 
 async fn download_helper<T: Downloadable + Debug>(

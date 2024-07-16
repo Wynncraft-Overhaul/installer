@@ -1,3 +1,4 @@
+// TODO: Make into a component
 use std::fmt::Debug;
 
 use dioxus::prelude::*;
@@ -98,21 +99,12 @@ pub fn Modal() -> Element {
             onclick: {
                 let mut modal = modal.clone();
                 move |_| modal.cancel()
-            },
+            }
         }
-        dialog {
-            class: "modal",
-            open: modal.inner.read().open,
-            h1 {
-                class: "modal-title",
-                "{modal.inner.read().title}"
-            }
-            div {
-                class: "modal-contents",
-                {modal.inner.read().contents.clone()}
-            }
-            div {
-                class: "modal-button-layout",
+        dialog { class: "modal", open: modal.inner.read().open,
+            h1 { class: "modal-title", "{modal.inner.read().title}" }
+            div { class: "modal-contents", {modal.inner.read().contents.clone()} }
+            div { class: "modal-button-layout",
                 button {
                     class: "modal-button",
                     onclick: {
@@ -120,7 +112,11 @@ pub fn Modal() -> Element {
                         move |_| modal.close()
                     },
                     autofocus: true,
-                    if modal.inner.read().cancelable {"Continue"} else {"Close"}
+                    if modal.inner.read().cancelable {
+                        "Continue"
+                    } else {
+                        "Close"
+                    }
                 }
                 if modal.inner.read().cancelable {
                     button {

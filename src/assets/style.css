@@ -148,6 +148,28 @@ input {
     color: gray;
 }
 
+.uninstall-button:disabled {
+    cursor: default;
+    color: gray;
+}
+
+.pack-uninstall {
+    font-family: "PRIMARY_FONT";
+    font-weight: normal;
+    color: #d95248;
+    background-color: transparent;
+    padding: .25em;
+    text-align: center;
+    font-size: 100%;
+    cursor: pointer;
+    border: 0;
+    text-decoration: underline;
+}
+
+.pack-uninstall:hover {
+    background-color: #dd9c97;
+}
+
 .feature-list {
     margin-bottom: 1em;
 }
@@ -370,9 +392,9 @@ li {
 }
 
 .toolbar-button:disabled {
-    cursor: default;
     height: 2em;
     background-color: #007d26;
+    color: currentColor;
 }
 
 .pagination {
@@ -446,4 +468,9 @@ img {
 
 .cancel {
     background-color: #d95248;
+}
+
+ul {
+    display: grid;
+    gap: .5em;
 }
