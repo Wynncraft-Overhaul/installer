@@ -13,6 +13,7 @@ struct TabInfo {
     color: String,
     title: String,
     background: String,
+    settings_background: String,
     primary_font: String,
     secondary_font: String,
 }
@@ -524,6 +525,12 @@ fn Version(mut props: VersionProps) -> Element {
     } else {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png")
     };
+    let settings_background =
+        if let Some(ref settings_background) = installer_profile.manifest.settings_background {
+            settings_background.clone()
+        } else {
+            tab_background.clone()
+        };
     let tab_secondary_font = if let Some(ref tab_secondary_font) =
         installer_profile.manifest.tab_secondary_font
     {
@@ -545,6 +552,7 @@ fn Version(mut props: VersionProps) -> Element {
                 color: tab_color,
                 title: tab_title,
                 background: tab_background,
+                settings_background,
                 primary_font: tab_primary_font,
                 secondary_font: tab_secondary_font,
             },
@@ -884,7 +892,13 @@ pub(crate) fn app() -> Element {
         .replace(
             "<BG_IMAGE>",
             match pages().get(&page()) {
-                Some(x) => &x.background,
+                Some(x) => {
+                    if settings() {
+                        &x.settings_background
+                    } else {
+                        &x.background
+                    }
+                },
                 None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png",
             },
         ).replace("<SECONDARY_FONT>", match pages().get(&page()) {

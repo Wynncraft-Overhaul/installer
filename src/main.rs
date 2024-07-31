@@ -416,6 +416,7 @@ struct Manifest {
     tab_background: Option<String>,
     tab_primary_font: Option<String>,
     tab_secondary_font: Option<String>,
+    settings_background: Option<String>,
     popup_title: Option<String>,
     popup_contents: Option<String>,
     description: String,
