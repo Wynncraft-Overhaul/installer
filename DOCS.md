@@ -55,6 +55,19 @@ The `shaderpacks` section works exactly the same as the Mods section.
 
 The `resourcepacks` section works exactly the same as the Mods section.
 
+## Remote Include
+
+`remote_include` is a list of objects to download and unzip, and the fields are:
+
+- `location`: DDL to the zip file
+- `path`: An optional path to create and place unzipped files in. (relative to modpack root)
+- `id`: This is an optional field which defaults to `default` it is the id of the feature requried to be true in order to be included. (`default` is always true)
+- `version`: A String which can be anything but make sure to change it when updating the include.
+- `name`: Optional but required for include to be listed in the credits screen. Name for the included file.
+- `authors`: Optional but required for include to be listed in the credits screen. List with objects which have the following fields:
+  - `name`: This field is the authors name.
+  - `link`: This field is a link to the authors page.
+
 ## Include
 
 Include is a list of include objects for which the fields are:

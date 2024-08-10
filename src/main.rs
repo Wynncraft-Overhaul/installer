@@ -14,7 +14,7 @@ use futures::StreamExt;
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageFormat};
 use isahc::config::RedirectPolicy;
-use isahc::http::StatusCode;
+use isahc::http::{HeaderMap, HeaderValue, StatusCode};
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
 use log::{error, info, warn};
@@ -405,6 +405,17 @@ struct Include {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+struct RemoteInclude {
+    location: String,
+    path: Option<String>,
+    #[serde(default = "default_id")]
+    id: String,
+    version: String,
+    name: Option<String>,
+    authors: Option<Vec<Author>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 struct Manifest {
     manifest_version: i32,
     modpack_version: String,
@@ -426,6 +437,7 @@ struct Manifest {
     mods: Vec<Mod>,
     shaderpacks: Vec<Shaderpack>,
     resourcepacks: Vec<Resourcepack>,
+    remote_include: Option<Vec<RemoteInclude>>,
     include: Vec<Include>,
     features: Vec<Feature>,
     #[serde(default = "default_enabled_features")]
@@ -618,6 +630,42 @@ impl From<image::error::ImageError> for LauncherProfileError {
     }
 }
 
+
+fn get_filename(headers: &HeaderMap<HeaderValue>, url: &str) -> Result<String, DownloadError> {
+    let filename = if let Some(x) = headers.get("content-disposition") {
+        let x = x.to_str().unwrap();
+        if x.contains("attachment") {
+            let re = Regex::new(r#"filename="(.*?)""#).unwrap();
+            match match re.captures(x) {
+                Some(v) => Ok(v),
+                None => Err(DownloadError::MissingFilename(url.to_string())),
+            } {
+                Ok(v) => v[1].to_string(),
+                Err(e) => match url.split('/').last() {
+                    Some(v) => v.to_string(),
+                    None => {
+                        return Err(e);
+                    }
+                }
+                .to_string(),
+            }
+        } else {
+            url
+                .split('/')
+                .last()
+                .unwrap() // this should be impossible to error because all urls will have "/"s in them and if they dont it gets caught earlier
+                .to_string()
+        }
+    } else {
+        url
+            .split('/')
+            .last()
+            .unwrap() // this should be impossible to error because all urls will have "/"s in them and if they dont it gets caught earlier
+            .to_string()
+    };
+    Ok(filename)
+}
+
 async fn download_loader_json(
     url: &str,
     loader_name: &str,
@@ -662,37 +710,7 @@ async fn download_from_ddl<T: Downloadable + Debug>(
         Ok(v) => v,
         Err(e) => return Err(DownloadError::HttpError(item.get_name().to_string(), e)),
     };
-    let filename = if let Some(x) = resp.headers().get("content-disposition") {
-        let x = x.to_str().unwrap();
-        if x.contains("attachment") {
-            let re = Regex::new(r#"filename="(.*?)""#).unwrap();
-            match match re.captures(x) {
-                Some(v) => Ok(v),
-                None => Err(DownloadError::MissingFilename(item.get_name().to_string())),
-            } {
-                Ok(v) => v[1].to_string(),
-                Err(e) => match item.get_location().split('/').last() {
-                    Some(v) => v.to_string(),
-                    None => {
-                        return Err(e);
-                    }
-                }
-                .to_string(),
-            }
-        } else {
-            item.get_location()
-                .split('/')
-                .last()
-                .unwrap() // this should be impossible to error because all locations will have "/"s in them and if they dont it gets caught earlier
-                .to_string()
-        }
-    } else {
-        item.get_location()
-            .split('/')
-            .last()
-            .unwrap() // this should be impossible to error because all locations will have "/"s in them and if they dont it gets caught earlier
-            .to_string()
-    };
+    let filename = get_filename(resp.headers(), item.get_location())?;
     let dist = match r#type {
         "mod" => modpack_root.join(Path::new("mods")),
         "resourcepack" => modpack_root.join(Path::new("resourcepacks")),
@@ -1254,6 +1272,67 @@ async fn download_helper<T: Downloadable + Debug, F: FnMut() -> () + Clone>(
     Ok(return_vec)
 }
 
+async fn download_zip(name: &str, http_client: &CachedHttpClient, url: &str, path: &Path) -> Result<Vec<String>, DownloadError> {
+    info!("Downloading '{}'", name);
+    let mut files: Vec<String> = vec![];
+    // download and unzip in modpack root
+    let mut tries = 0;
+    let mut content_resp = match loop {
+        let content_resp = http_client
+            .with_headers(
+                url,
+                &[("Accept", "application/octet-stream")],
+            )
+            .await;
+        if content_resp.is_err() {
+            tries += 1;
+            if tries >= ATTEMPTS {
+                break Err(content_resp.err().unwrap());
+            }
+        } else {
+            break Ok(content_resp.unwrap());
+        }
+    } {
+        Ok(v) => v,
+        Err(e) => return Err(DownloadError::HttpError(name.to_string(), e)),
+    };
+    let content_byte_resp = match content_resp.bytes().await {
+        Ok(v) => v,
+        Err(e) => return Err(DownloadError::IoError(name.to_string(), e)),
+    };
+    fs::create_dir_all(path).expect("Failed to create unzip path");
+    let zipfile_path = path.join("tmp_include.zip");
+    fs::write(&zipfile_path, content_byte_resp)
+        .expect("Failed to write 'tmp_include.zip'!");
+    info!("Downloaded '{}'", name);
+    info!("Unzipping '{}'", name);
+    let zipfile = fs::File::open(&zipfile_path).unwrap();
+    let mut archive = zip::ZipArchive::new(zipfile).unwrap();
+    // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).unwrap();
+        let outpath = match file.enclosed_name() {
+            Some(outpath) => path.join(outpath),
+            None => continue,
+        };
+        if (*file.name()).ends_with('/') {
+            fs::create_dir_all(&outpath).unwrap();
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(p).unwrap();
+                }
+            }
+            let mut outfile = fs::File::create(&outpath).unwrap();
+            std::io::copy(&mut file, &mut outfile).unwrap();
+            files.push(outpath.to_str().unwrap().to_string());
+        }
+    }
+    fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'tmp_include.zip'!");
+    info!("Unzipped '{}'", name);
+    Ok(files)
+}
+
 async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile, mut progress_callback: F) -> Result<(), String> {
     info!("Installing modpack");
     info!("installer_profile = {installer_profile:#?}");
@@ -1357,13 +1436,14 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
                 .expect("Missing body on modpack release!"),
         )
         .expect("Failed to parse hash pairs!");
+        let mut downloaded_assets = vec![];
         for inc in &manifest.include {
             if !installer_profile.enabled_features.contains(&inc.id) {
                 continue;
             }
             'a: for asset in &release.assets {
                 let inc_zip_name = inc.id.clone() + ".zip";
-                if asset.name == inc_zip_name {
+                if asset.name == inc_zip_name && !downloaded_assets.contains(&asset.id) {
                     let md5 = hash_pairs
                         .get(&inc_zip_name)
                         .expect("Asset does not have hash in release body")
@@ -1387,73 +1467,56 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
                         }
                         None => (),
                     }
-                    info!("Downloading '{}'", asset.name);
-                    let mut files: Vec<String> = vec![];
-                    // download and unzip in modpack root
-                    let mut tries = 0;
-                    let content_resp = loop {
-                        let content_resp = http_client
-                            .with_headers(
-                                format!(
-                                    "{}{}releases/assets/{}",
-                                    GH_API, installer_profile.modpack_source, asset.id
-                                ),
-                                &[("Accept", "application/octet-stream")],
-                            )
-                            .await;
-                        if content_resp.is_err() {
-                            tries += 1;
-                            if tries >= ATTEMPTS {
-                                break Err(format!(
-                                    "Failed to download 'include.zip'\n {:#?}",
-                                    content_resp.err().unwrap()
-                                ));
-                            }
-                        } else {
-                            break Ok(content_resp.unwrap());
-                        }
+                    let files = match download_zip(&asset.name, http_client, &format!(
+                        "{}{}releases/assets/{}",
+                        GH_API, installer_profile.modpack_source, asset.id
+                    ), modpack_root).await {
+                        Ok(v) => v,
+                        Err(e) => return Err(format!("Failed to download include: {:#?}", e)),
                     };
-                    if content_resp.is_err() {
-                        return Err(content_resp.err().unwrap());
-                    }
-                    let content_byte_resp = content_resp.unwrap().bytes().await;
-                    if content_byte_resp.is_err() {
-                        return Err(format!("{:#?}", content_byte_resp.err().unwrap()));
-                    }
-                    let zipfile_path = modpack_root.join(Path::new(&asset.name));
-                    fs::write(&zipfile_path, content_byte_resp.unwrap())
-                        .expect("Failed to write 'include.zip'!");
-                    info!("Downloaded '{}'", asset.name);
-                    info!("Unzipping '{}'", asset.name);
-                    let zipfile = fs::File::open(&zipfile_path).unwrap();
-                    let mut archive = zip::ZipArchive::new(zipfile).unwrap();
-                    // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
-                    for i in 0..archive.len() {
-                        let mut file = archive.by_index(i).unwrap();
-                        let outpath = match file.enclosed_name() {
-                            Some(path) => modpack_root.join(path),
-                            None => continue,
-                        };
-                        if (*file.name()).ends_with('/') {
-                            fs::create_dir_all(&outpath).unwrap();
-                        } else {
-                            if let Some(p) = outpath.parent() {
-                                if !p.exists() {
-                                    fs::create_dir_all(p).unwrap();
-                                }
-                            }
-                            let mut outfile = fs::File::create(&outpath).unwrap();
-                            std::io::copy(&mut file, &mut outfile).unwrap();
-                            files.push(outpath.to_str().unwrap().to_string());
-                        }
-                    }
-                    fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'include.zip'!");
                     included_files.insert(inc_zip_name.clone(), Included { md5, files });
-                    info!("Unzipped '{}'", asset.name);
                     info!("'{}' is now installed", asset.name);
                     progress_callback();
+                    downloaded_assets.push(asset.id);
                     break;
                 }
+            }
+        }
+
+        if let Some(includes) = manifest.remote_include.clone() {
+            for include in includes {
+                let name = include.name.unwrap_or(include.location.clone());
+                let outpath = if let Some(path) = include.path {
+                    modpack_root.join(path)
+                } else {
+                    modpack_root.to_owned()
+                };
+                match inc_files.get(&include.location) {
+                    Some(local_inc) => {
+                        if local_inc.md5 == include.version {
+                            included_files.insert(include.location, local_inc.to_owned());
+                            info!("Skipping '{}' as it is already downloaded", name);
+                            continue;
+                        } else {
+                            for file in &local_inc.files {
+                                let path = Path::new(file);
+                                assert!(
+                                    path.starts_with(&outpath),
+                                    "Local include path was not located in modpack root!"
+                                );
+                                let _ = fs::remove_file(path);
+                            }
+                        }
+                    }
+                    None => (),
+                };
+                let files = match download_zip(&name, http_client, &include.location, &outpath).await {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!("Failed to download include: {:#?}", e)),
+                };
+                included_files.insert(name.clone(), Included { md5: include.version, files });
+                info!("'{}' is now installed", name);
+                progress_callback();
             }
         }
     }
