@@ -1485,6 +1485,9 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
 
         if let Some(includes) = manifest.remote_include.clone() {
             for include in includes {
+                if !installer_profile.enabled_features.contains(&include.id) {
+                    continue;
+                }
                 let name = include.name.unwrap_or(include.location.clone());
                 let outpath = if let Some(path) = include.path {
                     modpack_root.join(path)
