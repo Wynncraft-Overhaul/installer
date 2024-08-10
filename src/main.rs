@@ -1120,7 +1120,7 @@ fn create_launcher_profile(
                 fs::write(
                     root.join(instance_cfg_path),
                     format!(
-                        "iconKey={}\nname={}{}{}{}{}",
+                        "InstanceType=OneSix\niconKey={}\nname={}{}{}{}{}",
                         manifest.uuid, manifest.name, max_mem, min_mem, override_mem, jvm_args
                     ),
                 )?;
