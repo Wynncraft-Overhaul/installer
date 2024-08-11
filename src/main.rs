@@ -1242,8 +1242,8 @@ async fn download_helper<T: Downloadable + Debug, F: FnMut() -> () + Clone>(
             let item = validate_item_path!(item, modpack_root);
             let path;
             if !enabled_features.contains(item.get_id()) && item.get_path().is_some() {
-                fs::remove_file(item.get_path().as_ref().unwrap())
-                    .expect("Failed to remove old mod");
+                info!("Removing: '{:#?}'", item.get_path());
+                let _ = fs::remove_file(item.get_path().as_ref().unwrap());
                 path = None;
             } else {
                 path = item.get_path().to_owned();
@@ -1407,7 +1407,8 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
             .contains(&inc.0.replace(".zip", ""))
         {
             for file in &inc.1.files {
-                fs::remove_file(file).expect("Failed to remove inc")
+                info!("Removing: '{file}'");
+                let _ = fs::remove_file(file);
             }
         }
     }
