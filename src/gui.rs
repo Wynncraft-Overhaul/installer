@@ -863,6 +863,7 @@ fn Version(mut props: VersionProps) -> Element {
                                     },
                                     onmouseout: move |evt| {
                                         evt.target.set_style("transform", "scale(1)");
+                                        }
              }
  
          }
