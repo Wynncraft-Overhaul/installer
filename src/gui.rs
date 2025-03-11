@@ -759,137 +759,121 @@ fn Version(mut props: VersionProps) -> Element {
     if (props.page)() != tab_group {
         return None;
     }
-    rsx! {
-        if *installing.read() {
-            ProgressView {
-                value: install_progress(),
-                max: install_item_amount() as i64,
-                title: installer_profile.manifest.subtitle,
-                status: progress_status.to_string()
-            }
-        } else if *credits.read() {
-            Credits {
-                manifest: installer_profile.manifest,
-                enabled: installer_profile.enabled_features,
-                credits
-            }
-        } else {
-            div { class: "version-container",
-                form { onsubmit: on_submit,
-                    div { class: "subtitle-container",
-                        h1 { "{installer_profile.manifest.subtitle}" }
-                    }
-                    div { class: "container",
-                        div { class: "info-container",
-                            div { class: "button-container",
-                                button {
-                                    class: "credits-button",
-                                    onclick: move |evt| {
-                                        credits.set(true);
-                                        evt.stop_propagation();
-                                    },
-                                    "i"
-                                }
+rsx! {
+    if *installing.read() {
+        ProgressView {
+            value: install_progress(),
+            max: install_item_amount() as i64,
+            title: installer_profile.manifest.subtitle,
+            status: progress_status.to_string()
+        }
+    } else if *credits.read() {
+        Credits {
+            manifest: installer_profile.manifest,
+            enabled: installer_profile.enabled_features,
+            credits
+        }
+    } else {
+        div {
+            class: "version-container",
+            form {
+                onsubmit: on_submit,
+                div {
+                    class: "subtitle-container",
+                    h1 { "{installer_profile.manifest.subtitle}" }
+                }
+                div {
+                    class: "container",
+                    div {
+                        class: "info-container",
+                        div {
+                            class: "button-container",
+                            button {
+                                class: "credits-button",
+                                onclick: move |evt| {
+                                    credits.set(true);
+                                    evt.stop_propagation();
+                                },
+                                "i"
                             }
-                            div { style: "width: 21vw",
-                                div {
-                                    class: "description",
-                                    dangerous_inner_html: "{installer_profile.manifest.description}"
-                                }
-                                p { style: "font-size: 1.2em;margin-bottom: .5em;",
-                                    "Optional features:"
-                                }
-                                div { 
-                                    class: "feature-list", 
-                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
-                                    for feat in installer_profile.manifest.features {
-                                        if !feat.hidden {
-                                            label { class: "tooltip",
-                                                input {
-                                                    checked: if installer_profile.installed {
-                                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                                                    } else {
-                                                        if feat.default { Some("true") } else { None }
-                                                    },
-                                                    name: "{feat.id}",
-                                                    onchange: move |evt| {
-                                                        feature_change(
-                                                            local_features,
-                                                            modify,
-                                                            evt,
-                                                            &feat,
-                                                            modify_count,
-                                                            enabled_features,
-                                                        )
-                                                    },
-                                                    r#type: "checkbox"
- 
-                                                }
- 
-
- 
-                                                "{feat.name}"
- 
-                                                match feat.description {
- 
-                                                    Some(ref desc) => rsx!(span {
- 
-                                                        class: "tooltiptext",
-                                                     style: "position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.9); color: #fff; padding: 6px 12px; border-radius: 6px; z-index: 1000; min-width: 150px; max-width: 300px; white-space: nowrap; text-align: center; visibility: hidden;",
+                        }
+                        div {
+                            style: "width: 21vw",
+                            div {
+                                class: "description",
+                                dangerous_inner_html: "{installer_profile.manifest.description}"
+                            }
+                            p {
+                                style: "font-size: 1.2em; margin-bottom: .5em;",
+                                "Optional features:"
+                            }
+                            div {
+                                class: "feature-list",
+                                style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
+                                for feat in installer_profile.manifest.features {
+                                    if !feat.hidden {
+                                        label {
+                                            class: "tooltip",
+                                            input {
+                                                checked: if installer_profile.installed {
+                                                    if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                                                } else {
+                                                    if feat.default { Some("true") } else { None }
+                                                },
+                                                name: "{feat.id}",
+                                                onchange: move |evt| {
+                                                    feature_change(
+                                                        local_features,
+                                                        modify,
+                                                        evt,
+                                                        &feat,
+                                                        modify_count,
+                                                        enabled_features,
+                                                    )
+                                                },
+                                                r#type: "checkbox"
+                                            }
+                                            "{feat.name}"
+                                            match feat.description {
+                                                Some(ref desc) => rsx!(span {
+                                                    class: "tooltiptext",
+                                                    style: "position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.9); color: #fff; padding: 6px 12px; border-radius: 6px; z-index: 1000; min-width: 150px; max-width: 300px; white-space: nowrap; text-align: center; visibility: hidden;",
                                                     onmouseover: move |evt| {
                                                         evt.target.set_style("visibility", "visible");
                                                     },
                                                     onmouseout: move |evt| {
                                                         evt.target.set_style("visibility", "hidden");
                                                     },
-                                                        "{desc}",
- 
-                                                    }),
- 
-                                                    None => rsx!("")
- 
-                    }
- 
-                }
- 
-            }
- 
-        }
- 
-    }
-div { 
-    style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8; transition: transform 0.2s ease-in-out;", 
-    onmouseover: "this.style.transform='scale(1.05)'",
-    onmouseout: "this.style.transform='scale(1)'",
-    input {
-        r#type: "submit",
-        value: if !installer_profile.installed {
-            "Install"
-        } else {
-            if !*modify.read() { "Update" } else { "Modify" }
-        },
-                            class: "install-button", 
-                            disabled: install_disable
- style: "width: 100%; padding: 10px; font-size: 1.2em; transition: transform 0.2s ease-in-out;"
-             }
- 
-         }
- 
-
-    }
- 
+                                                    "{desc}",
+                                                }),
+                                                None => rsx!("")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
- 
+                        div {
+                            style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8; transition: transform 0.2s ease-in-out;",
+                            onmouseover: "this.style.transform='scale(1.05)'",
+                            onmouseout: "this.style.transform='scale(1)'",
+                            input {
+                                r#type: "submit",
+                                value: if !installer_profile.installed {
+                                    "Install"
+                                } else {
+                                    if !*modify.read() { "Update" } else { "Modify" }
+                                },
+                                class: "install-button",
+                                disabled: install_disable,
+                                style: "width: 100%; padding: 10px; font-size: 1.2em; transition: transform 0.2s ease-in-out;"
+                            }
+                        }
                     }
- 
                 }
- 
             }
- 
         }
- 
     }
- 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
