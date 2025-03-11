@@ -780,18 +780,18 @@ fn Version(mut props: VersionProps) -> Element {
                                 }
                             }
 div { 
-    style: "width: 21vw", 
+    style: "display: flex; flex-direction: column; height: 100vh; width: 21vw;", // Ensure the window can grow with content
     div {
         class: "description",
         dangerous_inner_html: "{installer_profile.manifest.description}" // Inject the description
     }
     p { 
-        style: "font-size: 1.2em;margin-bottom: .5em;", // Styling for the label
+        style: "font-size: 1.2em; margin-bottom: .5em;", // Styling for the label
         "Optional features:" // The label text
     }
     div { 
         class: "feature-list", 
-        style: "display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 10px; border: 1px solid #ccc; position: relative;", // Feature list with scrolling and styling
+        style: "flex-grow: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative;", // Feature list with scrolling and dynamic resizing
         for feat in installer_profile.manifest.features {
             if !feat.hidden {
                 label { 
@@ -820,19 +820,17 @@ div {
                     match feat.description {
                         Some(ref desc) => rsx!(span {
                             class: "tooltiptext",
-                            style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 1000;", // Tooltip floating and centered
+                            style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background-color: #000; color: #fff; padding: 5px 10px; border-radius: 4px; z-index: 1000;", // Tooltip floating with a black bar and padding
                             "{desc}",
                         }),
                         None => rsx!("")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-    div { // New container for the install button
-        style: "padding: 10px; display: flex; justify-content: center;", // You can style this container as needed
+                    }
+                }
+            }
+        }
+    }
+    div { // Container for the install button
+        style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8;", // Ensures button is at the bottom
         input {
             r#type: "submit",
             value: if !installer_profile.installed {
@@ -841,7 +839,8 @@ div {
                 if !*modify.read() { "Update" } else { "Modify" }
             },
             class: "install-button",
-            disabled: install_disable
+            disabled: install_disable,
+            style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensure button is large enough and visible
  }
                         }
                     }
