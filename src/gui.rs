@@ -759,7 +759,7 @@ fn Version(mut props: VersionProps) -> Element {
     if (props.page)() != tab_group {
         return None;
     }
-   rsx! {
+      rsx! {
  
         if *installing.read() {
  
@@ -842,7 +842,8 @@ fn Version(mut props: VersionProps) -> Element {
                                 div { 
  
                                     class: "feature-list", 
-                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
+style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
+
  
                                     for feat in installer_profile.manifest.features {
  
@@ -884,51 +885,65 @@ fn Version(mut props: VersionProps) -> Element {
  
                                                     },
  
-                                                     r#type: "checkbox"
+                                                    r#type: "checkbox"
+ 
                                                 }
+ 
 
+ 
                                                 "{feat.name}"
-                                                match feat.description {
-                                                    Some(ref desc) => rsx!(span {
-                                                        class: "tooltiptext",
-                                                        style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px;", 
-                                                        "{desc}",
-                                                    }),
-                                                    None => rsx!("")
-                    }
  
-                }
+                                               match feat.description {
+    Some(ref desc) => rsx!(span {
+        class: "tooltiptext",
+        style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px;", 
+        "{desc}",
+    }),
+    None => rsx!("")
+}
  
-            }
+                                            }
  
-        }
+                                        }
  
-    }
+                                    }
+ 
+                                }
+ 
+                            }
+ 
+                        }
+ 
                         input {
+ 
                             r#type: "submit",
+ 
                             value: if !installer_profile.installed {
+ 
                                 "Install"
+ 
                             } else {
+ 
                                 if !*modify.read() { "Update" } else { "Modify" }
+ 
                             },
+ 
                             class: "install-button",
+ 
                             disabled: install_disable,
-                            style: "transition: transform 0.2s;",
-                            onmouseover: move |_| {
-                                // Increase button size on hover
-                                let button = web_sys::window().unwrap().document().unwrap().get_elements_by_class_name("install-button").item(0).unwrap();
-                                button.set_attribute("style", "transform: scale(1.1);").unwrap();
-                            },
-                            onmouseout: move |_| {
-                                // Revert button size when not hovering
-                                let button = web_sys::window().unwrap().document().unwrap().get_elements_by_class_name("install-button").item(0).unwrap();
-                                button.set_attribute("style", "transform: scale(1);").unwrap();
-             }
- 
-         }
- 
-
-    }
+style: "transition: transform 0.2s;",
+onmouseover: move |_| {
+    let button = web_sys::window().unwrap().document().unwrap()
+        .get_elements_by_class_name("install-button")
+        .item(0).unwrap();
+    button.set_attribute("style", "transform: scale(1.1);").unwrap();
+},
+onmouseout: move |_| {
+    let button = web_sys::window().unwrap().document().unwrap()
+        .get_elements_by_class_name("install-button")
+        .item(0).unwrap();
+    button.set_attribute("style", "transform: scale(1);").unwrap();
+}
  
                         }
  
