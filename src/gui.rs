@@ -860,6 +860,7 @@ fn Version(mut props: VersionProps) -> Element {
                                     style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensure button is large enough and visible
                                 }
                             }
+                            }
                         }
                     }
                 }
