@@ -847,10 +847,7 @@ fn Version(mut props: VersionProps) -> Element {
                                 if !*modify.read() { "Update" } else { "Modify" }
                             },
                             class: "install-button",
-                            disabled: install_disable,
-                            style: "transition: transform 0.2s;",
-                            onmouseover: "this.style.transform='scale(1.1)';",
-                            onmouseout: "this.style.transform='scale(1)';"
+                            disabled: install_disable
                         }
                     }
                 }
