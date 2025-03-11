@@ -804,6 +804,7 @@ fn Version(mut props: VersionProps) -> Element {
                                     for feat in installer_profile.manifest.features {
                                         if !feat.hidden {
                                             label { class: "tooltip",
+                                                   style: "position: relative; display: inline-block; cursor: pointer;",
                                                 input {
                                                     checked: if installer_profile.installed {
                                                         if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
@@ -828,7 +829,7 @@ fn Version(mut props: VersionProps) -> Element {
                                                 match feat.description {
                                                     Some(ref desc) => rsx!(span {
                                                         class: "tooltiptext",
-                                                        style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px; white-space: normal; word-wrap: break-word; overflow: visible; max-width: 200px; left: 100%; top: -5px; margin-left: 10px; visibility: visible;",
+                                                        style: "position: absolute;z-index: 10;background: rgba(0, 0, 0, 0.8);color: white;padding: 5px;border-radius: 5px;white-space: normal;word-wrap: break-word;overflow: visible;max-width: 200px;left: 100%;top: 50%;transform: translateY(-50%);margin-left: 10px;visibility: hidden;opacity: 0;transition: opacity 0.2s ease-in-out;",
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
