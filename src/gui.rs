@@ -826,44 +826,46 @@ fn Version(mut props: VersionProps) -> Element {
                                             }
                                         }
                                     }
-              div { style: "flex: 1; min-width: 10vw;",
-    for (i, feat) in installer_profile.manifest.features.iter().enumerate() {
-        if !feat.hidden {
-            if i % 2 == 1 {
-                label { class: "tooltip",
-                    input {
-                        checked: if installer_profile.installed {
-                            if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                        } else {
-                            if feat.default { Some("true") } else { None }
-                        },
-                        name: "{feat.id}",
-                        onchange: move |evt| {
-                            feature_change(
-                                local_features,
-                                modify,
-                                evt,
-                                &feat,
-                                modify_count,
-                                enabled_features,
-                            )
-                        },
-                        r#type: "checkbox"
-                    }
+                                    div { style: "flex: 1; min-width: 10vw;",
+                                        for (i, feat) in installer_profile.manifest.features.iter().enumerate() {
+                                            if !feat.hidden {
+                                                if i % 2 == 1 {
+                                                    label { class: "tooltip",
+                                                        input {
+                                                            checked: if installer_profile.installed {
+                                                                if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                                                            } else {
+                                                                if feat.default { Some("true") } else { None }
+                                                            },
+                                                            name: "{feat.id}",
+                                                            onchange: move |evt| {
+                                                                feature_change(
+                                                                    local_features,
+                                                                    modify,
+                                                                    evt,
+                                                                    &feat,
+                                                                    modify_count,
+                                                                    enabled_features,
+                                                                )
+                                                            },
+                                                            r#type: "checkbox"
+                                                        }
 
-                    "{feat.name}"
-                    match feat.description {
-                        Some(ref desc) => rsx!(span {
-                            class: "tooltiptext",
-                            "{desc}",
-                        }),
-                        None => rsx!("")
-                    }
-                }
-            }
-        }
-    }
-}
+                                                        "{feat.name}"
+                                                        match feat.description {
+                                                            Some(ref desc) => rsx!(span {
+                                                                class: "tooltiptext",
+                                                                "{desc}",
+                                                            }),
+                                                            None => rsx!("")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         input {
                             r#type: "submit",
                             value: if !installer_profile.installed {
