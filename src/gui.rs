@@ -863,26 +863,15 @@ fn Version(mut props: VersionProps) -> Element {
                                     },
                                     onmouseout: move |evt| {
                                         evt.target.set_style("transform", "scale(1)");
-                                        }
-             }
- 
-         }
- 
-
-    }
- 
+                                    }
+                                }
+                            }
                         }
- 
                     }
- 
                 }
- 
             }
- 
         }
- 
     }
- 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
