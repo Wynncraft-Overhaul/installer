@@ -780,13 +780,22 @@ fn Version(mut props: VersionProps) -> Element {
                                 }
                             }
 div { 
-    style: "width: 100%;", // Ensures grid takes up full space
+    style: "width: 21vw", 
+    div {
+        class: "description",
+        dangerous_inner_html: "{installer_profile.manifest.description}" // Inject the description
+    }
+    p { 
+        style: "font-size: 1.2em;margin-bottom: .5em;", // Styling for the label
+        "Optional features:" // The label text
+    }
     div { 
-        class: "feature-list",
-        style: "display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 10px; border: 1px solid #ccc; position: relative;", // Add position: relative here
+        class: "feature-list", 
+        style: "display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 10px; border: 1px solid #ccc; position: relative;", // Feature list with scrolling and styling
         for feat in installer_profile.manifest.features {
             if !feat.hidden {
-                label { class: "tooltip",
+                label { 
+                    class: "tooltip",
                     input {
                         checked: if installer_profile.installed {
                             if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
@@ -811,7 +820,7 @@ div {
                     match feat.description {
                         Some(ref desc) => rsx!(span {
                             class: "tooltiptext",
-                            style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 1000;", // Ensure the tooltip floats outside and appears above
+                            style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 1000;", // Tooltip floating and centered
                             "{desc}",
                         }),
                         None => rsx!("")
