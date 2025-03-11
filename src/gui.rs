@@ -782,7 +782,7 @@ fn Version(mut props: VersionProps) -> Element {
                             div { 
     style: "width: 100%;", // Ensures grid takes up full space
     div { class: "feature-list",
-        style: "display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #ccc;", // Enables scrolling
+        style: "display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 10px; border: 1px solid #ccc;", // Enables scrolling
         for feat in installer_profile.manifest.features {
             if !feat.hidden {
                 label { class: "tooltip",
