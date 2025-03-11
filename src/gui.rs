@@ -842,6 +842,9 @@ div {
             },
             class: "install-button",
             disabled: install_disable
+        }
+    }
+}
                         }
                     }
                 }
