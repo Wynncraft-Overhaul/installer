@@ -829,6 +829,8 @@ rsx! {
                                     }
                                 }
                             }
+}
+}
                             div { // Container for the install button
                                 style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8; position: sticky; bottom: 0;", // Ensures button is at the bottom and stays visible
                                 input {
