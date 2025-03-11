@@ -831,15 +831,17 @@ div {
                                 }
                             }
                         }
-                        input {
-                            r#type: "submit",
-                            value: if !installer_profile.installed {
-                                "Install"
-                            } else {
-                                if !*modify.read() { "Update" } else { "Modify" }
-                            },
-                            class: "install-button",
-                            disabled: install_disable
+    div { // New container for the install button
+        style: "padding: 10px; display: flex; justify-content: center;", // You can style this container as needed
+        input {
+            r#type: "submit",
+            value: if !installer_profile.installed {
+                "Install"
+            } else {
+                if !*modify.read() { "Update" } else { "Modify" }
+            },
+            class: "install-button",
+            disabled: install_disable
                         }
                     }
                 }
