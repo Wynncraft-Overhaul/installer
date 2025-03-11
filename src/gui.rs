@@ -826,15 +826,11 @@ rsx! {
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
-                    }
- 
-                }
- 
-            }
- 
-        }
- 
-    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 // *** FIXED INSTALL BUTTON ***
                                 div { 
                                     style: "padding: 10px; background-color: #f8f8f8; border-top: 1px solid #ccc; display: flex; justify-content: center; align-items: center;", // Ensures the button is always visible
@@ -848,25 +844,15 @@ rsx! {
                                         class: "install-button",
                                         disabled: install_disable,
                                         style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensures visibility and usability
-             }
- 
-         }
- 
-
-    }
- 
+                                    }
+                                }
+                            }
                         }
- 
                     }
- 
                 }
- 
             }
- 
         }
- 
     }
- 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
