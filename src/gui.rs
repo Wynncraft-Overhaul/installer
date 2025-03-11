@@ -847,12 +847,15 @@ rsx! {
                                                     "{desc}",
                                                 }),
                                                 None => rsx!("")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
                         div {
                             style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8; transition: transform 0.2s ease-in-out;",
                             onmouseover: "this.style.transform='scale(1.05)'",
