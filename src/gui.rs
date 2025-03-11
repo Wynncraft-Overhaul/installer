@@ -780,7 +780,7 @@ rsx! {
                             }
                         }
                         div { 
-                            style: "display: flex; flex-direction: column; min-height: 100vh; width: 21vw; overflow: hidden;", // Ensure the window can grow with content, but won't overflow
+                            style: "display: flex; flex-direction: column; height: 100vh; width: 21vw; overflow: hidden;", // Ensures the window grows with content but doesn't overflow
                             div {
                                 class: "description",
                                 dangerous_inner_html: "{installer_profile.manifest.description}" // Inject the description
@@ -791,7 +791,7 @@ rsx! {
                             }
                             div { 
                                 class: "feature-list", 
-                                style: "flex-grow: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative;", // Feature list with scrolling and dynamic resizing
+                                style: "flex-grow: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative; height: 100%;", // Feature list with scrolling and dynamic resizing
                                 for feat in installer_profile.manifest.features {
                                     if !feat.hidden {
                                         label { 
@@ -848,6 +848,7 @@ rsx! {
              }
  
          }
+ 
 
     }
  
