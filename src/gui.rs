@@ -122,19 +122,25 @@ fn Credits(mut props: CreditsProps) -> Element {
                                                         {author.name.to_string()}
                                                     } else {
                                                         {author.name.to_string() + ", "}
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+             }
+ 
+         }
+ 
+
     }
+ 
+                        }
+ 
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
+ 
 }
 
 #[component]
