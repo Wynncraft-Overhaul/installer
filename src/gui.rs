@@ -876,6 +876,8 @@ div {
                             class: "install-button", 
                             disabled: install_disable
  style: "width: 100%; padding: 10px; font-size: 1.2em; transition: transform 0.2s ease-in-out;"
+        }
+    }
                         }
  
                     }
