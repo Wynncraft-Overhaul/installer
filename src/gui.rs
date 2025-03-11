@@ -747,38 +747,21 @@ fn Version(mut props: VersionProps) -> Element {
     if (props.page)() != tab_group {
         return None;
     }
-    rsx! {
-        if *installing.read() {
-            ProgressView {
-                value: install_progress(),
-                max: install_item_amount() as i64,
-                title: installer_profile.manifest.subtitle,
-                status: progress_status.to_string()
-            }
-        } else if *credits.read() {
-            Credits {
-                manifest: installer_profile.manifest,
-                enabled: installer_profile.enabled_features,
-                credits
-            }
-        } else {
-            div { class: "version-container",
-                form { onsubmit: on_submit,
-                    div { class: "subtitle-container",
-                        h1 { "{installer_profile.manifest.subtitle}" }
-                    }
-                    div { class: "container",
-                        div { class: "info-container",
-                            div { class: "button-container",
-                                button {
-                                    class: "credits-button",
-                                    onclick: move |evt| {
-                                        credits.set(true);
-                                        evt.stop_propagation();
-                                    },
-                                    "i"
-                                }
-                            }
+rsx! {
+    if *installing.read() {
+        ProgressView {
+            value: install_progress(),
+            max: install_item_amount() as i64,
+            title: installer_profile.manifest.subtitle,
+            status: progress_status.to_string()
+        }
+    } else if *credits.read() {
+        Credits {
+            manifest: installer_profile.manifest,
+            enabled: installer_profile.enabled_features,
+            credits
+        }
+    } else {
         div { class: "version-container",
             form { onsubmit: on_submit,
                 div { class: "subtitle-container",
@@ -859,8 +842,6 @@ fn Version(mut props: VersionProps) -> Element {
                                     disabled: install_disable,
                                     style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensure button is large enough and visible
                                 }
-                            }
-                            }
                             }
                         }
                     }
