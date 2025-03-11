@@ -799,9 +799,8 @@ fn Version(mut props: VersionProps) -> Element {
                                 p { style: "font-size: 1.2em;margin-bottom: .5em;",
                                     "Optional features:"
                                 }
-                                div { 
-                                    class: "feature-list", 
-                                    style: "max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; position: relative;",
+                                div { class: "feature-list",
+                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
                                     for feat in installer_profile.manifest.features {
                                         if !feat.hidden {
                                             label { class: "tooltip",
@@ -826,13 +825,13 @@ fn Version(mut props: VersionProps) -> Element {
                                                 }
 
                                                 "{feat.name}"
-match feat.description {
-    Some(ref desc) => rsx!(span {
-        class: "tooltiptext",
-        style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px;", 
-        "{desc}",
-    }),
-    None => rsx!("")
+                                                match feat.description {
+                                                    Some(ref desc) => rsx!(span {
+                                                        class: "tooltiptext",
+                                                        style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px; white-space: nowrap;",
+                                                        "{desc}",
+                                                    }),
+                                                    None => rsx!("")
                                                 }
                                             }
                                         }
@@ -858,6 +857,7 @@ match feat.description {
             }
         }
     }
+}
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
