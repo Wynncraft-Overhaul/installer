@@ -826,11 +826,15 @@ rsx! {
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
                                 // *** FIXED INSTALL BUTTON ***
                                 div { 
                                     style: "padding: 10px; background-color: #f8f8f8; border-top: 1px solid #ccc; display: flex; justify-content: center; align-items: center;", // Ensures the button is always visible
