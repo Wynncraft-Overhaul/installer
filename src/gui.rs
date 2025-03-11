@@ -760,7 +760,7 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
     rsx! {
-        style { r#".tooltip { position: relative; display: inline-block; cursor: pointer; }.tooltiptext {position: absolute;z-index: 10;background: rgba(0, 0, 0, 0.8);color: white;padding: 5px;border-radius: 5px;white-space: normal;word-wrap: break-word;overflow: visible;max-width: 200px;left: 100%;top: 50%;transform: translateY(-50%);margin-left: 10px;visibility: hidden;opacity: 0;transition: opacity 0.2s ease-in-out;}.tooltip:hover .tooltiptext {visibility: visible;opacity: 1;}"# },
+        style { ".tooltip { position: relative; display: inline-block; cursor: pointer; }.tooltiptext {position: absolute;z-index: 10;background: rgba(0, 0, 0, 0.8);color: white;padding: 5px;border-radius: 5px;white-space: normal;word-wrap: break-word;overflow: visible;max-width: 200px;left: 100%;top: 50%;transform: translateY(-50%);margin-left: 10px;visibility: hidden;opacity: 0;transition: opacity 0.2s ease-in-out;}.tooltip:hover .tooltiptext {visibility: visible;opacity: 1;}"},
         if *installing.read() {
             ProgressView {
                 value: install_progress(),
