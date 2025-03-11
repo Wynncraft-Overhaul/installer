@@ -828,7 +828,7 @@ fn Version(mut props: VersionProps) -> Element {
                                                 match feat.description {
                                                     Some(ref desc) => rsx!(span {
                                                         class: "tooltiptext",
-                                                        style: "position: fixed; z-index: 1000; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px; white-space: nowrap;",
+                                                        style: "position: fixed; z-index: 1000; background: rgba(0, 0, 0, 0.9); color: white; padding: 5px; border-radius: 5px; white-space: nowrap;",
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
