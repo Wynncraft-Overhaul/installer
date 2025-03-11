@@ -779,46 +779,40 @@ fn Version(mut props: VersionProps) -> Element {
                                     "i"
                                 }
                             }
-                            div { style: "width: 21vw",
-                                div {
-                                    class: "description",
-                                    dangerous_inner_html: "{installer_profile.manifest.description}"
-                                }
-                                p { style: "font-size: 1.2em;margin-bottom: .5em;",
-                                    "Optional features:"
-                                }
-                                div { class: "feature-list",
-                                    style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;",
-                                    for feat in installer_profile.manifest.features {
-                                        if !feat.hidden {
-                                            label { class: "tooltip",
-                                                input {
-                                                    checked: if installer_profile.installed {
-                                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                                                    } else {
-                                                        if feat.default { Some("true") } else { None }
-                                                    },
-                                                    name: "{feat.id}",
-                                                    onchange: move |evt| {
-                                                        feature_change(
-                                                            local_features,
-                                                            modify,
-                                                            evt,
-                                                            &feat,
-                                                            modify_count,
-                                                            enabled_features,
-                                                        )
-                                                    },
-                                                    r#type: "checkbox"
-                                                }
+                            div { 
+    style: "width: 100%;", // Ensures grid takes up full space
+    div { class: "feature-list",
+        style: "display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #ccc;", // Enables scrolling
+        for feat in installer_profile.manifest.features {
+            if !feat.hidden {
+                label { class: "tooltip",
+                    input {
+                        checked: if installer_profile.installed {
+                            if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                        } else {
+                            if feat.default { Some("true") } else { None }
+                        },
+                        name: "{feat.id}",
+                        onchange: move |evt| {
+                            feature_change(
+                                local_features,
+                                modify,
+                                evt,
+                                &feat,
+                                modify_count,
+                                enabled_features,
+                            )
+                        },
+                        r#type: "checkbox"
+                    }
 
-                                                "{feat.name}"
-                                                match feat.description {
-                                                    Some(ref desc) => rsx!(span {
-                                                        class: "tooltiptext",
-                                                        "{desc}",
-                                                    }),
-                                                    None => rsx!("")
+                    "{feat.name}"
+                    match feat.description {
+                        Some(ref desc) => rsx!(span {
+                            class: "tooltiptext",
+                            "{desc}",
+                        }),
+                        None => rsx!("")
                                                 }
                                             }
                                         }
