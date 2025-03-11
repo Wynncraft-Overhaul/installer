@@ -759,204 +759,101 @@ fn Version(mut props: VersionProps) -> Element {
     if (props.page)() != tab_group {
         return None;
     }
-      rsx! {
- 
+    rsx! {
         if *installing.read() {
- 
             ProgressView {
- 
                 value: install_progress(),
- 
                 max: install_item_amount() as i64,
- 
                 title: installer_profile.manifest.subtitle,
- 
                 status: progress_status.to_string()
- 
             }
- 
         } else if *credits.read() {
- 
             Credits {
- 
                 manifest: installer_profile.manifest,
- 
                 enabled: installer_profile.enabled_features,
- 
                 credits
- 
             }
- 
         } else {
- 
             div { class: "version-container",
- 
                 form { onsubmit: on_submit,
- 
                     div { class: "subtitle-container",
- 
                         h1 { "{installer_profile.manifest.subtitle}" }
- 
                     }
- 
                     div { class: "container",
- 
                         div { class: "info-container",
- 
                             div { class: "button-container",
- 
                                 button {
- 
                                     class: "credits-button",
- 
                                     onclick: move |evt| {
- 
                                         credits.set(true);
- 
                                         evt.stop_propagation();
- 
                                     },
- 
                                     "i"
- 
                                 }
- 
                             }
- 
                             div { style: "width: 21vw",
- 
                                 div {
- 
                                     class: "description",
- 
                                     dangerous_inner_html: "{installer_profile.manifest.description}"
- 
                                 }
- 
                                 p { style: "font-size: 1.2em;margin-bottom: .5em;",
- 
                                     "Optional features:"
- 
                                 }
- 
-                                div { 
- 
-                                    class: "feature-list", 
-style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
-
- 
+                                div { class: "feature-list",
+                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;"
                                     for feat in installer_profile.manifest.features {
- 
                                         if !feat.hidden {
- 
                                             label { class: "tooltip",
- 
                                                 input {
- 
                                                     checked: if installer_profile.installed {
- 
                                                         if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
- 
                                                     } else {
- 
                                                         if feat.default { Some("true") } else { None }
- 
                                                     },
- 
                                                     name: "{feat.id}",
- 
                                                     onchange: move |evt| {
- 
                                                         feature_change(
- 
                                                             local_features,
- 
                                                             modify,
- 
                                                             evt,
- 
                                                             &feat,
- 
                                                             modify_count,
- 
                                                             enabled_features,
- 
                                                         )
- 
                                                     },
- 
                                                     r#type: "checkbox"
- 
                                                 }
- 
 
- 
                                                 "{feat.name}"
- 
-                                               match feat.description {
+match feat.description {
     Some(ref desc) => rsx!(span {
         class: "tooltiptext",
         style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px;", 
         "{desc}",
     }),
     None => rsx!("")
-}
- 
+                                                }
                                             }
- 
                                         }
- 
                                     }
- 
                                 }
- 
                             }
- 
                         }
- 
                         input {
- 
                             r#type: "submit",
- 
                             value: if !installer_profile.installed {
- 
                                 "Install"
- 
                             } else {
- 
                                 if !*modify.read() { "Update" } else { "Modify" }
- 
                             },
- 
                             class: "install-button",
- 
-                            disabled: install_disable,
-style: "transition: transform 0.2s;",
-onmouseover: move |_| {
-    let button = web_sys::window().unwrap().document().unwrap()
-        .get_elements_by_class_name("install-button")
-        .item(0).unwrap();
-    button.set_attribute("style", "transform: scale(1.1);").unwrap();
-},
-onmouseout: move |_| {
-    let button = web_sys::window().unwrap().document().unwrap()
-        .get_elements_by_class_name("install-button")
-        .item(0).unwrap();
-    button.set_attribute("style", "transform: scale(1);").unwrap();
-}
- 
+                            disabled: install_disable
                         }
- 
                     }
- 
                 }
- 
             }
- 
         }
- 
     }
- 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
