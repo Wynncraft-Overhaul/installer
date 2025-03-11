@@ -768,104 +768,105 @@ fn Version(mut props: VersionProps) -> Element {
                         h1 { "{installer_profile.manifest.subtitle}" }
                     }
                     div { class: "container",
-                        div { class: "info-container",
-                            div { class: "button-container",
-                                button {
-                                    class: "credits-button",
-                                    onclick: move |evt| {
-                                        credits.set(true);
-                                        evt.stop_propagation();
+div { class: "info-container",
+    div { class: "button-container",
+        button {
+            class: "credits-button",
+            onclick: move |evt| {
+                credits.set(true);
+                evt.stop_propagation();
+            },
+            "i"
+        }
+    } // <-- Closes button-container properly
+
+    div { style: "width: 21vw",
+        div { class: "description",
+            dangerous_inner_html: "{installer_profile.manifest.description}"
+        }
+        p { style: "font-size: 1.2em;margin-bottom: .5em;",
+            "Optional features:"
+        }
+
+        div { class: "feature-list", style: "display: flex; flex-wrap: wrap; column-gap: 1em;",
+            div { style: "flex: 1; min-width: 10vw;",
+                for (i, feat) in installer_profile.manifest.features.iter().enumerate() {
+                    if !feat.hidden {
+                        if i % 2 == 0 {
+                            label { class: "tooltip",
+                                input {
+                                    checked: if installer_profile.installed {
+                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                                    } else {
+                                        if feat.default { Some("true") } else { None }
                                     },
-                                    "i"
+                                    name: "{feat.id}",
+                                    onchange: move |evt| {
+                                        feature_change(
+                                            local_features,
+                                            modify,
+                                            evt,
+                                            &feat,
+                                            modify_count,
+                                            enabled_features,
+                                        )
+                                    },
+                                    r#type: "checkbox"
                                 }
-                            }
-                            div { style: "width: 21vw",
-                                div {
-                                    class: "description",
-                                    dangerous_inner_html: "{installer_profile.manifest.description}"
+                                "{feat.name}"
+                                match feat.description {
+                                    Some(ref desc) => rsx!(span {
+                                        class: "tooltiptext",
+                                        "{desc}",
+                                    }),
+                                    None => rsx!("")
                                 }
-                                p { style: "font-size: 1.2em;margin-bottom: .5em;",
-                                    "Optional features:"
-                                }
-                                div { class: "feature-list", style: "display: flex; flex-wrap: wrap; column-gap: 1em;",
-                                    div { style: "flex: 1; min-width: 10vw;",
-                                        for (i, feat) in installer_profile.manifest.features.iter().enumerate() {
-                                            if !feat.hidden {
-                                                if i % 2 == 0 {
-                                                    label { class: "tooltip",
-                                                        input {
-                                                            checked: if installer_profile.installed {
-                                                                if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                                                            } else {
-                                                                if feat.default { Some("true") } else { None }
-                                                            },
-                                                            name: "{feat.id}",
-                                                            onchange: move |evt| {
-                                                                feature_change(
-                                                                    local_features,
-                                                                    modify,
-                                                                    evt,
-                                                                    &feat,
-                                                                    modify_count,
-                                                                    enabled_features,
-                                                                )
-                                                            },
-                                                            r#type: "checkbox"
-                                                        }
+                            } // <-- Closes label properly
+                        }
+                    }
+                }
+            } // <-- Closes first div (left column)
 
-                                                        "{feat.name}"
-                                                        match feat.description {
-                                                            Some(ref desc) => rsx!(span {
-                                                                class: "tooltiptext",
-                                                                "{desc}",
-                                                            }),
-                                                            None => rsx!("")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    div { style: "flex: 1; min-width: 10vw;",
-                                        for (i, feat) in installer_profile.manifest.features.iter().enumerate() {
-                                            if !feat.hidden {
-                                                if i % 2 == 1 {
-                                                    label { class: "tooltip",
-                                                        input {
-                                                            checked: if installer_profile.installed {
-                                                                if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                                                            } else {
-                                                                if feat.default { Some("true") } else { None }
-                                                            },
-                                                            name: "{feat.id}",
-                                                            onchange: move |evt| {
-                                                                feature_change(
-                                                                    local_features,
-                                                                    modify,
-                                                                    evt,
-                                                                    &feat,
-                                                                    modify_count,
-                                                                    enabled_features,
-                                                                )
-                                                            },
-                                                            r#type: "checkbox"
-                                                        }
-
-                                                        "{feat.name}"
-                                                        match feat.description {
-                                                            Some(ref desc) => rsx!(span {
-                                                                class: "tooltiptext",
-                                                                "{desc}",
-                                                            }),
-                                                            None => rsx!("")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+            div { style: "flex: 1; min-width: 10vw;",
+                for (i, feat) in installer_profile.manifest.features.iter().enumerate() {
+                    if !feat.hidden {
+                        if i % 2 == 1 {
+                            label { class: "tooltip",
+                                input {
+                                    checked: if installer_profile.installed {
+                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                                    } else {
+                                        if feat.default { Some("true") } else { None }
+                                    },
+                                    name: "{feat.id}",
+                                    onchange: move |evt| {
+                                        feature_change(
+                                            local_features,
+                                            modify,
+                                            evt,
+                                            &feat,
+                                            modify_count,
+                                            enabled_features,
+                                        )
+                                    },
+                                    r#type: "checkbox"
                                 }
-                            }
+                                "{feat.name}"
+                                match feat.description {
+                                    Some(ref desc) => rsx!(span {
+                                        class: "tooltiptext",
+                                        "{desc}",
+                                    }),
+                                    None => rsx!("")
+                                }
+                            } // <-- Closes label properly
+                        }
+                    }
+                }
+            } // <-- Closes second div (right column)
+        } // <-- Closes feature-list properly
+    } // <-- Closes width: 21vw div properly
+} // <-- Closes info-container properly
                         input {
                             r#type: "submit",
                             value: if !installer_profile.installed {
