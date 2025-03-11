@@ -779,81 +779,92 @@ rsx! {
                                 "i"
                             }
                         }
+                        // Main wrapper to ensure proper layout
                         div { 
-                            style: "display: flex; flex-direction: column; height: 100vh; width: 21vw;", // Ensures the window can grow with content
+                            style: "display: flex; flex-direction: column; width: 21vw; height: 100%;", 
+                            
+                            // Description text
                             div {
                                 class: "description",
-                                dangerous_inner_html: "{installer_profile.manifest.description}" // Inject the description
+                                dangerous_inner_html: "{installer_profile.manifest.description}"
                             }
                             p { 
-                                style: "font-size: 1.2em; margin-bottom: .5em;", // Styling for the label
-                                "Optional features:" // The label text
+                                style: "font-size: 1.2em; margin-bottom: .5em;",
+                                "Optional features:"
                             }
-                            // *** SCROLLABLE FEATURE LIST + BUTTON CONTAINER ***
+                            
+                            // Feature list with FIXED HEIGHT (so install button stays visible)
                             div { 
-                                style: "flex-grow: 1; display: flex; flex-direction: column; overflow: hidden;", // Flex container for proper layout
-                                div { 
-                                    class: "feature-list", 
-                                    style: "flex-grow: 1; display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative;", // Scrollable feature list
-                                    for feat in installer_profile.manifest.features {
-                                        if !feat.hidden {
-                                            label { 
-                                                class: "tooltip",
-                                                input {
-                                                    checked: if installer_profile.installed {
-                                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                                                    } else {
-                                                        if feat.default { Some("true") } else { None }
-                                                    },
-                                                    name: "{feat.id}",
-                                                    onchange: move |evt| {
-                                                        feature_change(
-                                                            local_features,
-                                                            modify,
-                                                            evt,
-                                                            &feat,
-                                                            modify_count,
-                                                            enabled_features,
-                                                        )
-                                                    },
-                                                    r#type: "checkbox"
-                                                }
-                                                "{feat.name}"
-                                                match feat.description {
-                                                    Some(ref desc) => rsx!(span {
-                                                        class: "tooltiptext",
-                                                        style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.9); color: #fff; padding: 6px 12px; border-radius: 6px; z-index: 1000; min-width: 150px; max-width: 300px; white-space: nowrap; text-align: center;", // Proper tooltip box
-                                                        "{desc}",
-                                                    }),
-                                                    None => rsx!("")
-                                                }
+                                class: "feature-list", 
+                                style: "flex-grow: 1; max-height: 250px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative;", // FIXED HEIGHT ADDED
+                                for feat in installer_profile.manifest.features {
+                                    if !feat.hidden {
+                                        label { 
+                                            class: "tooltip",
+                                            input {
+                                                checked: if installer_profile.installed {
+                                                    if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                                                } else {
+                                                    if feat.default { Some("true") } else { None }
+                                                },
+                                                name: "{feat.id}",
+                                                onchange: move |evt| {
+                                                    feature_change(
+                                                        local_features,
+                                                        modify,
+                                                        evt,
+                                                        &feat,
+                                                        modify_count,
+                                                        enabled_features,
+                                                    )
+                                                },
+                                                r#type: "checkbox"
+                                            }
+                                            "{feat.name}"
+                                            match feat.description {
+                                                Some(ref desc) => rsx!(span {
+                                                    class: "tooltiptext",
+                                                    style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.9); color: #fff; padding: 6px 12px; border-radius: 6px; z-index: 1000; min-width: 150px; max-width: 300px; white-space: nowrap; text-align: center;",
+                                                    "{desc}",
+                                                }),
+                                                None => rsx!("")
                                             }
                                         }
                                     }
                                 }
-                                // *** FIXED INSTALL BUTTON ***
-                                div { 
-                                    style: "padding: 10px; background-color: #f8f8f8; border-top: 1px solid #ccc; display: flex; justify-content: center; align-items: center;", // Ensures the button is always visible
-                                    input {
-                                        r#type: "submit",
-                                        value: if !installer_profile.installed {
-                                            "Install"
-                                        } else {
-                                            if !*modify.read() { "Update" } else { "Modify" }
-                                        },
-                                        class: "install-button",
-                                        disabled: install_disable,
-                                        style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensures visibility and usability
-                                    }
-                                }
                             }
-                        }
-                    }
-                }
-            }
-        }
-        }
+                            // INSTALL BUTTON (Always visible at the bottom)
+                            div { 
+                                style: "padding: 10px; background-color: #f8f8f8; border-top: 1px solid #ccc; display: flex; justify-content: center; align-items: center;",
+                                input {
+                                    r#type: "submit",
+                                    value: if !installer_profile.installed {
+                                        "Install"
+                                    } else {
+                                        if !*modify.read() { "Update" } else { "Modify" }
+                                    },
+                                    class: "install-button",
+                                    disabled: install_disable,
+                                    style: "width: 100%; padding: 10px; font-size: 1.2em;" 
+             }
+ 
+         }
+ 
+
     }
+ 
+                        }
+ 
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
+ 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
