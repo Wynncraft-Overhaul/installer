@@ -824,13 +824,15 @@ rsx! {
                                                     "{desc}",
                                                 }),
                                                 None => rsx!("")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-}
-}
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
                             div { // Container for the install button
                                 style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8; position: sticky; bottom: 0;", // Ensures button is at the bottom and stays visible
                                 input {
@@ -843,14 +845,24 @@ rsx! {
                                     class: "install-button",
                                     disabled: install_disable,
                                     style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensure button is large enough and visible
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+             }
+ 
+         }
+
     }
+ 
+                        }
+ 
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
+ 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
