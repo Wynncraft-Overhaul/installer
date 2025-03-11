@@ -122,12 +122,19 @@ fn Credits(mut props: CreditsProps) -> Element {
                                                         {author.name.to_string()}
                                                     } else {
                                                         {author.name.to_string() + ", "}
-             }
+                                                    }
  
-         }
+                                                }
  
-
-    }
+                                            }
+ 
+                                        }
+ 
+                                    }
+ 
+                                }
+ 
+                            }
  
                         }
  
@@ -142,7 +149,6 @@ fn Credits(mut props: CreditsProps) -> Element {
     }
  
 }
-
 #[component]
 fn PackUninstallButton(launcher: Launcher, pack: PackName) -> Element {
     // TODO: Handle uninstall error
@@ -857,15 +863,26 @@ fn Version(mut props: VersionProps) -> Element {
                                     },
                                     onmouseout: move |evt| {
                                         evt.target.set_style("transform", "scale(1)");
-                                    }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+             }
+ 
+         }
+ 
 
+    }
+ 
+                        }
+ 
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
+ 
+}
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
