@@ -789,7 +789,7 @@ fn Version(mut props: VersionProps) -> Element {
                                 }
                                 div { 
                                     class: "feature-list", 
-                                    style: "max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
                                     for feat in installer_profile.manifest.features {
                                         if !feat.hidden {
                                             label { class: "tooltip",
