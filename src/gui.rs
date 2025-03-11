@@ -927,6 +927,9 @@ fn Version(mut props: VersionProps) -> Element {
                                 let button = web_sys::window().unwrap().document().unwrap().get_elements_by_class_name("install-button").item(0).unwrap();
                                 button.set_attribute("style", "transform: scale(1);").unwrap();
                             }
+
+                             }
+                    }
                         }
                     }
                 }
