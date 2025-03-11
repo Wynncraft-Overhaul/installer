@@ -900,13 +900,15 @@ fn Version(mut props: VersionProps) -> Element {
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
                         input {
                             r#type: "submit",
                             value: if !installer_profile.installed {
