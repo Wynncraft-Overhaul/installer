@@ -800,7 +800,7 @@ fn Version(mut props: VersionProps) -> Element {
                                     "Optional features:"
                                 }
                                 div { class: "feature-list",
-                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
+                                    style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px; position: relative;",
                                     for feat in installer_profile.manifest.features {
                                         if !feat.hidden {
                                             label { class: "tooltip",
@@ -828,7 +828,7 @@ fn Version(mut props: VersionProps) -> Element {
                                                 match feat.description {
                                                     Some(ref desc) => rsx!(span {
                                                         class: "tooltiptext",
-                                                        style: "position: sticky; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px; white-space: nowrap;",
+                                                        style: "position: absolute; z-index: 10; background: rgba(0, 0, 0, 0.8); color: white; padding: 5px; border-radius: 5px; white-space: normal; max-width: 200px; word-wrap: break-word; overflow: hidden; text-overflow: ellipsis;",
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
