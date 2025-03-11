@@ -789,62 +789,61 @@ rsx! {
                                 style: "font-size: 1.2em; margin-bottom: .5em;", // Styling for the label
                                 "Optional features:" // The label text
                             }
+                            // *** SCROLLABLE FEATURE LIST + BUTTON CONTAINER ***
                             div { 
-                                class: "feature-list", 
-                                style: "flex-grow: 1; display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative;", // Fixed max-height and scrollable feature list
-                                for feat in installer_profile.manifest.features {
-                                    if !feat.hidden {
-                                        label { 
-                                            class: "tooltip",
-                                            input {
-                                                checked: if installer_profile.installed {
-                                                    if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
-                                                } else {
-                                                    if feat.default { Some("true") } else { None }
-                                                },
-                                                name: "{feat.id}",
-                                                onchange: move |evt| {
-                                                    feature_change(
-                                                        local_features,
-                                                        modify,
-                                                        evt,
-                                                        &feat,
-                                                        modify_count,
-                                                        enabled_features,
-                                                    )
-                                                },
-                                                r#type: "checkbox"
+                                style: "flex-grow: 1; display: flex; flex-direction: column; overflow: hidden;", // Flex container for proper layout
+                                div { 
+                                    class: "feature-list", 
+                                    style: "flex-grow: 1; display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #ccc; position: relative;", // Scrollable feature list
+                                    for feat in installer_profile.manifest.features {
+                                        if !feat.hidden {
+                                            label { 
+                                                class: "tooltip",
+                                                input {
+                                                    checked: if installer_profile.installed {
+                                                        if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
+                                                    } else {
+                                                        if feat.default { Some("true") } else { None }
+                                                    },
+                                                    name: "{feat.id}",
+                                                    onchange: move |evt| {
+                                                        feature_change(
+                                                            local_features,
+                                                            modify,
+                                                            evt,
+                                                            &feat,
+                                                            modify_count,
+                                                            enabled_features,
+                                                        )
+                                                    },
+                                                    r#type: "checkbox"
+                                                }
+                                                "{feat.name}"
+                                                match feat.description {
+                                                    Some(ref desc) => rsx!(span {
+                                                        class: "tooltiptext",
+                                                        style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.9); color: #fff; padding: 6px 12px; border-radius: 6px; z-index: 1000; min-width: 150px; max-width: 300px; white-space: nowrap; text-align: center;", // Proper tooltip box
+                                                        "{desc}",
+                                                    }),
+                                                    None => rsx!("")
+                                                }
                                             }
-
-                                            "{feat.name}"
-                                            match feat.description {
-                                                Some(ref desc) => rsx!(span {
-                                                    class: "tooltiptext",
-                                                    style: "position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background-color: #000; color: #fff; padding: 5px 10px; border-radius: 4px; z-index: 1000;", // Tooltip floating with a black bar and padding
-                                                    "{desc}",
-                                                }),
-                                                None => rsx!("")
-                    }
- 
-                }
- 
-            }
- 
-        }
- 
-    }
-                            div { // Container for the install button
-                                style: "padding: 10px; display: flex; justify-content: center; align-items: center; background-color: #f8f8f8;", // Ensures button is at the bottom
-                                input {
-                                    r#type: "submit",
-                                    value: if !installer_profile.installed {
-                                        "Install"
-                                    } else {
-                                        if !*modify.read() { "Update" } else { "Modify" }
-                                    },
-                                    class: "install-button",
-                                    disabled: install_disable,
-                                    style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensure button is large enough and visible
+                                        }
+                                    }
+                                }
+                                // *** FIXED INSTALL BUTTON ***
+                                div { 
+                                    style: "padding: 10px; background-color: #f8f8f8; border-top: 1px solid #ccc; display: flex; justify-content: center; align-items: center;", // Ensures the button is always visible
+                                    input {
+                                        r#type: "submit",
+                                        value: if !installer_profile.installed {
+                                            "Install"
+                                        } else {
+                                            if !*modify.read() { "Update" } else { "Modify" }
+                                        },
+                                        class: "install-button",
+                                        disabled: install_disable,
+                                        style: "width: 100%; padding: 10px; font-size: 1.2em;" // Ensures visibility and usability
              }
  
          }
