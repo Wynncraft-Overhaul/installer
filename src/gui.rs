@@ -817,6 +817,13 @@ fn Version(mut props: VersionProps) -> Element {
                                                 match feat.description {
                                                     Some(ref desc) => rsx!(span {
                                                         class: "tooltiptext",
+                                                        style: "position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.9); color: #fff; padding: 6px 12px; border-radius: 6px; z-index: 1000; min-width: 150px; max-width: 300px; white-space: nowrap; text-align: center; visibility: hidden;",
+                                                    onmouseover: move |evt| {
+                                                        evt.target.set_style("visibility", "visible");
+                                                    },
+                                                    onmouseout: move |evt| {
+                                                        evt.target.set_style("visibility", "hidden");
+                                                    },
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
@@ -827,15 +834,24 @@ fn Version(mut props: VersionProps) -> Element {
                                 }
                             }
                         }
-                        input {
-                            r#type: "submit",
-                            value: if !installer_profile.installed {
-                                "Install"
-                            } else {
-                                if !*modify.read() { "Update" } else { "Modify" }
-                            },
-                            class: "install-button",
-                            disabled: install_disable
+                        div { 
+                                style: "padding: 10px; background-color: #f8f8f8; border-top: 1px solid #ccc; display: flex; justify-content: center; align-items: center;",
+                                input {
+                                    r#type: "submit",
+                                    value: if !installer_profile.installed {
+                                        "Install"
+                                    } else {
+                                        if !*modify.read() { "Update" } else { "Modify" }
+                                    },
+                                    class: "install-button",
+                                    disabled: install_disable,
+                                    style: "width: 100%; padding: 10px; font-size: 1.2em; transition: transform 0.2s ease-in-out;",
+                                    onmouseover: move |evt| {
+                                        evt.target.set_style("transform", "scale(1.1)");
+                                    },
+                                    onmouseout: move |evt| {
+                                        evt.target.set_style("transform", "scale(1)");
+                                    }
                         }
                     }
                 }
