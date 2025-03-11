@@ -842,11 +842,6 @@ fn Version(mut props: VersionProps) -> Element {
                                 div { 
  
                                     class: "feature-list", 
- 
-
-                                    style: "max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
- 
-
                                     style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px;",
  
                                     for feat in installer_profile.manifest.features {
@@ -928,18 +923,26 @@ fn Version(mut props: VersionProps) -> Element {
                                 // Revert button size when not hovering
                                 let button = web_sys::window().unwrap().document().unwrap().get_elements_by_class_name("install-button").item(0).unwrap();
                                 button.set_attribute("style", "transform: scale(1);").unwrap();
-                            }
+             }
+ 
+         }
+ 
 
-                             }
-                    
-                        }
-                      
-                        }
-                    }
-                }
-            }
-        }
     }
+ 
+                        }
+ 
+                    }
+ 
+                }
+ 
+            }
+ 
+        }
+ 
+    }
+ 
+}
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
