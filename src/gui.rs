@@ -831,19 +831,19 @@ rsx! {
 
         // Script block placed above the content
     script { r#"
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.tooltip').forEach(el => {
-                el.addEventListener('mousemove', (e) => {
+        document.addEventListener('DOMContentLoaded', function() {{
+            document.querySelectorAll('.tooltip').forEach(el => {{
+                el.addEventListener('mousemove', (e) => {{
                     let tooltip = el.querySelector('.tooltiptext');
-                    if (tooltip) {
+                    if (tooltip) {{
                         tooltip.style.left = `${e.clientX}px`;
                         tooltip.style.top = `${e.clientY}px`;
                         tooltip.style.visibility = 'visible';
                         tooltip.style.opacity = '1';
-                    }
-                });
-            });
-        });
+                    }}
+                }});
+            }});
+        }});
     "# }
 
     if *installing.read() {
