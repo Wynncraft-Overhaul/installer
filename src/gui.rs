@@ -538,16 +538,49 @@ fn feature_change(
 }
 
 #[derive(PartialEq, Props, Clone)]
-struct VersionProps {
-    modpack_source: String,
-    modpack_branch: String,
-    launcher: super::Launcher,
-    error: Signal<Option<String>>,
-    name: Signal<String>,
-    page: Signal<usize>,
+struct HomePageTabProps {
     pages: Signal<BTreeMap<usize, TabInfo>>,
+    page: Signal<usize>,
 }
 
+// Modify the HomePageTab component
+#[component]
+fn HomePageTab(props: HomePageTabProps) -> Element {
+    let page_count = props.pages.with(|p| p.len());
+    log::info!("Rendering Home Page with {} tabs", page_count);
+    
+    rsx! {
+        div { class: "home-container",
+            h1 { class: "home-title", "Welcome to the Modpack Installer" }
+            
+            p { class: "home-description", 
+                "Select one of the available modpacks below to continue with installation."
+            }
+            
+            div { class: "tab-card-container",
+                for (index, info) in props.pages.with(|p| p.clone()) {
+                    // Skip the home page tab itself
+                    if index != 0 {
+                        div {
+                            class: "tab-card",
+                            onclick: move |_| {
+                                props.page.set(index);
+                                log::info!("Clicked tab card: switching to tab {}", index);
+                            },
+                            style: "background-image: url({});", info.background,
+                            
+                            div { class: "tab-card-content",
+                                h2 { class: "tab-card-title", "{info.title}" }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Modify the Version component to handle moved values
 #[component]
 fn Version(mut props: VersionProps) -> Element {
     let profile = use_resource(move || {
@@ -556,7 +589,7 @@ fn Version(mut props: VersionProps) -> Element {
         let launcher = props.launcher.clone();
         log::info!("Loading modpack from source: {}, branch: {}", source, branch);
         async move { 
-            log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, &(source + &branch));
+            log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, &(source.clone() + &branch));
             let result = super::init(source, branch, launcher).await;
             match &result {
                 Ok(profile) => {
@@ -596,7 +629,7 @@ fn Version(mut props: VersionProps) -> Element {
             return rsx! {
                 div { class: "error-container",
                     h2 { "Error Loading Modpack" }
-                    p { "Failed to load manifest for branch: {props.modpack_branch}" }
+                    p { "Failed to load manifest for branch: {props.modpack_branch.clone()}" }
                     p { class: "error-details", "{e}" }
                 }
             };
