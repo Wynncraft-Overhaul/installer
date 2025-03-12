@@ -772,7 +772,7 @@ rsx! {
             width: 100%;
         }}
 
-        
+      
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
@@ -780,14 +780,14 @@ rsx! {
             background-color: rgba(0, 0, 0, 0.9);
             color: white;
             padding: 6px 10px;
-            border-radius: 5px;  
+            border-radius: 5px; 
             z-index: 9999;
             white-space: normal;
             max-width: 250px;
             text-align: left;
             word-wrap: break-word;
 
-            
+           
             bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
@@ -822,27 +822,28 @@ rsx! {
             overflow-wrap: break-word;
         }}
 
-       
+        
         .feature-list {{
             max-height: 200px;
-            overflow-y: auto;
+            overflow-y: auto; 
             overflow-x: hidden;
             border: 1px solid #ccc;
             padding: 5px;
             position: relative;
-            overflow: visible;
-            border-radius: 8px; 
+            border-radius: 8px;  
         }}
 
-       
+      
         .install-button {{
-            border-radius: 8px;  
+            border-radius: 8px; 
             padding: 10px 20px; 
             background-color: #007bff;
             color: white;
             border: none;
             cursor: pointer;
             transition: background-color 0.3s ease;
+            width: 100%;  
+            max-width: 400px; 
         }}
 
         
@@ -858,9 +859,10 @@ rsx! {
 
         
         .description {{
-            border-radius: 8px;  
+            border-radius: 8px; 
             padding: 10px;
-            background-color: #f9f9f9;
+            background-color: transparent; 
+            color: #333; 
         }}
 
     " }
