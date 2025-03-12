@@ -1086,6 +1086,13 @@ fn AppHeader(
         log::info!("  Tab {}: title={}", index, info.title);
     }
     
+    // Fix: Get the pages data once and collect real tabs to avoid temporary value errors
+    let pages_data = pages();
+    let real_tabs: Vec<(usize, TabInfo)> = pages_data.iter()
+        .filter(|(_, info)| !info.title.starts_with("Tab "))
+        .map(|(index, info)| (*index, info.clone()))
+        .collect();
+    
     rsx!(
         header { class: "app-header",
             // Logo (if available) serves as home button
@@ -1125,11 +1132,12 @@ fn AppHeader(
                 }
                 
                 // Only show real modpack tabs, not placeholders
-                for (index, info) in pages().iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
+                // Use the collected real_tabs instead of filtering within RSX
+                for (index, info) in real_tabs {
                     button {
-                        class: if page() == *index { "header-tab-button active" } else { "header-tab-button" },
+                        class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
                         onclick: move |_| {
-                            page.set(*index);
+                            page.set(index);
                             log::info!("Switching to tab {}: {}", index, info.title);
                         },
                         "{info.title}"
@@ -1275,34 +1283,11 @@ pub(crate) fn app() -> Element {
 
         // Always render AppHeader if we're past the initial launcher selection
         if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
-            if page() == HOME_PAGE {
-                // Simpler header for home page
-                header { class: "app-header",
-                    // Logo (if available)
-                    if let Some(url) = logo_url {
-                        img { class: "app-logo", src: "{url}", alt: "Logo" }
-                    }
-                    
-                    h1 { class: "app-title", "Modpack Installer" }
-                    
-                    // Settings button
-                    button {
-                        class: "settings-button",
-                        onclick: move |_| {
-                            settings.set(true);
-                            log::info!("Opening settings");
-                        },
-                        "Settings"
-                    }
-                }
-            } else {
-                // Regular header with tabs for specific modpack pages
-                AppHeader {
-                    page,
-                    pages,
-                    settings,
-                    logo_url
-                }
+            AppHeader {
+                page,
+                pages,
+                settings,
+                logo_url
             }
         }
 
@@ -1323,44 +1308,27 @@ pub(crate) fn app() -> Element {
                     b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
                 }
             } else {
-                // Main navigation area
-                div {
-                    // Show home button when not on home page
-                    if page() != HOME_PAGE {
-                        div { class: "navigation-buttons",
-                            button {
-                                class: "home-button",
-                                onclick: move |_| {
-                                    page.set(HOME_PAGE);
-                                    log::info!("Returning to home page");
-                                },
-                                "← Back to Home"
-                            }
-                        }
+                // Content area - no need for back button since we have a Home tab now
+                if page() == HOME_PAGE {
+                    // Show home page with necessary parameters
+                    HomePage { 
+                        pages, 
+                        page,
+                        branches: branches.clone(),
+                        modpack_source: modpack_source.clone(),
+                        launcher: launcher.clone()
                     }
-                
-                    // Content area
-                    if page() == HOME_PAGE {
-                        // Show home page with necessary parameters
-                        HomePage { 
-                            pages, 
+                } else {
+                    // Show specific modpack version page
+                    for i in 0..branches.len() {
+                        Version {
+                            modpack_source: props.modpack_source.clone(),
+                            modpack_branch: branches[i].name.clone(),
+                            launcher: launcher.as_ref().unwrap().clone(),
+                            error: err,
+                            name,
                             page,
-                            branches: branches.clone(),
-                            modpack_source: modpack_source.clone(),
-                            launcher: launcher.clone()
-                        }
-                    } else {
-                        // Show specific modpack version page
-                        for i in 0..branches.len() {
-                            Version {
-                                modpack_source: props.modpack_source.clone(),
-                                modpack_branch: branches[i].name.clone(),
-                                launcher: launcher.as_ref().unwrap().clone(),
-                                error: err,
-                                name,
-                                page,
-                                pages
-                            }
+                            pages
                         }
                     }
                 }
