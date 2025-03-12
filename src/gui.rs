@@ -44,8 +44,10 @@ fn HomePage(
     }
     
     // Collect real modpacks first into a Vec to avoid lifetime issues
-    let real_modpacks: Vec<(usize, &TabInfo)> = pages().iter()
+    // Fix: Clone to convert &usize to usize for collection
+    let real_modpacks: Vec<(usize, TabInfo)> = pages().iter()
         .filter(|(_, info)| !info.title.starts_with("Tab "))
+        .map(|(index, info)| (*index, info.clone())) // Clone and dereference
         .collect();
     
     rsx! {
@@ -62,7 +64,8 @@ fn HomePage(
                                position: relative; background-color: {info.color}; 
                                background-image: url('{info.background}'); background-size: cover; background-position: center;",
                         onclick: move |_| {
-                            page.set(*index);
+                            // Fix: No need to dereference index now as it's already a usize
+                            page.set(index);
                             log::info!("Navigating to tab {}: {}", index, info.title);
                         },
                         div { 
@@ -1119,8 +1122,9 @@ pub(crate) fn app() -> Element {
         let mut tabs_loading = use_signal(|| true);
     
     // We'll use this effect to detect when tabs are loaded
-    use_effect(move || {
-        // Collect results into a Vec to avoid lifetime issues
+ use_effect(move || {
+        // Count valid tabs without collecting, since we don't need to
+        // keep references beyond this function
         let valid_tabs = pages().iter()
             .filter(|(_, info)| !info.title.starts_with("Tab "))
             .count();
