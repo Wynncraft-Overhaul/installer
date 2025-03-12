@@ -826,8 +826,6 @@ let mut local_features = use_signal(|| {
         None
     }
 });
-
-let mut update_available = use_signal(|| installer_profile.update_available);
     
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
@@ -1127,8 +1125,8 @@ pub(crate) fn app() -> Element {
     let name = use_signal(String::default);
     
     // Single declaration of page and pages signals
-    let page = use_signal(|| 0); 
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+let page = use_signal(|| 0); 
+let mut pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
     
     // Initialize with placeholder tabs for all expected tab groups (0-6)
     use_effect(move || {
