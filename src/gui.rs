@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, path::PathBuf};
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+use base64::{engine, Engine};
 use dioxus::prelude::*;
-use modal::ModalContext;
+use modal::{Modal, ModalContext};
 
 use crate::{get_app_data, get_installed_packs, get_launcher, uninstall, Launcher, PackName};
 
@@ -16,18 +16,6 @@ struct TabInfo {
     settings_background: String,
     primary_font: String,
     secondary_font: String,
-}
-
-// Add VersionProps definition
-#[derive(PartialEq, Props, Clone)]
-struct VersionProps {
-    modpack_source: String,
-    modpack_branch: String,
-    launcher: Launcher,
-    error: Signal<Option<String>>,
-    name: Signal<String>,
-    page: Signal<usize>,
-    pages: Signal<BTreeMap<usize, TabInfo>>,
 }
 
 #[component]
@@ -146,253 +134,6 @@ fn Credits(mut props: CreditsProps) -> Element {
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[derive(PartialEq, Props, Clone)]
-struct AppHeaderProps {
-    page: Signal<usize>, 
-    pages: Signal<BTreeMap<usize, TabInfo>>,
-    settings: Signal<bool>,
-    logo_url: Option<String>,
-}
-
-#[component]
-fn AppHeader(props: AppHeaderProps) -> Element {
-    // Log what tabs we have available
-    log::info!("Rendering AppHeader with {} tabs", props.pages().len());
-    for (index, info) in props.pages().iter() {
-        log::info!("  Tab {}: title={}", index, info.title);
-    }
-    
-    rsx!(
-        header { class: "app-header",
-            // Logo (if available)
-            if let Some(url) = props.logo_url.clone() {
-                img { class: "app-logo", src: "{url}", alt: "Logo" }
-            }
-            
-            h1 { class: "app-title", "Modpack Installer" }
-            
-            // Tabs from pages - show only if we have pages
-            div { class: "header-tabs",
-                // Always include the home tab first
-                button {
-                    class: if props.page() == 0 { "header-tab-button active" } else { "header-tab-button" },
-                    onclick: move |_| {
-                        props.page.set(0);
-                        log::info!("Switching to home tab");
-                    },
-                    "Home"
-                }
-                
-                // Then show other tabs
-                {
-                    props.pages().iter().filter(|&(index, _)| *index != 0).map(|(index, info)| {
-                        let idx = *index;
-                        let page_signal = props.page.clone();
-                        let title = info.title.clone();
-                        
-                        rsx!(
-                            button {
-                                key: "{idx}",
-                                class: if props.page() == idx { "header-tab-button active" } else { "header-tab-button" },
-                                onclick: move |_| {
-                                    page_signal.set(idx);
-                                    log::info!("Switching to tab {}: {}", idx, title);
-                                },
-                                "{title}"
-                            }
-                        )
-                    })
-                }
-            }
-            
-            // Settings button
-            button {
-                class: "settings-button",
-                onclick: move |_| {
-                    props.settings.set(true);
-                    log::info!("Opening settings");
-                },
-                "Settings"
-            }
-        }
-    )
-}
-
-#[derive(Clone)]
-pub(crate) struct AppProps {
-    pub branches: Vec<super::GithubBranch>,
-    pub modpack_source: String,
-    pub config: super::Config,
-    pub config_path: PathBuf,
-}
-
-pub(crate) fn app() -> Element {
-    let props = use_context::<AppProps>();
-    let css = include_str!("assets/style.css");
-    let branches = props.branches.clone();
-    let config = use_signal(|| props.config);
-    let settings = use_signal(|| false);
-    let err: Signal<Option<String>> = use_signal(|| None);
-
-    let name = use_signal(String::default);
-
-    // Default to home page (page 0)
-    let page = use_signal(|| 0); 
-    let pages = use_signal(|| {
-        // Initialize with home page
-        let mut map = BTreeMap::<usize, TabInfo>::new();
-        map.insert(0, TabInfo {
-            color: "#320625".to_string(),
-            title: "Home".to_string(),
-            background: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string(),
-            settings_background: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string(),
-            primary_font: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string(),
-            secondary_font: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string(),
-        });
-        map
-    });
-    
-    // Log information about the branches we're loading
-    log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
-    for (i, branch) in branches.iter().enumerate() {
-        log::info!("  Branch {}: name={}", i, branch.name);
-    }
-
-    // Update CSS whenever relevant values change
-    let css_content = {
-        let page = page.clone();
-        let settings = settings.clone();
-        let pages = pages.clone();
-        
-        let default_color = "#320625".to_string();
-        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
-        
-        let bg_color = match pages().get(&page()) {
-            Some(x) => x.color.clone(),
-            None => default_color,
-        };
-        
-        let bg_image = match pages().get(&page()) {
-            Some(x) => {
-                if settings() {
-                    x.settings_background.clone()
-                } else {
-                    x.background.clone()
-                }
-            },
-            None => default_bg,
-        };
-        
-        let secondary_font = match pages().get(&page()) {
-            Some(x) => x.secondary_font.clone(),
-            None => default_font.clone(),
-        };
-        
-        let primary_font = match pages().get(&page()) {
-            Some(x) => x.primary_font.clone(),
-            None => default_font,
-        };
-        
-        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
-        
-        css
-            .replace("<BG_COLOR>", &bg_color)
-            .replace("<BG_IMAGE>", &bg_image)
-            .replace("<SECONDARY_FONT>", &secondary_font)
-            .replace("<PRIMARY_FONT>", &primary_font)
-    };
-
-    let cfg = config.with(|cfg| cfg.clone());
-    let launcher = match super::get_launcher(&cfg.launcher) {
-        Ok(val) => Some(val),
-        Err(_) => None,
-    };
-
-    let mut modal_context = use_context_provider(|| ModalContext::default());
-    if let Some(e) = err() {
-        modal_context.open("Error", rsx! {
-            p {
-                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
-            }
-            textarea { class: "error-area", readonly: true, "{e}" }
-        }, false, Some(move |_| err.set(None)));
-    }
-
-    // Determine which logo to use - could be made configurable via manifest
-    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
-
-    rsx! {
-        style { "{css_content}" }
-
-        modal::Modal {}
-
-        // Always render AppHeader if we're past the initial launcher selection
-        if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
-            AppHeader {
-                page,
-                pages,
-                settings,
-                logo_url
-            }
-        }
-
-        div { class: "main-container",
-            if settings() {
-                Settings {
-                    config,
-                    settings,
-                    config_path: props.config_path,
-                    error: err,
-                    b64_id: URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
-                }
-            } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
-                Launcher {
-                    config,
-                    config_path: props.config_path,
-                    error: err,
-                    b64_id: URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
-                }
-            } else if page() == 0 {
-                // Render home page if we're on page 0
-                HomePageTab {
-                    pages,
-                    page
-                }
-            } else {
-                // Find the corresponding branch for the current page
-                {
-                    let current_page = page();
-                    let branches_clone = branches.clone();
-                    
-                    rsx! {
-                        {
-                            branches_clone.iter().enumerate().filter_map(move |(i, branch)| {
-                                let branch_idx = i + 1; // Offset by 1 since page 0 is home
-                                if current_page == branch_idx {
-                                    Some(rsx!(
-                                        Version {
-                                            modpack_source: props.modpack_source.clone(),
-                                            modpack_branch: branch.name.clone(),
-                                            launcher: launcher.as_ref().unwrap().clone(),
-                                            error: err.clone(),
-                                            name: name.clone(),
-                                            page: page.clone(),
-                                            pages: pages.clone()
-                                        }
-                                    ))
-                                } else {
-                                    None
-                                }
-                            })
                         }
                     }
                 }
@@ -683,7 +424,7 @@ fn CustomMultiMCButton(mut props: LauncherProps) -> Element {
             onclick: custom_multimc,
             r#type: "button",
             "Use custom MultiMC directory"
-            }
+        }
     )
 }
 
@@ -796,125 +537,60 @@ fn feature_change(
     }
 }
 
-// Add this before the HomePageTab function
 #[derive(PartialEq, Props, Clone)]
-struct HomePageTabProps {
-    pages: Signal<BTreeMap<usize, TabInfo>>,
+struct VersionProps {
+    modpack_source: String,
+    modpack_branch: String,
+    launcher: super::Launcher,
+    error: Signal<Option<String>>,
+    name: Signal<String>,
     page: Signal<usize>,
-}
-
-#[component]
-fn HomePageTab(mut props: HomePageTabProps) -> Element {
-    let page_count = props.pages.with(|p| p.len());
-    log::info!("Rendering Home Page with {} tabs", page_count);
-    
-    rsx! {
-        div { class: "home-container",
-            h1 { class: "home-title", "Welcome to the Modpack Installer" }
-            
-            p { class: "home-description", 
-                "Select one of the available modpacks below to continue with installation."
-            }
-            
-            div { class: "tab-card-container",
-                {
-                    props.pages.with(|pages| {
-                        rsx! {
-                            for (index, info) in pages.iter().filter(|&(index, _)| *index != 0) {
-                                {
-                                    let current_index = *index;
-                                    let current_background = info.background.clone();
-                                    let current_title = info.title.clone();
-                                    let page_signal = props.page.clone();
-                                    
-                                    rsx!(
-                                        div {
-                                            key: "{current_index}",
-                                            class: "tab-card",
-                                            onclick: move |_| {
-                                                page_signal.set(current_index);
-                                                log::info!("Clicked tab card: switching to tab {}", current_index);
-                                            },
-                                            style: format!("background-image: url({});", current_background),
-                                            
-                                            div { class: "tab-card-content",
-                                                h2 { class: "tab-card-title", "{current_title}" }
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    })
-                }
-            }
-        }
-    }
+    pages: Signal<BTreeMap<usize, TabInfo>>,
 }
 
 #[component]
 fn Version(mut props: VersionProps) -> Element {
-    let modpack_source = props.modpack_source.clone();
-    let modpack_branch = props.modpack_branch.clone();
-    let launcher = props.launcher.clone();
-    
-    // Create separate variables for display and async closure
-    let display_branch = modpack_branch.clone();
-    let async_branch = modpack_branch.clone();
-
     let profile = use_resource(move || {
-        let source = modpack_source.clone();
-        let branch = async_branch.clone();
-        let launcher = launcher.clone();
+        let source = props.modpack_source.clone();
+        let branch = props.modpack_branch.clone();
+        let launcher = props.launcher.clone();
         log::info!("Loading modpack from source: {}, branch: {}", source, branch);
         async move { 
-            log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, &(source.clone() + &branch));
             let result = super::init(source, branch, launcher).await;
-            match &result {
-                Ok(profile) => {
-                    log::info!("Successfully loaded manifest: subtitle={}, tab_group={:?}, has {} features", 
-                        profile.manifest.subtitle,
-                        profile.manifest.tab_group,
-                        profile.manifest.features.len()
-                    );
-                }
-                Err(e) => {
-                    log::error!("Failed to load manifest: {}", e);
-                }
+            if let Ok(ref profile) = result {
+                log::info!("Loaded manifest: subtitle={}, tab_group={:?}, has {} features", 
+                    profile.manifest.subtitle,
+                    profile.manifest.tab_group,
+                    profile.manifest.features.len()
+                );
+            } else if let Err(ref e) = result {
+                log::error!("Failed to load manifest: {}", e);
             }
             result
         }
     });
 
-    // When loading profile resources, show a loading indicator with more info
+    // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
+        log::info!("Profile resource is still loading...");
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
-                div { class: "loading-text", 
-                    "Loading modpack information for: {display_branch}..." 
-                }
-                div { class: "loading-details", "This may take a moment. Please wait..." }
+                div { class: "loading-text", "Loading modpack information..." }
             }
         };
     }
 
-    // Handle error case more gracefully
     let installer_profile = match profile.unwrap() {
         Ok(v) => v,
         Err(e) => {
-            let error_msg = format!("{:#?}", e) + " (Failed to retrieve installer profile!)";
-            log::error!("Error loading profile: {}", error_msg);
-            props.error.set(Some(error_msg));
-            return rsx! {
-                div { class: "error-container",
-                    h2 { "Error Loading Modpack" }
-                    p { "Failed to load manifest for branch: {display_branch}" }
-                    p { class: "error-details", "{e}" }
-                }
-            };
+            props.error.set(Some(
+                format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
+            ));
+            return None;
         }
     };
+
     // Process manifest data for tab information
     // Extract and log the tab information for debugging
     log::info!("Processing manifest tab information:");
@@ -995,166 +671,486 @@ fn Version(mut props: VersionProps) -> Element {
         )
     });
 
-    // Complete implementation of the Version component
-    let mut enabled_features = use_signal(|| Vec::<String>::new());
-    let mut show_features_dialog = use_signal(|| false);
-    let mut show_credits = use_signal(|| false);
     let mut installing = use_signal(|| false);
-    let mut progress = use_signal(|| 0);
-    let mut status = use_signal(|| "Preparing to install...".to_string());
-    let mut total_steps = use_signal(|| 0);
+    let mut progress_status = use_signal(|| "");
+    let mut install_progress = use_signal(|| 0);
+    let mut modify = use_signal(|| false);
+    let mut modify_count = use_signal(|| 0);
+    let enabled_features = use_signal(|| {
+        if installer_profile.installed {
+            installer_profile
+                .local_manifest
+                .as_ref()
+                .unwrap()
+                .enabled_features
+                .clone()
+        } else {
+            installer_profile.enabled_features.clone()
+        }
+    });
+    let mut install_item_amount = use_signal(|| 0);
+    let mut credits = use_signal(|| false);
+    let mut installed = use_signal(|| installer_profile.installed);
+    let mut update_available = use_signal(|| installer_profile.update_available);
+    let mut local_features = use_signal(|| {
+        if let Some(manifest) = installer_profile.local_manifest.clone() {
+            Some(manifest.enabled_features)
+        } else {
+            None
+        }
+    });
     
-    // Check if installation is in progress
-    if *installing.read() {
-        return rsx! {
-            ProgressView {
-                value: *progress.read(),
-                max: *total_steps.read(),
-                status: status.read().clone(),
-                title: "Installing Modpack".to_string()
-            }
-        };
-    }
-    
-    // Show credits if requested
-    if *show_credits.read() {
-        return rsx! {
-            Credits {
-                manifest: installer_profile.manifest.clone(),
-                enabled: enabled_features.read().clone(),
-                credits: show_credits.clone()
-            }
-        };
-    }
-    
-    // Render main version component
-    rsx! {
-        div { class: "version-container",
-            div { class: "version-header",
-                h1 { class: "version-title", "{installer_profile.manifest.subtitle}" }
-                
-                // Description section
-                div { class: "version-description",
-                    for paragraph in installer_profile.manifest.description.split("\n\n") {
-                        p { "{paragraph}" }
+    let movable_profile = installer_profile.clone();
+    let on_submit = move |_| {
+        // TODO: Don't do naive item amount calculation
+        *install_item_amount.write() = movable_profile.manifest.mods.len()
+            + movable_profile.manifest.resourcepacks.len()
+            + movable_profile.manifest.shaderpacks.len()
+            + movable_profile.manifest.include.len();
+        let movable_profile = movable_profile.clone();
+        let movable_profile2 = movable_profile.clone();
+        async move {
+            let install = move |canceled| {
+                let mut installer_profile = movable_profile.clone();
+                spawn(async move {
+                    if canceled {
+                        return;
                     }
-                }
+                    installing.set(true);
+                    installer_profile.enabled_features = enabled_features.read().clone();
+                    installer_profile.manifest.enabled_features = enabled_features.read().clone();
+                    local_features.set(Some(enabled_features.read().clone()));
+
+                    if !*installed.read() {
+                        progress_status.set("Installing");
+                        match super::install(&installer_profile, move || {
+                            install_progress.with_mut(|x| *x += 1);
+                        })
+                        .await
+                        {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
+                                        \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                        \"dataSourceId\": \"{}\",
+                                        \"userAction\": \"install\",
+                                        \"additionalData\": {{
+                                            \"features\": {:?},
+                                            \"version\": \"{}\",
+                                            \"launcher\": \"{}\"
+                                        }}
+                                    }}",
+                                        installer_profile.manifest.uuid,
+                                        installer_profile.manifest.enabled_features,
+                                        installer_profile.manifest.modpack_version,
+                                        installer_profile.launcher.unwrap(),
+                                    ),
+                                );
+                            }
+                            Err(e) => {
+                                props.error.set(Some(
+                                    format!("{:#?}", e) + " (Failed to install modpack!)",
+                                ));
+                                installing.set(false);
+                                return;
+                            }
+                        }
+                        installed.set(true);
+                    } else if *update_available.read() {
+                        progress_status.set("Updating");
+                        match super::update(&installer_profile, move || {
+                            install_progress.with_mut(|x| *x += 1);
+                        })
+                        .await
+                        {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"update\",
+                                    \"additionalData\": {{
+                                        \"old_version\": \"{}\",
+                                        \"new_version\": \"{}\"
+                                    }}
+                                }}",
+                                        installer_profile.manifest.uuid,
+                                        installer_profile.local_manifest.unwrap().modpack_version,
+                                        installer_profile.manifest.modpack_version
+                                    ),
+                                );
+                            }
+                            Err(e) => {
+                                props.error.set(Some(
+                                    format!("{:#?}", e) + " (Failed to update modpack!)",
+                                ));
+                                installing.set(false);
+                                return;
+                            }
+                        }
+                        update_available.set(false);
+                    } else if *modify.read() {
+                        progress_status.set("Modifying");
+                        match super::update(&installer_profile, move || {
+                            *install_progress.write() += 1
+                        })
+                        .await
+                        {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"modify\",
+                                    \"additionalData\": {{
+                                        \"features\": {:?}
+                                    }}
+                                }}",
+                                        installer_profile.manifest.uuid,
+                                        installer_profile.manifest.enabled_features
+                                    ),
+                                );
+                            }
+                            Err(e) => {
+                                props.error.set(Some(
+                                    format!("{:#?}", e) + " (Failed to modify modpack!)",
+                                ));
+                                installing.set(false);
+                                return;
+                            }
+                        }
+                        modify.with_mut(|x| *x = false);
+                        modify_count.with_mut(|x| *x = 0);
+                        update_available.set(false);
+                    }
+                    installing.set(false);
+                });
+            };
+
+            if let Some(contents) = movable_profile2.manifest.popup_contents {
+                use_context::<ModalContext>().open(
+                    movable_profile2.manifest.popup_title.unwrap_or_default(),
+                    rsx!(div {
+                        dangerous_inner_html: "{contents}",
+                    }),
+                    true,
+                    Some(install),
+                )
+            } else {
+                install(false);
             }
-            
-            // Action buttons
-            div { class: "version-actions",
-                button {
-                    class: "primary-button",
-                    onclick: move |_| {
-                        // Normally would start installation here
-                        installing.set(true);
-                        total_steps.set(100); // Example value
+        }
+    };
+
+    let install_disable = if *installed.read() && !*update_available.read() && !*modify.read() {
+        Some("true")
+    } else {
+        None
+    };
+
+    if *props.name.read() == String::default() {
+        props.name.set(installer_profile.manifest.name.clone())
+    }
+    
+    if (props.page)() != tab_group {
+        return None;
+    }
+    
+    rsx! {
+        if *installing.read() {
+            ProgressView {
+                value: install_progress(),
+                max: install_item_amount() as i64,
+                title: installer_profile.manifest.subtitle,
+                status: progress_status.to_string()
+            }
+        } else if *credits.read() {
+            Credits {
+                manifest: installer_profile.manifest,
+                enabled: installer_profile.enabled_features,
+                credits
+            }
+        } else {
+            div { class: "version-container",
+                form { onsubmit: on_submit,
+                    // Header section with title and subtitle (using manifest data)
+                    div { class: "content-header",
+                        h1 { "{installer_profile.manifest.subtitle}" }
+                    }
+                    
+                    // Description section (using manifest data)
+                    div { class: "content-description",
+                        // The 'dangerous_inner_html' directive renders HTML content safely
+                        dangerous_inner_html: "{installer_profile.manifest.description}",
                         
-                        // In a real implementation, you would trigger installation process
-                        // and update progress/status signals during installation
-                    },
-                    "Install"
-                }
-                
-                button {
-                    class: "secondary-button",
-                    onclick: move |_| {
-                        show_features_dialog.set(true);
-                    },
-                    "Configure Features"
-                }
-                
-                button {
-                    class: "secondary-button",
-                    onclick: move |_| {
-                        show_credits.set(true);
-                    },
-                    "View Credits"
-                }
-            }
-            
-            // Features configuration dialog
-            if *show_features_dialog.read() {
-                div { class: "features-dialog",
-                    div { class: "features-header",
-                        h2 { "Configure Modpack Features" }
-                        button {
-                            class: "close-button",
-                            onclick: move |_| {
-                                show_features_dialog.set(false);
-                            },
-                            "Close"
+                        // Credits link
+                        div {
+                            a {
+                                class: "credits-link",
+                                onclick: move |evt| {
+                                    credits.set(true);
+                                    evt.stop_propagation();
+                                },
+                                "View Credits"
+                            }
                         }
                     }
                     
-                    div { class: "features-content",
-                        form {
-                            class: "features-form",
-                            onsubmit: move |evt| {
-                                evt.stop_propagation();
-                                show_features_dialog.set(false);
-                            },
-                            
-                            div { class: "feature-cards-container",
-                                for feature in &installer_profile.manifest.features {
-                                    {
-                                        let is_enabled = enabled_features.read().contains(&feature.id);
-                                        let feature_clone = feature.clone();
-                                        rsx!(
-                                            FeatureCard {
-                                                feature: feature_clone,
-                                                enabled: is_enabled,
-                                                on_toggle: move |evt| {
-                                                    feature_change(
-                                                        Signal::new(None),  // local_features
-                                                        Signal::new(false), // modify
-                                                        evt,
-                                                        feature,
-                                                        Signal::new(0),     // modify_count
-                                                        enabled_features.clone(),
-                                                    );
-                                                }
-                                            }
+                    // Features heading
+                    h2 { "Optional Features" }
+                    
+                    // Log feature information
+                    {
+                        log::info!("Rendering {} features for manifest", 
+                                  installer_profile.manifest.features.len());
+                        for feat in &installer_profile.manifest.features {
+                            log::info!("Feature: id={}, name={}, hidden={}, default={}", 
+                                      feat.id, feat.name, feat.hidden, feat.default);
+                        }
+                    }
+                    
+                    // Feature cards in a responsive grid
+                    div { class: "feature-cards-container",
+                        for feat in installer_profile.manifest.features {
+                            if !feat.hidden {
+                                FeatureCard {
+                                    feature: feat.clone(),
+                                    enabled: if installer_profile.installed {
+                                        enabled_features.with(|x| x.contains(&feat.id))
+                                    } else {
+                                        feat.default
+                                    },
+                                    on_toggle: move |evt| {
+                                        feature_change(
+                                            local_features,
+                                            modify,
+                                            evt,
+                                            &feat,
+                                            modify_count,
+                                            enabled_features,
                                         )
                                     }
                                 }
                             }
-                            
-                            div { class: "features-actions",
-                                button {
-                                    r#type: "submit",
-                                    class: "primary-button",
-                                    "Save Configuration"
-                                }
-                                
-                                button {
-                                    r#type: "button",
-                                    class: "secondary-button",
-                                    onclick: move |evt| {
-                                        evt.stop_propagation();
-                                        // Enable all features
-                                        enabled_features.set(
-                                            installer_profile.manifest.features
-                                                .iter()
-                                                .map(|f| f.id.clone())
-                                                .collect()
-                                        );
-                                    },
-                                    "Enable All"
-                                }
-                                
-                                button {
-                                    r#type: "button",
-                                    class: "secondary-button",
-                                    onclick: move |evt| {
-                                        evt.stop_propagation();
-                                        // Disable all features
-                                        enabled_features.set(Vec::new());
-                                    },
-                                    "Disable All"
-                                }
+                        }
+                    }
+                    
+                    // Install/Update/Modify button at the bottom
+                    div { class: "install-button-container",
+                        button {
+                            r#type: "submit",
+                            class: "main-install-button",
+                            disabled: install_disable,
+                            if !installer_profile.installed {
+                                "Install"
+                            } else {
+                                if !*modify.read() { "Update" } else { "Modify" }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// New header component with tabs
+#[component]
+fn AppHeader(
+    page: Signal<usize>, 
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+    settings: Signal<bool>,
+    logo_url: Option<String>
+) -> Element {
+    // Log what tabs we have available
+    log::info!("Rendering AppHeader with {} tabs", pages().len());
+    for (index, info) in pages().iter() {
+        log::info!("  Tab {}: title={}", index, info.title);
+    }
+    
+    rsx!(
+        header { class: "app-header",
+            // Logo (if available)
+            if let Some(url) = logo_url {
+                img { class: "app-logo", src: "{url}", alt: "Logo" }
+            }
+            
+            h1 { class: "app-title", "Modpack Installer" }
+            
+            // Tabs from pages - show only if we have pages
+            div { class: "header-tabs",
+                if !pages().is_empty() {
+                    for (index, info) in pages() {
+                        button {
+                            class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
+                            onclick: move |_| {
+                                page.set(index);
+                                log::info!("Switching to tab {}: {}", index, info.title);
+                            },
+                            "{info.title}"
+                        }
+                    }
+                } else {
+                    // If no tabs, show a message for debugging purposes
+                    span { style: "color: #888; font-style: italic;", "Loading tabs..." }
+                }
+            }
+            
+            // Settings button
+            button {
+                class: "settings-button",
+                onclick: move |_| {
+                    settings.set(true);
+                    log::info!("Opening settings");
+                },
+                "Settings"
+            }
+        }
+    )
+}
+
+#[derive(Clone)]
+pub(crate) struct AppProps {
+    pub branches: Vec<super::GithubBranch>,
+    pub modpack_source: String,
+    pub config: super::Config,
+    pub config_path: PathBuf,
+}
+
+pub(crate) fn app() -> Element {
+    let props = use_context::<AppProps>();
+    let css = include_str!("assets/style.css");
+    let branches = props.branches.clone();
+    let config = use_signal(|| props.config);
+    let settings = use_signal(|| false);
+    let mut err: Signal<Option<String>> = use_signal(|| None);
+
+    let name = use_signal(String::default);
+
+    let page = use_signal(|| 0);
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    
+    // Make pages a UseRef so we can access it in UseEffect
+    let page = use_signal(|| 0); 
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    
+    // Log information about the branches we're loading
+    log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
+    for (i, branch) in branches.iter().enumerate() {
+        log::info!("  Branch {}: name={}", i, branch.name);
+    }
+    
+    // Update CSS whenever relevant values change
+    let css_content = {
+        let page = page.clone();
+        let settings = settings.clone();
+        let pages = pages.clone();
+        
+        let default_color = "#320625".to_string();
+        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
+        
+        let bg_color = match pages().get(&page()) {
+            Some(x) => x.color.clone(),
+            None => default_color,
+        };
+        
+        let bg_image = match pages().get(&page()) {
+            Some(x) => {
+                if settings() {
+                    x.settings_background.clone()
+                } else {
+                    x.background.clone()
+                }
+            },
+            None => default_bg,
+        };
+        
+        let secondary_font = match pages().get(&page()) {
+            Some(x) => x.secondary_font.clone(),
+            None => default_font.clone(),
+        };
+        
+        let primary_font = match pages().get(&page()) {
+            Some(x) => x.primary_font.clone(),
+            None => default_font,
+        };
+        
+        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
+        
+        css
+            .replace("<BG_COLOR>", &bg_color)
+            .replace("<BG_IMAGE>", &bg_image)
+            .replace("<SECONDARY_FONT>", &secondary_font)
+            .replace("<PRIMARY_FONT>", &primary_font)
+    };
+
+    let cfg = config.with(|cfg| cfg.clone());
+    let launcher = match super::get_launcher(&cfg.launcher) {
+        Ok(val) => Some(val),
+        Err(_) => None,
+    };
+
+    let mut modal_context = use_context_provider(|| ModalContext::default());
+    if let Some(e) = err() {
+        modal_context.open("Error", rsx! {
+            p {
+                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
+            }
+            textarea { class: "error-area", readonly: true, "{e}" }
+        }, false, Some(move |_| err.set(None)));
+    }
+
+    // Determine which logo to use - could be made configurable via manifest
+    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
+
+    rsx! {
+        style { "{css_content}" }
+
+        Modal {}
+
+        // Always render AppHeader if we're past the initial launcher selection
+        if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
+            AppHeader {
+                page,
+                pages,
+                settings,
+                logo_url
+            }
+        }
+
+        div { class: "main-container",
+            if settings() {
+                Settings {
+                    config,
+                    settings,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                }
+            } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
+                Launcher {
+                    config,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                }
+            } else {
+                for i in 0..branches.len() {
+                    Version {
+                        modpack_source: props.modpack_source.clone(),
+                        modpack_branch: branches[i].name.clone(),
+                        launcher: launcher.as_ref().unwrap().clone(),
+                        error: err,
+                        name,
+                        page,
+                        pages
                     }
                 }
             }
