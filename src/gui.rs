@@ -773,26 +773,35 @@ rsx! {
         }}
 
         
-        .tooltip .tooltiptext {{
-            visibility: hidden;
-            opacity: 0;
-            position: fixed; 
-            background-color: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 5px 8px;
-            border-radius: 5px;
-            z-index: 10000;
-            white-space: normal; 
-            max-width: 250px;
-            text-align: left;
-            word-wrap: break-word;
-        }}
+.tooltip .tooltiptext {{
+    visibility: hidden;
+    opacity: 0;
+    position: absolute; 
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 5px;
+    z-index: 9999; 
+    white-space: normal;
+    max-width: 250px;
+    text-align: left;
+    word-wrap: break-word;
+    
+    
+    left: 100%; 
+    top: 50%;
+    transform: translateY(-50%); 
+    
+    
+    right: auto;
+    bottom: auto;
+}}
 
-        
-        .tooltip:hover .tooltiptext {{
-            visibility: visible;
-            opacity: 1;
-        }}
+
+.tooltip:hover .tooltiptext {{
+    visibility: visible;
+    opacity: 1;
+}}
 
         
         .feature-list input[type=\"checkbox\"] {{
