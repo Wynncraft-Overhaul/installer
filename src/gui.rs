@@ -737,17 +737,9 @@ fn Version(mut props: VersionProps) -> Element {
         log::info!("  tab_primary_font: None, defaulting to '{}'", default_font);
         String::from(default_font)
     };
-    
-    // FIX: Clone these values to prevent ownership issues
-    let tab_color_clone = tab_color.clone();
-    let tab_title_clone = tab_title.clone();
-    let tab_background_clone = tab_background.clone();
-    let settings_background_clone = settings_background.clone();
-    let tab_primary_font_clone = tab_primary_font.clone();
-    let tab_secondary_font_clone = tab_secondary_font.clone();
-    let tab_group_clone = tab_group;
 
-   if !tab_title.is_empty() && tab_title != "Default" {
+    // Only insert tab if it has meaningful title
+    if !tab_title.is_empty() && tab_title != "Default" {
         props.pages.with_mut(|x| {
             x.insert(
                 tab_group,
@@ -760,10 +752,10 @@ fn Version(mut props: VersionProps) -> Element {
                     secondary_font: tab_secondary_font,
                 },
             );
-            
             // We no longer need to ensure_all_tab_groups here
             // Let's only insert real modpack tabs, not placeholders
         });
+    }
 
     let mut installing = use_signal(|| false);
     let mut progress_status = use_signal(|| "");
@@ -810,13 +802,13 @@ fn Version(mut props: VersionProps) -> Element {
     let mut update_available = use_signal(|| installer_profile.update_available);
     
     // Clone local_manifest to prevent ownership issues
-let mut local_features = use_signal(|| {
-    if let Some(ref manifest) = installer_profile.local_manifest {
-        Some(manifest.enabled_features.clone())
-    } else {
-        None
-    }
-});
+    let mut local_features = use_signal(|| {
+        if let Some(ref manifest) = installer_profile.local_manifest {
+            Some(manifest.enabled_features.clone())
+        } else {
+            None
+        }
+    });
     
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
@@ -1106,9 +1098,17 @@ pub(crate) struct AppProps {
 }
 
 pub(crate) fn app() -> Element {
-    // ... existing code ...
+    let props = use_context::<AppProps>();
+    let css = include_str!("assets/style.css");
+    let branches = props.branches.clone();
+    let config = use_signal(|| props.config);
+    let mut settings = use_signal(|| false);
+    let mut err: Signal<Option<String>> = use_signal(|| None);
+
+    let name = use_signal(String::default);
     
-    let mut page = use_signal(|| HOME_PAGE); // Start with HOME_PAGE as default
+    // Start with HOME_PAGE as default
+    let mut page = use_signal(|| HOME_PAGE);
     let mut pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
     
     // Tab loading state tracking
@@ -1126,64 +1126,158 @@ pub(crate) fn app() -> Element {
             tabs_loading.set(false);
         }
     });
-    
-    // ... existing code ...
-    
+
+    // CSS calculation
+    let css_content = {
+        let page_val = page();
+        let settings_val = settings();
+        let pages_val = pages();
+        
+        let default_color = "#320625".to_string();
+        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
+        
+        let bg_color = match pages_val.get(&page_val) {
+            Some(x) => x.color.clone(),
+            None => default_color,
+        };
+        
+        let bg_image = match pages_val.get(&page_val) {
+            Some(x) => {
+                if settings_val {
+                    x.settings_background.clone()
+                } else {
+                    x.background.clone()
+                }
+            },
+            None => default_bg,
+        };
+        
+        let secondary_font = match pages_val.get(&page_val) {
+            Some(x) => x.secondary_font.clone(),
+            None => default_font.clone(),
+        };
+        
+        let primary_font = match pages_val.get(&page_val) {
+            Some(x) => x.primary_font.clone(),
+            None => default_font,
+        };
+        
+        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
+        
+        css
+            .replace("<BG_COLOR>", &bg_color)
+            .replace("<BG_IMAGE>", &bg_image)
+            .replace("<SECONDARY_FONT>", &secondary_font)
+            .replace("<PRIMARY_FONT>", &primary_font)
+    };
+
+    let cfg = config.with(|cfg| cfg.clone());
+    let launcher = match super::get_launcher(&cfg.launcher) {
+        Ok(val) => Some(val),
+        Err(_) => None,
+    };
+
+    let mut modal_context = use_context_provider(|| ModalContext::default());
+    if let Some(e) = err() {
+        modal_context.open("Error", rsx! {
+            p {
+                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
+            }
+            textarea { class: "error-area", readonly: true, "{e}" }
+        }, false, Some(move |_| err.set(None)));
+    }
+
+    // Determine which logo to use
+    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/icon.png".to_string());
+
     rsx! {
-        style { "{css}" }
+        style { "{css_content}" }
 
         Modal {}
 
-        if *settings.read() {
-            // ... existing settings code ...
-        } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
-            // ... existing launcher code ...
-        } else {
-            div { class: "toolbar",
-                // Add home button
-                button {
-                    class: "toolbar-button",
-                    style: "padding: 0 10px; margin-right: 10px;",
-                    onclick: move |evt| {
-                        page.set(HOME_PAGE);
-                        evt.stop_propagation();
-                    },
-                    img { 
-                        src: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/home_icon.png",
-                        style: "width: 20px; height: 20px; margin-right: 5px;"
+        // Always render AppHeader if we're past the initial launcher selection
+        if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
+            if page() == HOME_PAGE {
+                // Simpler header for home page
+                header { class: "app-header",
+                    // Logo (if available)
+                    if let Some(url) = logo_url {
+                        img { class: "app-logo", src: "{url}", alt: "Logo" }
                     }
-                    "Home"
+                    
+                    h1 { class: "app-title", "Modpack Installer" }
+                    
+                    // Settings button
+                    button {
+                        class: "settings-button",
+                        onclick: move |_| {
+                            settings.set(true);
+                            log::info!("Opening settings");
+                        },
+                        "Settings"
+                    }
                 }
-                
-                // Only show pagination if not on home page
-                if page() != HOME_PAGE {
-                    Pagination { page, pages }
-                }
-                
-                button {
-                    class: "toolbar-button",
-                    style: "padding: 0;margin-right: 0;",
-                    onclick: move |evt| {
-                        settings.set(true);
-                        evt.stop_propagation();
-                    },
-                    img { src: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/cog_icon.png" }
+            } else {
+                // Regular header with tabs for specific modpack pages
+                AppHeader {
+                    page,
+                    pages,
+                    settings,
+                    logo_url
                 }
             }
-            div { class: "fake-body",
-                // Show HomePage if HOME_PAGE is selected
-                if page() == HOME_PAGE {
-                    HomePage { pages, page }
-                } else {
-                    for i in 0..branches.len() {
-                        Version {
-                            modpack_source: props.modpack_source.clone(),
-                            modpack_branch: branches[i].name.clone(),
-                            launcher: launcher.as_ref().unwrap().clone(),
-                            error: err,
-                            name,
-                            page,
-                            pages
+        }
+
+        div { class: "main-container",
+            if settings() {
+                Settings {
+                    config,
+                    settings,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                }
+            } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
+                Launcher {
+                    config,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                }
+            } else {
+                // Main navigation area
+                div {
+                    // Show home button when not on home page
+                    if page() != HOME_PAGE {
+                        div { class: "navigation-buttons",
+                            button {
+                                class: "home-button",
+                                onclick: move |_| {
+                                    page.set(HOME_PAGE);
+                                    log::info!("Returning to home page");
+                                },
+                                "← Back to Home"
+                            }
+                        }
+                    }
+                
+                    // Content area
+                    if page() == HOME_PAGE {
+                        // Show home page
+                        HomePage { pages, page }
+                    } else {
+                        // Show specific modpack version page
+                        for i in 0..branches.len() {
+                            Version {
+                                modpack_source: props.modpack_source.clone(),
+                                modpack_branch: branches[i].name.clone(),
+                                launcher: launcher.as_ref().unwrap().clone(),
+                                error: err,
+                                name,
+                                page,
+                                pages
+                            }
                         }
                     }
                 }
