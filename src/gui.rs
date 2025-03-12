@@ -591,22 +591,19 @@ fn Version(mut props: VersionProps) -> Element {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png")
     };
     
-    let settings_background =
-        if let Some(ref settings_background) = installer_profile.manifest.settings_background {
-            settings_background.clone()
-        } else {
-            tab_background.clone()
-        };
+    let settings_background = if let Some(ref settings_background) = installer_profile.manifest.settings_background {
+        settings_background.clone()
+    } else {
+        tab_background.clone()
+    };
         
-    let tab_secondary_font = if let Some(ref tab_secondary_font) =
-        installer_profile.manifest.tab_secondary_font {
+    let tab_secondary_font = if let Some(ref tab_secondary_font) = installer_profile.manifest.tab_secondary_font {
         tab_secondary_font.clone()
     } else {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
     };
     
-    let tab_primary_font = if let Some(ref tab_primary_font) =
-        installer_profile.manifest.tab_primary_font {
+    let tab_primary_font = if let Some(ref tab_primary_font) = installer_profile.manifest.tab_primary_font {
         tab_primary_font.clone()
     } else {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
