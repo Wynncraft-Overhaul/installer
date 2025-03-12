@@ -1306,7 +1306,7 @@ pub(crate) fn app() -> Element {
                                 return;
                             }
                         
-                    } else if *update_available.read() {
+                     else if *update_available.read() {
                         progress_status.set("Updating");
                         match super::update(&installer_profile, move || {
                             install_progress.with_mut(|x| *x += 1);
