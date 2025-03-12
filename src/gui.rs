@@ -556,7 +556,7 @@ fn Version(mut props: VersionProps) -> Element {
         let launcher = props.launcher.clone();
         log::info!("Loading modpack from source: {}, branch: {}", source, branch);
         async move { 
-            log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, source + branch);
+            log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, &(source + &branch));
             let result = super::init(source, branch, launcher).await;
             match &result {
                 Ok(profile) => {
@@ -973,7 +973,8 @@ fn Version(mut props: VersionProps) -> Element {
 }
 
 // New HomePage component for browsing available modpacks
-#[derive(PartialEq, Props)]
+// Fixed HomePageTabProps with Clone derive
+#[derive(PartialEq, Props, Clone)]
 struct HomePageTabProps {
     pages: Signal<BTreeMap<usize, TabInfo>>,
     page: Signal<usize>,
