@@ -944,13 +944,6 @@ rsx! {
         "#
     }
 }  // ✅ Properly closed rsx! block
-
-// Ensure the `Version` function has a proper closing brace
-fn Version(mut props: VersionProps) -> Element {
-    rsx! {
-        div { "Version component" }
-    }
-}  // ✅ Closing for the `Version` function
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
