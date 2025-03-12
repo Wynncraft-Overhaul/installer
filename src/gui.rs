@@ -1259,7 +1259,7 @@ pub(crate) fn app() -> Element {
                                     ),
                                 
                                 installed.set(true);
-                            }
+                            
                             Err(e) => {
                                 props.error.set(Some(
                                     format!("{:#?}", e) + " (Failed to install modpack!)",
