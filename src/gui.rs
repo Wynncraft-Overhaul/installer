@@ -719,8 +719,8 @@ let mut install_progress = use_signal(|| 0);
 let mut modify = use_signal(|| false);
 let mut modify_count = use_signal(|| 0);
 
-// Use use_memo to compute initial features
-let enabled_features = use_memo(move || {
+// Compute initial features, but keep as a Signal
+let enabled_features = use_signal(|| {
     let mut features = vec!["default".to_string()];
     
     if installer_profile.installed && installer_profile.local_manifest.is_some() {
@@ -742,7 +742,7 @@ let mut install_item_amount = use_signal(|| 0);
 let mut credits = use_signal(|| false);
 let mut installed = use_signal(|| installer_profile.installed);
 let mut update_available = use_signal(|| installer_profile.update_available);
-let mut local_features = use_memo(move || {
+let mut local_features = use_signal(|| {
     if let Some(manifest) = installer_profile.local_manifest.clone() {
         Some(manifest.enabled_features)
     } else {
