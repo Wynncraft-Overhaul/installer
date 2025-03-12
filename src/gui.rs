@@ -18,6 +18,18 @@ struct TabInfo {
     secondary_font: String,
 }
 
+// Add VersionProps definition
+#[derive(PartialEq, Props, Clone)]
+struct VersionProps {
+    modpack_source: String,
+    modpack_branch: String,
+    launcher: Launcher,
+    error: Signal<Option<String>>,
+    name: Signal<String>,
+    page: Signal<usize>,
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+}
+
 #[component]
 fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
     rsx!(
@@ -537,18 +549,13 @@ fn feature_change(
     }
 }
 
-#[derive(PartialEq, Props, Clone)]
-struct HomePageTabProps {
-    pages: Signal<BTreeMap<usize, TabInfo>>,
-    page: Signal<usize>,
-}
 
 #[component]
 fn HomePageTab(props: HomePageTabProps) -> Element {
     let page_count = props.pages.with(|p| p.len());
     log::info!("Rendering Home Page with {} tabs", page_count);
     
-    Some(rsx!(
+    rsx!(
         div { class: "home-container",
             h1 { class: "home-title", "Welcome to the Modpack Installer" }
             
@@ -576,7 +583,14 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                 }
             }
         }
-    ))
+    )
+}
+
+// Ensure HomePageTabProps is defined
+#[derive(PartialEq, Props, Clone)]
+struct HomePageTabProps {
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+    page: Signal<usize>,
 }
 
 #[component]
