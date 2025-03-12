@@ -73,6 +73,7 @@ fn HomePage(
         }
     } else {
         // We have valid tabs, show them in the grid
+        // Collect real modpacks first into a Vec to avoid lifetime issues
         let real_modpacks: Vec<(usize, TabInfo)> = pages().iter()
             .filter(|(_, info)| !info.title.starts_with("Tab "))
             .map(|(index, info)| (*index, info.clone()))
@@ -662,7 +663,7 @@ fn ensure_all_tab_groups(pages: &mut BTreeMap<usize, TabInfo>) {
 #[component]
 fn Version(mut props: VersionProps) -> Element {
     // Early return if we're on the HOME_PAGE - this is just to load data
-    if props.page() == HOME_PAGE {
+    if (props.page)() == HOME_PAGE {
         log::info!("Version component loading data for home page");
         // We still load the resources for the home page to populate tabs
     }
@@ -695,7 +696,7 @@ fn Version(mut props: VersionProps) -> Element {
     // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
         log::info!("Profile resource is still loading...");
-        return if props.page() == HOME_PAGE {
+        return if (props.page)() == HOME_PAGE {
             rsx! { "" } // Empty element for HOME_PAGE
         } else {
             rsx! {
@@ -710,7 +711,7 @@ fn Version(mut props: VersionProps) -> Element {
     let installer_profile = match profile.unwrap() {
         Ok(v) => v,
         Err(e) => {
-            if props.page() != HOME_PAGE {
+            if (props.page)() != HOME_PAGE {
                 props.error.set(Some(
                     format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
                 ));
@@ -801,10 +802,9 @@ fn Version(mut props: VersionProps) -> Element {
     });
 
     // If we're only loading data for the home page, return empty
-    if props.page() == HOME_PAGE {
+    if (props.page)() == HOME_PAGE {
         return rsx! { "" }; // Empty element
     }
-    
 
     let mut installing = use_signal(|| false);
     let mut progress_status = use_signal(|| "");
@@ -1164,6 +1164,12 @@ pub(crate) fn app() -> Element {
     // Tab loading state tracking
     let mut tabs_loading = use_signal(|| true);
     
+    // Log the branch information to help with debugging
+    log::info!("App initialized with {} branches", branches.len());
+    for (i, branch) in branches.iter().enumerate() {
+        log::info!("Branch {}: {}", i, branch.name);
+    }
+    
     // We'll use this effect to detect when tabs are loaded
     use_effect(move || {
         // Count valid tabs
@@ -1173,6 +1179,9 @@ pub(crate) fn app() -> Element {
             
         if valid_tabs > 0 && tabs_loading() {
             log::info!("Valid modpack tabs loaded: {}", valid_tabs);
+            for (index, info) in pages().iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
+                log::info!("  Tab {}: {}", index, info.title);
+            }
             tabs_loading.set(false);
         }
     });
@@ -1224,8 +1233,14 @@ pub(crate) fn app() -> Element {
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
-        Ok(val) => Some(val),
-        Err(_) => None,
+        Ok(val) => {
+            log::info!("Successfully loaded launcher: {}", cfg.launcher);
+            Some(val)
+        },
+        Err(e) => {
+            log::error!("Failed to load launcher: {} - {}", cfg.launcher, e);
+            None
+        },
     };
 
     let mut modal_context = use_context_provider(|| ModalContext::default());
