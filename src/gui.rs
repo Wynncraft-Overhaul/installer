@@ -564,38 +564,35 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
             }
             
             div { class: "tab-card-container",
-                {props.pages.with(|p| 
-                    p.iter()
-                     .filter(|&(index, _)| *index != 0)
-                     .map(|(index, info)| {
-                        rsx!(
-                            div {
-                                key: "{index}",
-                                class: "tab-card",
-                                onclick: move |_| {
-                                    props.page.set(*index);
-                                    log::info!("Clicked tab card: switching to tab {}", index);
-                                },
-                                style: "background-image: url({});", info.background,
-                                
-                                div { class: "tab-card-content",
-                                    h2 { class: "tab-card-title", "{info.title}" }
+                {props.pages.with(|pages| 
+                    pages.iter()
+                         .filter(|&(index, _)| *index != 0)
+                         .map(|(index, info)| {
+                            let current_index = *index;
+                            let current_background = info.background.clone();
+                            let current_title = info.title.clone();
+                            
+                            rsx!(
+                                div {
+                                    key: "{current_index}",
+                                    class: "tab-card",
+                                    onclick: move |_| {
+                                        props.page.set(current_index);
+                                        log::info!("Clicked tab card: switching to tab {}", current_index);
+                                    },
+                                    style: "background-image: url({});", current_background,
+                                    
+                                    div { class: "tab-card-content",
+                                        h2 { class: "tab-card-title", "{current_title}" }
+                                    }
                                 }
-                            }
-                        )
-                     })
-                     .collect::<Vec<_>>()
+                            )
+                         })
+                         .collect::<Vec<_>>()
                 )}
             }
         }
     }
-}
-
-// Ensure HomePageTabProps is defined
-#[derive(PartialEq, Props, Clone)]
-struct HomePageTabProps {
-    pages: Signal<BTreeMap<usize, TabInfo>>,
-    page: Signal<usize>,
 }
 
 #[component]
@@ -603,6 +600,9 @@ fn Version(mut props: VersionProps) -> Element {
     let modpack_source = props.modpack_source.clone();
     let modpack_branch = props.modpack_branch.clone();
     let launcher = props.launcher.clone();
+    
+    // Create a separate variable for error display
+    let error_branch = modpack_branch.clone();
 
     let profile = use_resource(move || {
         let source = modpack_source.clone();
@@ -649,7 +649,7 @@ fn Version(mut props: VersionProps) -> Element {
             return rsx! {
                 div { class: "error-container",
                     h2 { "Error Loading Modpack" }
-                    p { "Failed to load manifest for branch: {modpack_branch}" }
+                    p { "Failed to load manifest for branch: {error_branch}" }
                     p { class: "error-details", "{e}" }
                 }
             };
