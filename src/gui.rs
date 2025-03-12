@@ -953,8 +953,6 @@ rsx! {
         });
     " }
  
-    }
- 
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
