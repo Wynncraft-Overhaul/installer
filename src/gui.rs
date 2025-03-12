@@ -804,7 +804,7 @@ rsx! {
                                 for feat in installer_profile.manifest.features {
                                     if !feat.hidden {
                                         label { class: "tooltip",
-                                               style: "display: inline-flex; align-items: center; position: relative; cursor: pointer;",
+                                               style: "display: flex; align-items: center; position: relative; cursor: pointer;",
                                             input {
                                                 checked: if installer_profile.installed {
                                                     if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
