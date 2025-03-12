@@ -587,98 +587,131 @@ struct VersionProps {
 
 #[component]
 fn Version(mut props: VersionProps) -> Element {
-    // Improved logging for debugging
+    // Fix: Using logging to debug the profile loading
     log::info!("Loading Version component for source: {}, branch: {}", 
               props.modpack_source, props.modpack_branch);
     
-    // Use a more robust resource loading approach
     let profile = use_resource(move || {
         let source = props.modpack_source.clone();
         let branch = props.modpack_branch.clone();
         let launcher = props.launcher.clone();
-        
+        log::info!("Starting resource load for modpack from source: {}, branch: {}", source, branch);
         async move { 
-            log::info!("Attempting to initialize modpack: source={}, branch={}", source, branch);
-            
-            match super::init(source, branch, launcher).await {
+            let result = super::init(source, branch, launcher).await;
+            match &result {
                 Ok(profile) => {
-                    log::info!("Successfully loaded manifest for branch {}", branch);
-                    log::info!("  Subtitle: {}", profile.manifest.subtitle);
-                    log::info!("  Features count: {}", profile.manifest.features.len());
-                    Some(profile)
+                    log::info!("Successfully loaded manifest: subtitle={}, has {} features", 
+                        profile.manifest.subtitle,
+                        profile.manifest.features.len());
                 },
                 Err(e) => {
-                    log::error!("Failed to load manifest for branch {}: {}", branch, e);
-                    None
+                    log::error!("Failed to load manifest: {}", e);
                 }
             }
+            result
         }
     });
 
-    // Improved loading state handling
-    match profile.read().as_ref() {
-        None => {
-            log::info!("Profile still loading for branch: {}", props.modpack_branch);
-            rsx! {
-                div { class: "loading-container", 
-                    div { class: "loading-spinner" }
-                    div { class: "loading-text", "Loading modpack information for {props.modpack_branch}..." }
-                }
+    // When loading profile resources, show a loading indicator
+    if profile.read().is_none() {
+        log::info!("Profile resource is still loading...");
+        return rsx! {
+            div { class: "loading-container", 
+                div { class: "loading-spinner" }
+                div { class: "loading-text", "Loading modpack information..." }
             }
-        },
-        Some(None) => {
-            log::error!("Failed to load profile for branch: {}", props.modpack_branch);
-            rsx! {
-                div { class: "error-container", 
-                    div { class: "error-text", "Failed to load modpack information" }
-                }
-            }
-        },
-        Some(Some(installer_profile)) => {
-            // Process manifest data for tab information with more robust extraction
-            let tab_group = installer_profile.manifest.tab_group.unwrap_or(0);
-            
-            let tab_title = installer_profile.manifest.tab_title
-                .clone()
-                .unwrap_or_else(|| installer_profile.manifest.subtitle.clone());
-            
-            let tab_color = installer_profile.manifest.tab_color
-                .clone()
-                .unwrap_or_else(|| String::from("#320625"));
-            
-            let tab_background = installer_profile.manifest.tab_background
-                .clone()
-                .unwrap_or_else(|| String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png"));
-            
-            let settings_background = installer_profile.manifest.settings_background
-                .clone()
-                .unwrap_or_else(|| tab_background.clone());
-            
-            let tab_secondary_font = installer_profile.manifest.tab_secondary_font
-                .clone()
-                .unwrap_or_else(|| String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2"));
-            
-            let tab_primary_font = installer_profile.manifest.tab_primary_font
-                .clone()
-                .unwrap_or_else(|| String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2"));
+        };
+    }
 
-            // Log the tab information being added
-            log::info!("Adding tab group {} with title: {}", tab_group, tab_title);
-            
-            // Insert tab information into pages map
-            props.pages.with_mut(|pages| {
-                pages.insert(
-                    tab_group,
-                    TabInfo {
-                        color: tab_color,
-                        title: tab_title,
-                        background: tab_background,
-                        settings_background,
-                        primary_font: tab_primary_font,
-                        secondary_font: tab_secondary_font,
-                    }
-                )
-            });
+    let installer_profile = match profile.unwrap() {
+        Ok(v) => v,
+        Err(e) => {
+            props.error.set(Some(
+                format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
+            ));
+            return None;
+        }
+    };
+
+    // Process manifest data for tab information
+    // Extract and log the tab information for debugging
+    log::info!("Processing manifest tab information:");
+    log::info!("  subtitle: {}", installer_profile.manifest.subtitle);
+    log::info!("  description length: {}", installer_profile.manifest.description.len());
+    
+    let tab_group = if let Some(tab_group) = installer_profile.manifest.tab_group {
+        log::info!("  tab_group: {}", tab_group);
+        tab_group
+    } else {
+        log::info!("  tab_group: None, defaulting to 0");
+        0
+    };
+    
+    let tab_title = if let Some(ref tab_title) = installer_profile.manifest.tab_title {
+        log::info!("  tab_title: {}", tab_title);
+        tab_title.clone()
+    } else {
+        log::info!("  tab_title: None, using subtitle");
+        installer_profile.manifest.subtitle.clone()
+    };
+    
+    let tab_color = if let Some(ref tab_color) = installer_profile.manifest.tab_color {
+        log::info!("  tab_color: {}", tab_color);
+        tab_color.clone()
+    } else {
+        log::info!("  tab_color: None, defaulting to '#320625'");
+        String::from("#320625")
+    };
+    
+    let tab_background = if let Some(ref tab_background) = installer_profile.manifest.tab_background {
+        log::info!("  tab_background: {}", tab_background);
+        tab_background.clone()
+    } else {
+        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png";
+        log::info!("  tab_background: None, defaulting to '{}'", default_bg);
+        String::from(default_bg)
+    };
+    
+    let settings_background = if let Some(ref settings_background) = installer_profile.manifest.settings_background {
+        log::info!("  settings_background: {}", settings_background);
+        settings_background.clone()
+    } else {
+        log::info!("  settings_background: None, using tab_background");
+        tab_background.clone()
+    };
+        
+    let tab_secondary_font = if let Some(ref tab_secondary_font) = installer_profile.manifest.tab_secondary_font {
+        log::info!("  tab_secondary_font: {}", tab_secondary_font);
+        tab_secondary_font.clone()
+    } else {
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
+        log::info!("  tab_secondary_font: None, defaulting to '{}'", default_font);
+        String::from(default_font)
+    };
+    
+    let tab_primary_font = if let Some(ref tab_primary_font) = installer_profile.manifest.tab_primary_font {
+        log::info!("  tab_primary_font: {}", tab_primary_font);
+        tab_primary_font.clone()
+    } else {
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
+        log::info!("  tab_primary_font: None, defaulting to '{}'", default_font);
+        String::from(default_font)
+    };
+    
+    log::info!("Inserting tab_group {} into pages map", tab_group);
+    props.pages.with_mut(|x| {
+        x.insert(
+            tab_group,
+            TabInfo {
+                color: tab_color,
+                title: tab_title,
+                background: tab_background,
+                settings_background,
+                primary_font: tab_primary_font,
+                secondary_font: tab_secondary_font,
+            },
+        )
+    });
 
     let mut installing = use_signal(|| false);
     let mut progress_status = use_signal(|| "");
