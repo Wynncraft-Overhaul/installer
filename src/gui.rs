@@ -819,13 +819,15 @@ fn Version(mut props: VersionProps) -> Element {
     let update_available = use_signal(|| installer_profile.update_available);
     
     // Clone local_manifest to prevent ownership issues
-    let local_features = use_signal(|| {
-        if let Some(ref manifest) = installer_profile.local_manifest {
-            Some(manifest.enabled_features.clone())
-        } else {
-            None
-        }
-    });
+let mut local_features = use_signal(|| {
+    if let Some(ref manifest) = installer_profile.local_manifest {
+        Some(manifest.enabled_features.clone())
+    } else {
+        None
+    }
+});
+
+let mut update_available = use_signal(|| installer_profile.update_available);
     
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
@@ -1145,49 +1147,49 @@ pub(crate) fn app() -> Element {
     }
     
     // CSS calculation with error handling
-    let css_content = use_memo(move || {
-        let page_val = page.get();
-        let settings_val = settings.get();
-        let pages_val = pages.get();
-        
-        let default_color = "#320625".to_string();
-        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
-        
-        let bg_color = match pages_val.get(&page_val) {
-            Some(x) => x.color.clone(),
-            None => default_color,
-        };
-        
-        let bg_image = match pages_val.get(&page_val) {
-            Some(x) => {
-                if settings_val {
-                    x.settings_background.clone()
-                } else {
-                    x.background.clone()
-                }
-            },
-            None => default_bg,
-        };
-        
-        let secondary_font = match pages_val.get(&page_val) {
-            Some(x) => x.secondary_font.clone(),
-            None => default_font.clone(),
-        };
-        
-        let primary_font = match pages_val.get(&page_val) {
-            Some(x) => x.primary_font.clone(),
-            None => default_font,
-        };
-        
-        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
-        
-        css
-            .replace("<BG_COLOR>", &bg_color)
-            .replace("<BG_IMAGE>", &bg_image)
-            .replace("<SECONDARY_FONT>", &secondary_font)
-            .replace("<PRIMARY_FONT>", &primary_font)
-    });
+let css_content = {
+    let page_val = page();
+    let settings_val = settings();
+    let pages_val = pages();
+    
+    let default_color = "#320625".to_string();
+    let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
+    let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
+    
+    let bg_color = match pages_val.get(&page_val) {
+        Some(x) => x.color.clone(),
+        None => default_color,
+    };
+    
+    let bg_image = match pages_val.get(&page_val) {
+        Some(x) => {
+            if settings_val {
+                x.settings_background.clone()
+            } else {
+                x.background.clone()
+            }
+        },
+        None => default_bg,
+    };
+    
+    let secondary_font = match pages_val.get(&page_val) {
+        Some(x) => x.secondary_font.clone(),
+        None => default_font.clone(),
+    };
+    
+    let primary_font = match pages_val.get(&page_val) {
+        Some(x) => x.primary_font.clone(),
+        None => default_font,
+    };
+    
+    log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
+    
+    css
+        .replace("<BG_COLOR>", &bg_color)
+        .replace("<BG_IMAGE>", &bg_image)
+        .replace("<SECONDARY_FONT>", &secondary_font)
+        .replace("<PRIMARY_FONT>", &primary_font)
+};
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
