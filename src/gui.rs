@@ -825,7 +825,7 @@ fn Version(mut props: VersionProps) -> Element {
                                                     r#type: "checkbox"
                                                 }
 
-                                                "{feat.name}"
+                                            "{feat.name}"
                                                 match feat.description {
                                                     Some(ref desc) => rsx!(span {
                                                         class: "tooltiptext",
