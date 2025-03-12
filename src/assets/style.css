@@ -576,6 +576,7 @@ a:hover {
     align-items: center;
     justify-content: center;
     height: 100%;
+    gap: 20px;
 }
 
 .loading-spinner {
@@ -583,9 +584,8 @@ a:hover {
     height: 50px;
     border: 5px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
-    border-top-color: #fce8f6;
+    border-top-color: #fff;
     animation: spin 1s ease-in-out infinite;
-    margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -593,9 +593,18 @@ a:hover {
 }
 
 .loading-text {
-    font-size: 1.2rem;
-    font-family: "SECONDARY_FONT";
+    font-size: 18px;
+    color: white;
 }
+
+.modpack-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.modpack-card:hover {
+    transform: translateY(-5px);
+    
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
