@@ -760,6 +760,39 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
 rsx! {
+    style { "
+        /* Tooltip container styling */
+        .tooltip {
+            position: relative;  /* Make sure this container is positioned relative */
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        /* Tooltip text styling */
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            opacity: 0;
+            position: fixed;  /* Use 'fixed' to place it in relation to the viewport */
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px;
+            border-radius: 3px;
+            z-index: 9999;  /* Ensure tooltip is on top */
+            transition: opacity 0.3s ease-in-out;
+            top: 50%;  /* Position it slightly below the label */
+            left: 50%;
+            transform: translate(-50%, 10px); /* Center horizontally and place below */
+            white-space: nowrap;
+            max-width: 250px; /* Prevent the tooltip from becoming too wide */
+        }
+
+        /* Tooltip visible when hovering over the label */
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    " }
+
     if *installing.read() {
         ProgressView {
             value: install_progress(),
