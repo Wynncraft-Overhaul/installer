@@ -603,11 +603,12 @@ fn Version(mut props: VersionProps) -> Element {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
     };
     
-    let tab_primary_font = if let Some(ref tab_primary_font) = installer_profile.manifest.tab_primary_font {
-        tab_primary_font.clone()
-    } else {
-        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
-    };
+let tab_primary_font = if let Some(ref tab_primary_font) =
+    installer_profile.manifest.tab_primary_font {
+    tab_primary_font.clone()
+} else {
+    String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
+};
     
     props.pages.with_mut(|x| {
         x.insert(
