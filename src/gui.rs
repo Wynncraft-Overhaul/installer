@@ -942,7 +942,7 @@ rsx! {
  
         }
 
-    }
+    
 div {
     dangerous_inner_html: r#"
         <script>
