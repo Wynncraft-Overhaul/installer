@@ -1122,7 +1122,7 @@ pub(crate) fn app() -> Element {
     }
 
     // Determine which logo to use - could be made configurable via manifest
-    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
+    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/icon.png".to_string());
 
     rsx! {
         style { "{css_content}" }
