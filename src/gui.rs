@@ -761,7 +761,7 @@ fn Version(mut props: VersionProps) -> Element {
     }
 rsx! {
     style { "
-        
+       
         .tooltip {{
             position: relative;
             display: inline-flex;
@@ -776,11 +776,11 @@ rsx! {
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
-            position: absolute;  
+            position: absolute;
             background-color: rgba(0, 0, 0, 0.9);
             color: white;
             padding: 6px 10px;
-            border-radius: 5px;
+            border-radius: 5px;  
             z-index: 9999;
             white-space: normal;
             max-width: 250px;
@@ -788,9 +788,9 @@ rsx! {
             word-wrap: break-word;
 
             
-            bottom: 100%;  
-            left: 50%; 
-            transform: translateX(-50%);  
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
             margin-bottom: 10px;
         }}
 
@@ -800,7 +800,7 @@ rsx! {
             opacity: 1;
         }}
 
-        
+       
         .feature-list input[type="checkbox"] {{
             flex-shrink: 0;
             width: 18px;
@@ -822,6 +822,7 @@ rsx! {
             overflow-wrap: break-word;
         }}
 
+       
         .feature-list {{
             max-height: 200px;
             overflow-y: auto;
@@ -829,8 +830,39 @@ rsx! {
             border: 1px solid #ccc;
             padding: 5px;
             position: relative;
-            overflow: visible; 
+            overflow: visible;
+            border-radius: 8px; 
         }}
+
+       
+        .install-button {{
+            border-radius: 8px;  
+            padding: 10px 20px; 
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }}
+
+        
+        .install-button:hover {{
+            background-color: #0056b3;
+        }}
+
+        
+        .container, .info-container, .button-container, .version-container, .subtitle-container {{
+            border-radius: 8px;  
+            padding: 10px;
+        }}
+
+        
+        .description {{
+            border-radius: 8px;  
+            padding: 10px;
+            background-color: #f9f9f9;
+        }}
+
     " }
 
     if *installing.read() {
