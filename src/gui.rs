@@ -941,6 +941,8 @@ rsx! {
             }
  
         }
+
+    }
     script { "
         document.querySelectorAll('.tooltip').forEach(el => {
             el.addEventListener('mousemove', (e) => {
