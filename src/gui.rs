@@ -556,38 +556,50 @@ fn Version(mut props: VersionProps) -> Element {
         let launcher = props.launcher.clone();
         log::info!("Loading modpack from source: {}, branch: {}", source, branch);
         async move { 
+            log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, source + branch);
             let result = super::init(source, branch, launcher).await;
-            if let Ok(ref profile) = result {
-                log::info!("Loaded manifest: subtitle={}, tab_group={:?}, has {} features", 
-                    profile.manifest.subtitle,
-                    profile.manifest.tab_group,
-                    profile.manifest.features.len()
-                );
-            } else if let Err(ref e) = result {
-                log::error!("Failed to load manifest: {}", e);
+            match &result {
+                Ok(profile) => {
+                    log::info!("Successfully loaded manifest: subtitle={}, tab_group={:?}, has {} features", 
+                        profile.manifest.subtitle,
+                        profile.manifest.tab_group,
+                        profile.manifest.features.len()
+                    );
+                }
+                Err(e) => {
+                    log::error!("Failed to load manifest: {}", e);
+                }
             }
             result
         }
     });
 
-    // When loading profile resources, show a loading indicator
+    // When loading profile resources, show a loading indicator with more info
     if profile.read().is_none() {
-        log::info!("Profile resource is still loading...");
+        log::info!("Profile resource is still loading for branch: {}", props.modpack_branch);
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
-                div { class: "loading-text", "Loading modpack information..." }
+                div { class: "loading-text", "Loading modpack information for: {props.modpack_branch}..." }
+                div { class: "loading-details", "This may take a moment. Please wait..." }
             }
         };
     }
 
+    // Handle error case more gracefully
     let installer_profile = match profile.unwrap() {
         Ok(v) => v,
         Err(e) => {
-            props.error.set(Some(
-                format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
-            ));
-            return None;
+            let error_msg = format!("{:#?}", e) + " (Failed to retrieve installer profile!)";
+            log::error!("Error loading profile: {}", error_msg);
+            props.error.set(Some(error_msg));
+            return rsx! {
+                div { class: "error-container",
+                    h2 { "Error Loading Modpack" }
+                    p { "Failed to load manifest for branch: {props.modpack_branch}" }
+                    p { class: "error-details", "{e}" }
+                }
+            };
         }
     };
 
