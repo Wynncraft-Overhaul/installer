@@ -17,7 +17,7 @@ use isahc::config::RedirectPolicy;
 use isahc::http::{HeaderMap, HeaderValue, StatusCode};
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use platform_info::{PlatformInfo, PlatformInfoAPI, UNameAPI};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -1804,33 +1804,33 @@ async fn init(
     modpack_branch: String,
     launcher: Launcher,
 ) -> Result<InstallerProfile, String> {
-    println!("DEBUG: Initializing with:");
-    println!("  Source: {}", modpack_source);
-    println!("  Branch: {}", modpack_branch);
-    println!("  Launcher: {:?}", launcher);
+    debug!("Initializing with:");
+    debug!("  Source: {}", modpack_source);
+    debug!("  Branch: {}", modpack_branch);
+    debug!("  Launcher: {:?}", launcher);
 
     let http_client = CachedHttpClient::new();
     
     // Construct full URL
     let full_url = format!("{}{}{}/manifest.json", GH_RAW, modpack_source, modpack_branch);
-    println!("DEBUG: Fetching manifest from URL: {}", full_url);
+    debug!("Fetching manifest from URL: {}", full_url);
 
     let mut manifest_resp = match http_client.get_async(full_url.clone()).await {
         Ok(val) => val,
         Err(e) => {
-            println!("DEBUG: Failed to fetch manifest. Error: {:?}", e);
+            error!("Failed to fetch manifest. Error: {:?}", e);
             return Err(e.to_string());
         }
     };
 
     let manifest_text = match manifest_resp.text().await {
         Ok(text) => {
-            println!("DEBUG: Received manifest text:");
-            println!("{}", text);
+            debug!("Received manifest text:");
+            debug!("{}", text);
             text
         },
         Err(e) => {
-            println!("DEBUG: Failed to get manifest text. Error: {:?}", e);
+            error!("Failed to get manifest text. Error: {:?}", e);
             return Err(e.to_string());
         }
     };
@@ -1838,7 +1838,7 @@ async fn init(
     let manifest: Manifest = match serde_json::from_str(&manifest_text) {
         Ok(val) => val,
         Err(e) => {
-            println!("DEBUG: Failed to parse manifest. Error: {:?}", e);
+            error!("Failed to parse manifest. Error: {:?}", e);
             return Err(e.to_string());
         }
     };
