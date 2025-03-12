@@ -921,9 +921,9 @@ rsx! {
                 }
             }
         }
-    }  
+    }  // ✅ Closes the last else block properly
 
-    
+    // ✅ Moves the script block outside the conditional blocks but inside `rsx!`
     div {
         dangerous_inner_html: r#"
             <script>
@@ -943,7 +943,14 @@ rsx! {
             </script>
         "#
     }
-}
+}  // ✅ Properly closed `rsx!` block
+
+// ✅ Closing delimiter for the `Version` function
+fn Version(mut props: VersionProps) -> Element {
+    rsx! {
+        div { "Version component" }
+    }
+}  // ✅ Closes the `Version` function
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
