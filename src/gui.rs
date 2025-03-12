@@ -761,18 +761,18 @@ fn Version(mut props: VersionProps) -> Element {
     }
 rsx! {
     style { "
-       
+        
         .tooltip {{
-            position: relative;  
+            position: relative; 
             display: inline-block;
             cursor: pointer;
         }}
 
-       
+        
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
-            position: absolute;  
+            position: absolute; 
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 5px;
@@ -780,15 +780,15 @@ rsx! {
             z-index: 9999;
             transition: opacity 0.3s ease-in-out;
             white-space: nowrap;
-            max-width: 250px;  
+            max-width: 250px; 
             width: auto;
-            text-align: left; 
+            text-align: left;
             top: -35px; 
             left: 50%;
             transform: translateX(-50%); 
         }}
 
-       
+        
         .tooltip:hover .tooltiptext {{
             visibility: visible;
             opacity: 1;
@@ -800,8 +800,11 @@ rsx! {
             align-items: center;
             margin-bottom: 10px;
             white-space: nowrap; 
+            width: 100%; 
+            flex-wrap: wrap; 
         }}
 
+        
         .feature-list input[type="checkbox"] {{
             margin-right: 10px; 
             width: 20px; 
@@ -810,13 +813,21 @@ rsx! {
 
         
         .feature-list {{
-            position: relative;  
+            position: relative; 
             max-height: 200px; 
             overflow-y: auto; 
             overflow-x: hidden; 
-            border: 1px solid #ccc; 
+            border: 1px solid #ccc;
             padding: 5px;
-            position: relative;  
+            position: relative; 
+            word-wrap: break-word; 
+        }}
+
+        
+        .feature-list .tooltiptext {{
+            width: auto;
+            max-width: 250px;
+            word-wrap: break-word;
         }}
     " }
 
@@ -883,7 +894,7 @@ rsx! {
                                                 },
                                                 r#type: "checkbox"
                                             }
-                                            
+
                                             div { style: "flex-grow: 1;", "{feat.name}" }
 
                                             match feat.description {
