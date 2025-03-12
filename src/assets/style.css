@@ -60,8 +60,8 @@ a:hover {
     justify-content: space-between;
     align-items: center;
     padding: 10px 20px;
-    background-color: rgba(0, 0, 0, 0.7);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     height: 60px;
 }
 
@@ -74,12 +74,22 @@ a:hover {
 .app-logo {
     height: 40px;
     margin-right: 15px;
+    transition: transform 0.2s ease;
+}
+
+.app-logo:hover {
+    transform: scale(1.1);
 }
 
 .app-title {
     font-size: 1.5rem;
     margin: 0;
     font-family: "SECONDARY_FONT";
+    transition: text-shadow 0.2s ease;
+}
+
+.app-title:hover {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .header-tabs {
@@ -88,6 +98,7 @@ a:hover {
     margin: 0 20px;
     flex-grow: 1;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 .header-tab-button {
@@ -98,15 +109,20 @@ a:hover {
     font-family: "SECONDARY_FONT";
     font-size: 1rem;
     transition: all 0.2s ease;
+    color: #fce8f6;
 }
 
 .header-tab-button:hover {
     background-color: rgba(50, 6, 37, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .header-tab-button.active {
     background-color: var(--bg-color);
     border-color: #fce8f6;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
 .settings-button {
@@ -115,10 +131,15 @@ a:hover {
     border-radius: 4px;
     padding: 8px 16px;
     font-family: "SECONDARY_FONT";
+    transition: all 0.2s ease;
+    color: #fce8f6;
 }
 
 .settings-button:hover {
     background-color: rgba(50, 6, 37, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Main Container */
@@ -209,50 +230,6 @@ a:hover {
     transform: scale(1.05);
 }
 
-/* Header Tabs Enhancements */
-.app-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 20px;
-    background-color: rgba(0, 0, 0, 0.8);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-    height: 60px;
-}
-
-.header-tabs {
-    display: flex;
-    gap: 10px;
-    margin: 0 20px;
-    flex-grow: 1;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.header-tab-button {
-    background-color: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    padding: 8px 16px;
-    font-family: "SECONDARY_FONT";
-    font-size: 1rem;
-    transition: all 0.2s ease;
-    color: #fce8f6;
-}
-
-.header-tab-button:hover {
-    background-color: rgba(50, 6, 37, 0.8);
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: translateY(-2px);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-.header-tab-button.active {
-    background-color: var(--bg-color);
-    border-color: #fce8f6;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-}
-
 /* Version/Details Screen */
 .version-container {
     max-width: 1000px;
@@ -269,6 +246,7 @@ a:hover {
     font-family: "SECONDARY_FONT";
     font-size: 2.2rem;
     margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .content-description {
@@ -277,6 +255,7 @@ a:hover {
     padding: 20px;
     margin-bottom: 30px;
     line-height: 1.6;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .credits-link {
@@ -286,10 +265,12 @@ a:hover {
     color: #fce8f6;
     text-decoration: none;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .credits-link:hover {
     text-decoration: underline;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 /* Feature Cards */
@@ -347,7 +328,7 @@ a:hover {
     font-family: "SECONDARY_FONT";
     text-align: center;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .feature-toggle-button.enabled {
@@ -360,6 +341,7 @@ a:hover {
 
 .feature-toggle-button:hover {
     opacity: 0.9;
+    transform: scale(1.05);
 }
 
 /* Install Button */
@@ -377,11 +359,12 @@ a:hover {
     font-size: 1.5rem;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
+    color: #fce8f6;
 }
 
 .main-install-button:hover:not([disabled]) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 15px rgba(7, 60, 23, 0.4);
     background-color: #0a4d1e;
 }
 
@@ -397,6 +380,7 @@ a:hover {
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .credits-header {
@@ -411,6 +395,7 @@ a:hover {
 .credits-header h1 {
     font-family: "SECONDARY_FONT";
     margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .close-button {
@@ -419,6 +404,13 @@ a:hover {
     border-radius: 4px;
     padding: 8px 16px;
     font-family: "SECONDARY_FONT";
+    transition: all 0.2s ease;
+}
+
+.close-button:hover {
+    background-color: #c73c32;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .credits-content {
@@ -435,6 +427,11 @@ a:hover {
     margin-bottom: 15px;
     padding-bottom: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s ease;
+}
+
+.credit-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .credit-name {
@@ -450,6 +447,12 @@ a:hover {
 
 .credit-author {
     color: #fce8f6;
+    transition: all 0.2s ease;
+}
+
+.credit-author:hover {
+    color: #fff;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 /* Settings Screen */
@@ -459,12 +462,14 @@ a:hover {
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .settings-title {
     font-family: "SECONDARY_FONT";
     text-align: center;
     margin-bottom: 20px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .settings-form {
@@ -490,6 +495,13 @@ a:hover {
     padding: 10px;
     color: #fce8f6;
     width: 100%;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.setting-select:focus {
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+    outline: none;
 }
 
 .settings-buttons {
@@ -506,19 +518,39 @@ a:hover {
     font-family: "SECONDARY_FONT";
     font-size: 1rem;
     flex: 1;
+    transition: all 0.2s ease;
 }
 
 .primary-button {
     background-color: #073c17;
 }
 
+.primary-button:hover {
+    background-color: #0a4d1e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
 .secondary-button {
     background-color: #d95248;
+}
+
+.secondary-button:hover {
+    background-color: #c73c32;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .custom-multimc-button {
     background-color: #555;
     width: 100%;
+    transition: all 0.2s ease;
+}
+
+.custom-multimc-button:hover {
+    background-color: #666;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Launcher Selection Screen */
@@ -529,6 +561,7 @@ a:hover {
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .launcher-title, 
@@ -536,6 +569,7 @@ a:hover {
     font-family: "SECONDARY_FONT";
     text-align: center;
     margin-bottom: 20px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .launcher-form {
@@ -568,10 +602,13 @@ a:hover {
     width: 100%;
     text-align: left;
     margin-bottom: 8px;
+    transition: all 0.2s ease;
 }
 
 .uninstall-list-item:hover {
     background-color: #c73c32;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Progress Screen */
@@ -582,6 +619,7 @@ a:hover {
     border-radius: 8px;
     padding: 20px;
     text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .progress-header {
@@ -591,6 +629,7 @@ a:hover {
 .progress-header h1 {
     font-family: "SECONDARY_FONT";
     margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .progress-content {
@@ -606,6 +645,7 @@ a:hover {
     background-color: #333;
     margin-bottom: 20px;
     overflow: hidden;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 .progress-bar::-webkit-progress-bar {
@@ -616,6 +656,7 @@ a:hover {
 .progress-bar::-webkit-progress-value {
     background-color: #073c17;
     border-radius: 10px;
+    box-shadow: 0 0 5px rgba(7, 60, 23, 0.5);
 }
 
 .progress-bar::-moz-progress-bar {
@@ -626,6 +667,7 @@ a:hover {
 .progress-status {
     font-size: 1.2rem;
     margin: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 /* Loading Containers */
@@ -665,26 +707,6 @@ a:hover {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Home page card styles */
-.modpack-card {
-    width: 300px;
-    height: 200px;
-    border-radius: 10px;
-    overflow: hidden;
-    cursor: pointer;
-    position: relative;
-    background-size: cover;
-    background-position: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    margin-bottom: 20px;
-}
-
-.modpack-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-}
-
 /* Navigation buttons */
 .navigation-buttons {
     margin-bottom: 20px;
@@ -708,6 +730,20 @@ a:hover {
     background-color: rgba(50, 6, 37, 0.8);
     transform: translateY(-2px);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Error handling */
+.error-area {
+    width: 100%;
+    height: 150px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 10px;
+    color: #fce8f6;
+    font-family: monospace;
+    margin-top: 10px;
+    resize: none;
 }
 
 /* Responsive fixes */
