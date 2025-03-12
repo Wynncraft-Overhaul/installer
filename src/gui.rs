@@ -943,17 +943,23 @@ rsx! {
         }
 
     }
-    script { r#"
-    document.querySelectorAll('.tooltip').forEach(el => {
-        el.addEventListener('mousemove', (e) => {
-            let tooltip = el.querySelector('.tooltiptext');
-            if (tooltip) {
-                tooltip.style.setProperty('--tooltip-x', `${e.clientX}px`);
-                tooltip.style.setProperty('--tooltip-y', `${e.clientY}px`);
-            }
+script {
+    dangerous_inner_html: "
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.tooltip').forEach(el => {
+                el.addEventListener('mousemove', (e) => {
+                    let tooltip = el.querySelector('.tooltiptext');
+                    if (tooltip) {
+                        tooltip.style.left = `${e.clientX}px`;
+                        tooltip.style.top = `${e.clientY}px`;
+                        tooltip.style.visibility = 'visible';
+                        tooltip.style.opacity = '1';
+                    }
+                });
+            });
         });
-    });
-"# }
+    "
+}
  
 }
 #[component]
