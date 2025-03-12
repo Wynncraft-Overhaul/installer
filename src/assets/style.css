@@ -128,11 +128,12 @@ a:hover {
     padding: 20px;
 }
 
-/* Home Page Styles */
+/* Home Container enhancements */
 .home-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    text-align: center;
 }
 
 .home-title {
@@ -140,29 +141,34 @@ a:hover {
     text-align: center;
     margin-bottom: 30px;
     font-size: 2.5rem;
+    color: #fce8f6;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .home-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
+    gap: 25px;
+    justify-items: center;
 }
 
 .home-pack-card {
     height: 200px;
+    width: 300px;
     border-radius: 8px;
     background-size: cover;
     background-position: center;
     position: relative;
     overflow: hidden;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
     cursor: pointer;
 }
 
 .home-pack-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7), 0 0 15px rgba(255, 255, 255, 0.3);
+    filter: brightness(1.1);
 }
 
 .home-pack-info {
@@ -173,12 +179,19 @@ a:hover {
     padding: 15px;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
     text-align: center;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.home-pack-card:hover .home-pack-info {
+    transform: translateY(-3px);
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
 }
 
 .home-pack-title {
     font-family: "SECONDARY_FONT";
     margin: 0 0 10px 0;
     font-size: 1.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .home-pack-button {
@@ -187,11 +200,57 @@ a:hover {
     padding: 8px 16px;
     border-radius: 4px;
     font-family: "SECONDARY_FONT";
-    transition: background-color 0.2s ease;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .home-pack-card:hover .home-pack-button {
     background-color: rgba(7, 60, 23, 1);
+    transform: scale(1.05);
+}
+
+/* Header Tabs Enhancements */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    height: 60px;
+}
+
+.header-tabs {
+    display: flex;
+    gap: 10px;
+    margin: 0 20px;
+    flex-grow: 1;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.header-tab-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-family: "SECONDARY_FONT";
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    color: #fce8f6;
+}
+
+.header-tab-button:hover {
+    background-color: rgba(50, 6, 37, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.header-tab-button.active {
+    background-color: var(--bg-color);
+    border-color: #fce8f6;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
 /* Version/Details Screen */
@@ -569,20 +628,26 @@ a:hover {
     margin: 0;
 }
 
+/* Loading Containers */
 .loading-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    height: 300px;
     padding: 40px;
     gap: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    max-width: 500px;
+    margin: 50px auto;
 }
 
 .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid rgba(255, 255, 255, 0.3);
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     border-top-color: #fff;
     animation: spin 1s ease-in-out infinite;
@@ -593,9 +658,11 @@ a:hover {
 }
 
 .loading-text {
-    font-size: 18px;
+    font-size: 20px;
     color: white;
     font-family: "SECONDARY_FONT";
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 /* Home page card styles */
@@ -618,15 +685,14 @@ a:hover {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 }
 
-/* Navigation button styles */
+/* Navigation buttons */
 .navigation-buttons {
-    display: flex;
     margin-bottom: 20px;
     padding: 0 20px;
 }
 
 .home-button {
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     padding: 8px 16px;
@@ -635,14 +701,16 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .home-button:hover {
     background-color: rgba(50, 6, 37, 0.8);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
-/* Responsive Adjustments */
+/* Responsive fixes */
 @media (max-width: 768px) {
     .app-header {
         flex-direction: column;
