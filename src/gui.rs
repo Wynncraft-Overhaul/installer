@@ -1,4 +1,430 @@
+use std::{collections::BTreeMap, path::PathBuf};
+
+use base64::{engine, Engine};
+use dioxus::prelude::*;
+use modal::{Modal, ModalContext};
+
+use crate::{get_app_data, get_installed_packs, get_launcher, uninstall, Launcher, PackName};
+
+mod modal;
+
+#[derive(Clone)]
+struct TabInfo {
+    color: String,
+    title: String,
+    background: String,
+    settings_background: String,
+    primary_font: String,
+    secondary_font: String,
 }
+
+#[component]
+fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
+    rsx!(
+        div { class: "progress-container",
+            div { class: "progress-header",
+                h1 { "{title}" }
+            }
+            div { class: "progress-content",
+                progress { class: "progress-bar", max, value: "{value}" }
+                p { class: "progress-status", "{status}" }
+            }
+        }
+    )
+}
+
+#[derive(PartialEq, Props, Clone)]
+struct CreditsProps {
+    manifest: super::Manifest,
+    enabled: Vec<String>,
+    credits: Signal<bool>,
+}
+
+#[component]
+fn Credits(mut props: CreditsProps) -> Element {
+    rsx! {
+        div { class: "credits-container",
+            div { class: "credits-header",
+                h1 { "{props.manifest.subtitle}" }
+                button {
+                    class: "close-button",
+                    onclick: move |evt| {
+                        props.credits.set(false);
+                        evt.stop_propagation();
+                    },
+                    "Close"
+                }
+            }
+            div { class: "credits-content",
+                div { class: "credits-list",
+                    ul {
+                        for r#mod in props.manifest.mods {
+                            if props.enabled.contains(&r#mod.id) {
+                                li { class: "credit-item",
+                                    div { class: "credit-name", "{r#mod.name}" }
+                                    div { class: "credit-authors",
+                                        "by "
+                                        for author in &r#mod.authors {
+                                            a { href: "{author.link}", class: "credit-author",
+                                                if r#mod.authors.last().unwrap() == author {
+                                                    {author.name.to_string()}
+                                                } else {
+                                                    {author.name.to_string() + ", "}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        for shaderpack in props.manifest.shaderpacks {
+                            if props.enabled.contains(&shaderpack.id) {
+                                li { class: "credit-item",
+                                    div { class: "credit-name", "{shaderpack.name}" }
+                                    div { class: "credit-authors",
+                                        "by "
+                                        for author in &shaderpack.authors {
+                                            a { href: "{author.link}", class: "credit-author",
+                                                if shaderpack.authors.last().unwrap() == author {
+                                                    {author.name.to_string()}
+                                                } else {
+                                                    {author.name.to_string() + ", "}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        for resourcepack in props.manifest.resourcepacks {
+                            if props.enabled.contains(&resourcepack.id) {
+                                li { class: "credit-item",
+                                    div { class: "credit-name", "{resourcepack.name}" }
+                                    div { class: "credit-authors",
+                                        "by "
+                                        for author in &resourcepack.authors {
+                                            a { href: "{author.link}", class: "credit-author",
+                                                if resourcepack.authors.last().unwrap() == author {
+                                                    {author.name.to_string()}
+                                                } else {
+                                                    {author.name.to_string() + ", "}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        for include in props.manifest.include {
+                            if props.enabled.contains(&include.id) && include.authors.is_some() 
+                               && include.name.is_some() {
+                                li { class: "credit-item",
+                                    div { class: "credit-name", "{include.name.as_ref().unwrap()}" }
+                                    div { class: "credit-authors",
+                                        "by "
+                                        for author in &include.authors.as_ref().unwrap() {
+                                            a { href: "{author.link}", class: "credit-author",
+                                                if include.authors.as_ref().unwrap().last().unwrap() == author {
+                                                    {author.name.to_string()}
+                                                } else {
+                                                    {author.name.to_string() + ", "}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn PackUninstallButton(launcher: Launcher, pack: PackName) -> Element {
+    let mut hidden = use_signal(|| false);
+    rsx!(
+        li { hidden,
+            button {
+                class: "uninstall-list-item",
+                onclick: move |_| {
+                    uninstall(&launcher, &pack.uuid).unwrap();
+                    *hidden.write() = true;
+                },
+                "{pack.name}"
+            }
+        }
+    )
+}
+
+#[derive(PartialEq, Props, Clone)]
+struct SettingsProps {
+    config: Signal<super::Config>,
+    settings: Signal<bool>,
+    config_path: PathBuf,
+    error: Signal<Option<String>>,
+    b64_id: String,
+}
+
+#[component]
+fn Settings(mut props: SettingsProps) -> Element {
+    let mut vanilla = None;
+    let mut multimc = None;
+    let mut prism = None;
+    let mut custom = None;
+    let launcher = get_launcher(&props.config.read().launcher).unwrap();
+    let packs = match get_installed_packs(&launcher) {
+        Ok(v) => v,
+        Err(err) => {
+            *props.error.write() = Some(err.to_string());
+            return None;
+        }
+    };
+    match &props.config.read().launcher[..] {
+        "vanilla" => vanilla = Some("true"),
+        "multimc-MultiMC" => multimc = Some("true"),
+        "multimc-PrismLauncher" => prism = Some("true"),
+        _ => {}
+    }
+    if props.config.read().launcher.starts_with("custom") {
+        custom = Some("true")
+    }
+
+    rsx! {
+        div { class: "settings-container",
+            h1 { class: "settings-title", "Settings" }
+            form {
+                id: "settings",
+                class: "settings-form",
+                onsubmit: move |event| {
+                    props
+                        .config
+                        .write()
+                        .launcher = event.data.values()["launcher-select"].as_value();
+                    if let Err(e) = std::fs::write(
+                        &props.config_path,
+                        serde_json::to_vec(&*props.config.read()).unwrap(),
+                    ) {
+                        props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                    }
+                    props.settings.set(false);
+                },
+                
+                div { class: "setting-group",
+                    label { class: "setting-label", "Launcher:" }
+                    select {
+                        name: "launcher-select",
+                        id: "launcher-select",
+                        form: "settings",
+                        class: "setting-select",
+                        if super::get_minecraft_folder().is_dir() {
+                            option { value: "vanilla", selected: vanilla, "Vanilla" }
+                        }
+                        if super::get_multimc_folder("MultiMC").is_ok() {
+                            option { value: "multimc-MultiMC", selected: multimc, "MultiMC" }
+                        }
+                        if super::get_multimc_folder("PrismLauncher").is_ok() {
+                            option {
+                                value: "multimc-PrismLauncher",
+                                selected: prism,
+                                "Prism Launcher"
+                            }
+                        }
+                        if custom.is_some() {
+                            option {
+                                value: "{props.config.read().launcher}",
+                                selected: custom,
+                                "Custom MultiMC"
+                            }
+                        }
+                    }
+                }
+                
+                CustomMultiMCButton {
+                    config: props.config,
+                    config_path: props.config_path.clone(),
+                    error: props.error,
+                    b64_id: props.b64_id.clone()
+                }
+                
+                div { class: "settings-buttons",
+                    input {
+                        r#type: "submit",
+                        value: "Save",
+                        class: "primary-button",
+                        id: "save"
+                    }
+                    
+                    button {
+                        class: "secondary-button",
+                        r#type: "button",
+                        disabled: packs.is_empty(),
+                        onclick: move |evt| {
+                            let mut modal = use_context::<ModalContext>();
+                            modal
+                                .open(
+                                    "Select modpack to uninstall",
+                                    rsx! {
+                                        div { class: "uninstall-list-container",
+                                            ul { class: "uninstall-list",
+                                                for pack in packs.clone() {
+                                                    PackUninstallButton { launcher: launcher.clone(), pack }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    false,
+                                    Some(|_| {}),
+                                );
+                            evt.stop_propagation();
+                        },
+                        "Uninstall"
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Props, Clone)]
+struct LauncherProps {
+    config: Signal<super::Config>,
+    config_path: PathBuf,
+    error: Signal<Option<String>>,
+    b64_id: String,
+}
+
+#[component]
+fn Launcher(mut props: LauncherProps) -> Element {
+    let mut vanilla = None;
+    let mut multimc = None;
+    let mut prism = None;
+    match &props.config.read().launcher[..] {
+        "vanilla" => vanilla = Some("true"),
+        "multimc-MultiMC" => multimc = Some("true"),
+        "multimc-PrismLauncher" => prism = Some("true"),
+        _ => {}
+    }
+    let has_supported_launcher = super::get_minecraft_folder().is_dir()
+        || super::get_multimc_folder("MultiMC").is_ok()
+        || super::get_multimc_folder("PrismLauncher").is_ok();
+        
+    if !has_supported_launcher {
+        rsx!(NoLauncherFound {
+            config: props.config,
+            config_path: props.config_path,
+            error: props.error,
+            b64_id: props.b64_id.clone()
+        })
+    } else {
+        rsx! {
+            div { class: "launcher-container",
+                h1 { class: "launcher-title", "Select Launcher" }
+                form {
+                    id: "launcher-form",
+                    class: "launcher-form",
+                    onsubmit: move |event| {
+                        props
+                            .config
+                            .write()
+                            .launcher = event.data.values()["launcher-select"].as_value();
+                        props.config.write().first_launch = Some(false);
+                        if let Err(e) = std::fs::write(
+                            &props.config_path,
+                            serde_json::to_vec(&*props.config.read()).unwrap(),
+                        ) {
+                            props.error.set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                        }
+                    },
+                    
+                    div { class: "setting-group",
+                        label { class: "setting-label", "Launcher:" }
+                        select {
+                            name: "launcher-select",
+                            id: "launcher-select",
+                            form: "launcher-form",
+                            class: "setting-select",
+                            if super::get_minecraft_folder().is_dir() {
+                                option { value: "vanilla", selected: vanilla, "Vanilla" }
+                            }
+                            if super::get_multimc_folder("MultiMC").is_ok() {
+                                option {
+                                    value: "multimc-MultiMC",
+                                    selected: multimc,
+                                    "MultiMC"
+                                }
+                            }
+                            if super::get_multimc_folder("PrismLauncher").is_ok() {
+                                option {
+                                    value: "multimc-PrismLauncher",
+                                    selected: prism,
+                                    "Prism Launcher"
+                                }
+                            }
+                        }
+                    }
+                    
+                    CustomMultiMCButton {
+                        config: props.config,
+                        config_path: props.config_path.clone(),
+                        error: props.error,
+                        b64_id: props.b64_id.clone()
+                    }
+                    
+                    input {
+                        r#type: "submit",
+                        value: "Continue",
+                        class: "primary-button",
+                        id: "continue-button"
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn CustomMultiMCButton(mut props: LauncherProps) -> Element {
+    let custom_multimc = move |_evt| {
+        let directory_dialog = rfd::FileDialog::new()
+            .set_title("Pick root directory of desired MultiMC based launcher.")
+            .set_directory(get_app_data());
+        let directory = directory_dialog.pick_folder();
+        match directory {
+            Some(path) => {
+                if !path.join("instances").is_dir() {
+                    return;
+                }
+                let path = path.to_str();
+                if path.is_none() {
+                    props
+                        .error
+                        .set(Some(String::from("Could not get path to directory!")));
+                }
+                props.config.write().launcher = format!("custom-{}", path.unwrap());
+                props.config.write().first_launch = Some(false);
+                if let Err(e) = std::fs::write(
+                    &props.config_path,
+                    serde_json::to_vec(&*props.config.read()).unwrap(),
+                ) {
+                    props
+                        .error
+                        .set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+                }
+            }
+            None => {}
+        }
+    };
+    
+    rsx!(
+        button {
+            class: "secondary-button custom-multimc-button",
+            onclick: custom_multimc,
+            r#type: "button",
+            "Use custom MultiMC directory"
+            }
     )
 }
 
@@ -378,7 +804,6 @@ pub(crate) struct AppProps {
     pub config: super::Config,
     pub config_path: PathBuf,
 }
-
 pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
     let css = include_str!("assets/style.css");
