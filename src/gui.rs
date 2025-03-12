@@ -1233,7 +1233,7 @@ border-radius: 20px;
                     
                     // Description section
                     div { class: "content-description",
-                        dangerous_inner_html: "{installer_profile.manifest.description}"
+                        dangerous_inner_html: "{installer_profile.manifest.description}",
                         
                         // Credits link
                         div {
