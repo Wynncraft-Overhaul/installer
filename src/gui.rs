@@ -760,8 +760,7 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
 rsx! {
-rsx! {
-    // Add style to the rsx block
+    
     style { "
         .tooltip {{
             position: relative;
@@ -776,7 +775,7 @@ rsx! {
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
-            position: absolute;  /* Tooltip positioned above the element */
+            position: absolute;  
             background-color: rgba(0, 0, 0, 0.9);
             color: white;
             padding: 6px 10px;
@@ -787,11 +786,11 @@ rsx! {
             text-align: left;
             word-wrap: break-word;
 
-            /* Position the tooltip above the element */
+            
             bottom: 100%;
             left: 50%;
-            transform: translateX(-50%);  /* Center tooltip horizontally */
-            margin-bottom: 10px;  /* Adjust for space above */
+            transform: translateX(-50%);  
+            margin-bottom: 10px;  
         }}
 
         .tooltip:hover .tooltiptext {{
@@ -799,7 +798,7 @@ rsx! {
             opacity: 1;
         }}
 
-        /* Optional feature list and checkbox styles */
+        
         .feature-list input[type="checkbox"] {{
             flex-shrink: 0;
             width: 18px;
@@ -831,7 +830,7 @@ rsx! {
         }}
     " }
 
-    // Render the form with optional feature text and checkboxes
+   
     if *installing.read() {
         ProgressView {
             value: install_progress(),
