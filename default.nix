@@ -9,8 +9,6 @@ pkgs.rustPlatform.buildRustPackage rec {
 
   src = pkgs.lib.cleanSource ./.;
 
-  buildType = "debug";
-
   nativeBuildInputs = [ pkg-config wrapGAppsHook3 ];
   buildInputs = [ openssl glib gtk3 webkitgtk_4_1 xdotool glib-networking ];
 }

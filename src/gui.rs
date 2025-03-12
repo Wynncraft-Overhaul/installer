@@ -857,7 +857,7 @@ fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -
                                 },
                                 "View Credits"
                             }
-                        };
+                        }
                     }
                     
                     // Features heading
@@ -1032,8 +1032,6 @@ pub(crate) fn app() -> Element {
     };
 
     let packs: Resource<()> = {
-        // Log information about the branches we're loading
-        info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
         let source = props.modpack_source.clone();
         let branches = branches.clone();
         let launcher = launcher.clone();
@@ -1041,11 +1039,12 @@ pub(crate) fn app() -> Element {
             let source = source.clone();
             let branches = branches.clone();
             let launcher = launcher.clone();
+            info!("Loading {} branches from source: {}", branches.len(), source);
             async move {
                 let source = source.clone();
                 let branches = branches.clone();
                 let launcher = launcher.clone();
-                futures::stream::iter(branches.iter().map(|x| init_branch(source.clone(), x.name.clone(), launcher.clone().unwrap(), pages.clone()))).for_each_concurrent(1, |fut| async move {let _ = fut.await;}).await; // FIXME: handle failed branch init
+                futures::stream::iter(branches.iter().map(|x| init_branch(source.clone(), x.name.clone(), launcher.clone().unwrap(), pages.clone()))).for_each_concurrent(usize::MAX, |fut| async move {let _ = fut.await;}).await; // FIXME: handle failed branch init
             }
         })
     };
