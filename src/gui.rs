@@ -761,15 +761,15 @@ fn Version(mut props: VersionProps) -> Element {
     }
 rsx! {
     style { "
-        /* Tooltip container styling */
-        .tooltip {
+        
+        .tooltip {{
             position: relative;  /* Make sure this container is positioned relative */
             display: inline-block;
             cursor: pointer;
-        }
+        }}
 
-        /* Tooltip text styling */
-        .tooltip .tooltiptext {
+        
+        .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
             position: fixed;  /* Use 'fixed' to place it in relation to the viewport */
@@ -784,13 +784,13 @@ rsx! {
             transform: translate(-50%, 10px); /* Center horizontally and place below */
             white-space: nowrap;
             max-width: 250px; /* Prevent the tooltip from becoming too wide */
-        }
+        }}
 
-        /* Tooltip visible when hovering over the label */
-        .tooltip:hover .tooltiptext {
+        
+        .tooltip:hover .tooltiptext {{
             visibility: visible;
             opacity: 1;
-        }
+        }}
     " }
 
     if *installing.read() {
