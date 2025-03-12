@@ -800,13 +800,13 @@ rsx! {
             align-items: center;
             margin-bottom: 10px;
             white-space: nowrap; 
-        } }
+        }}
 
         .feature-list input[type="checkbox"] {{
             margin-right: 10px; 
             width: 20px; 
             height: 20px;
-         }
+         }}
     " }
 
     if *installing.read() {
