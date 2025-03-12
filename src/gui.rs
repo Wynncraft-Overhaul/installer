@@ -155,23 +155,26 @@ fn Credits(mut props: CreditsProps) -> Element {
     }
 }
 
-#[component]
-fn AppHeader(
+#[derive(PartialEq, Props, Clone)]
+struct AppHeaderProps {
     page: Signal<usize>, 
     pages: Signal<BTreeMap<usize, TabInfo>>,
     settings: Signal<bool>,
-    logo_url: Option<String>
-) -> Element {
+    logo_url: Option<String>,
+}
+
+#[component]
+fn AppHeader(props: AppHeaderProps) -> Element {
     // Log what tabs we have available
-    log::info!("Rendering AppHeader with {} tabs", pages().len());
-    for (index, info) in pages().iter() {
+    log::info!("Rendering AppHeader with {} tabs", props.pages().len());
+    for (index, info) in props.pages().iter() {
         log::info!("  Tab {}: title={}", index, info.title);
     }
     
     rsx!(
         header { class: "app-header",
             // Logo (if available)
-            if let Some(url) = logo_url {
+            if let Some(url) = props.logo_url.clone() {
                 img { class: "app-logo", src: "{url}", alt: "Logo" }
             }
             
@@ -181,9 +184,9 @@ fn AppHeader(
             div { class: "header-tabs",
                 // Always include the home tab first
                 button {
-                    class: if page() == 0 { "header-tab-button active" } else { "header-tab-button" },
+                    class: if props.page() == 0 { "header-tab-button active" } else { "header-tab-button" },
                     onclick: move |_| {
-                        page.set(0);
+                        props.page.set(0);
                         log::info!("Switching to home tab");
                     },
                     "Home"
@@ -191,15 +194,15 @@ fn AppHeader(
                 
                 // Then show other tabs
                 {
-                    pages().iter().filter(|&(index, _)| *index != 0).map(|(index, info)| {
+                    props.pages().iter().filter(|&(index, _)| *index != 0).map(|(index, info)| {
                         let idx = *index;
-                        let page_signal = page.clone();
+                        let page_signal = props.page.clone();
                         let title = info.title.clone();
                         
                         rsx!(
                             button {
                                 key: "{idx}",
-                                class: if page() == idx { "header-tab-button active" } else { "header-tab-button" },
+                                class: if props.page() == idx { "header-tab-button active" } else { "header-tab-button" },
                                 onclick: move |_| {
                                     page_signal.set(idx);
                                     log::info!("Switching to tab {}: {}", idx, title);
@@ -215,7 +218,7 @@ fn AppHeader(
             button {
                 class: "settings-button",
                 onclick: move |_| {
-                    settings.set(true);
+                    props.settings.set(true);
                     log::info!("Opening settings");
                 },
                 "Settings"
@@ -238,7 +241,7 @@ pub(crate) fn app() -> Element {
     let branches = props.branches.clone();
     let config = use_signal(|| props.config);
     let settings = use_signal(|| false);
-    let mut err: Signal<Option<String>> = use_signal(|| None);
+    let err: Signal<Option<String>> = use_signal(|| None);
 
     let name = use_signal(String::default);
 
@@ -369,31 +372,30 @@ pub(crate) fn app() -> Element {
                 // Find the corresponding branch for the current page
                 {
                     let current_page = page();
-                    let launcher_clone = launcher.clone();
-                    let error_signal = err.clone();
-                    let name_signal = name.clone();
-                    let page_signal = page.clone();
-                    let pages_signal = pages.clone();
-                    let source = props.modpack_source.clone();
+                    let branches_clone = branches.clone();
                     
-                    branches.iter().enumerate().filter_map(move |(i, branch)| {
-                        let branch_idx = i + 1; // Offset by 1 since page 0 is home
-                        if current_page == branch_idx {
-                            Some(rsx!(
-                                Version {
-                                    modpack_source: source.clone(),
-                                    modpack_branch: branch.name.clone(),
-                                    launcher: launcher_clone.as_ref().unwrap().clone(),
-                                    error: error_signal.clone(),
-                                    name: name_signal.clone(),
-                                    page: page_signal.clone(),
-                                    pages: pages_signal.clone()
+                    rsx! {
+                        {
+                            branches_clone.iter().enumerate().filter_map(move |(i, branch)| {
+                                let branch_idx = i + 1; // Offset by 1 since page 0 is home
+                                if current_page == branch_idx {
+                                    Some(rsx!(
+                                        Version {
+                                            modpack_source: props.modpack_source.clone(),
+                                            modpack_branch: branch.name.clone(),
+                                            launcher: launcher.as_ref().unwrap().clone(),
+                                            error: err.clone(),
+                                            name: name.clone(),
+                                            page: page.clone(),
+                                            pages: pages.clone()
+                                        }
+                                    ))
+                                } else {
+                                    None
                                 }
-                            ))
-                        } else {
-                            None
+                            })
                         }
-                    })
+                    }
                 }
             }
         }
@@ -794,6 +796,7 @@ fn feature_change(
         }
     }
 }
+
 // Add this before the HomePageTab function
 #[derive(PartialEq, Props, Clone)]
 struct HomePageTabProps {
@@ -1089,7 +1092,7 @@ fn Version(mut props: VersionProps) -> Element {
                         form {
                             class: "features-form",
                             onsubmit: move |evt| {
-                                evt.prevent_default();
+                                evt.stop_propagation();
                                 show_features_dialog.set(false);
                             },
                             
@@ -1129,7 +1132,7 @@ fn Version(mut props: VersionProps) -> Element {
                                     r#type: "button",
                                     class: "secondary-button",
                                     onclick: move |evt| {
-                                        evt.prevent_default();
+                                        evt.stop_propagation();
                                         // Enable all features
                                         enabled_features.set(
                                             installer_profile.manifest.features
@@ -1145,238 +1148,13 @@ fn Version(mut props: VersionProps) -> Element {
                                     r#type: "button",
                                     class: "secondary-button",
                                     onclick: move |evt| {
-                                        evt.prevent_default();
+                                        evt.stop_propagation();
                                         // Disable all features
                                         enabled_features.set(Vec::new());
                                     },
                                     "Disable All"
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-fn AppHeader(
-    page: Signal<usize>, 
-    pages: Signal<BTreeMap<usize, TabInfo>>,
-    settings: Signal<bool>,
-    logo_url: Option<String>
-) -> Element {
-    // Log what tabs we have available
-    log::info!("Rendering AppHeader with {} tabs", pages().len());
-    for (index, info) in pages().iter() {
-        log::info!("  Tab {}: title={}", index, info.title);
-    }
-    
-    rsx!(
-        header { class: "app-header",
-            // Logo (if available)
-            if let Some(url) = logo_url {
-                img { class: "app-logo", src: "{url}", alt: "Logo" }
-            }
-            
-            h1 { class: "app-title", "Modpack Installer" }
-            
-            // Tabs from pages - show only if we have pages
-            div { class: "header-tabs",
-                // Always include the home tab first
-                button {
-                    class: if page() == 0 { "header-tab-button active" } else { "header-tab-button" },
-                    onclick: move |_| {
-                        page.set(0);
-                        log::info!("Switching to home tab");
-                    },
-                    "Home"
-                }
-                
-                // Then show other tabs
-                for (index, info) in pages() {
-                    if index != 0 { // Skip home page in this loop since we added it above
-                        button {
-                            class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
-                            onclick: move |_| {
-                                page.set(index);
-                                log::info!("Switching to tab {}: {}", index, info.title);
-                            },
-                            "{info.title}"
-                        }
-                    }
-                }
-            }
-            
-            // Settings button
-            button {
-                class: "settings-button",
-                onclick: move |_| {
-                    settings.set(true);
-                    log::info!("Opening settings");
-                },
-                "Settings"
-            }
-        }
-    )
-}
-
-#[derive(Clone)]
-pub(crate) struct AppProps {
-    pub branches: Vec<super::GithubBranch>,
-    pub modpack_source: String,
-    pub config: super::Config,
-    pub config_path: PathBuf,
-}
-
-pub(crate) fn app() -> Element {
-    let props = use_context::<AppProps>();
-    let css = include_str!("assets/style.css");
-    let branches = props.branches.clone();
-    let config = use_signal(|| props.config);
-    let settings = use_signal(|| false);
-    let mut err: Signal<Option<String>> = use_signal(|| None);
-
-    let name = use_signal(String::default);
-
-    // Default to home page (page 0)
-    let page = use_signal(|| 0); 
-    let pages = use_signal(|| {
-        // Initialize with home page
-        let mut map = BTreeMap::<usize, TabInfo>::new();
-        map.insert(0, TabInfo {
-            color: "#320625".to_string(),
-            title: "Home".to_string(),
-            background: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string(),
-            settings_background: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string(),
-            primary_font: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string(),
-            secondary_font: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string(),
-        });
-        map
-    });
-    
-    // Log information about the branches we're loading
-    log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
-    for (i, branch) in branches.iter().enumerate() {
-        log::info!("  Branch {}: name={}", i, branch.name);
-    }
-
-    // Update CSS whenever relevant values change
-    let css_content = {
-        let page = page.clone();
-        let settings = settings.clone();
-        let pages = pages.clone();
-        
-        let default_color = "#320625".to_string();
-        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
-        
-        let bg_color = match pages().get(&page()) {
-            Some(x) => x.color.clone(),
-            None => default_color,
-        };
-        
-        let bg_image = match pages().get(&page()) {
-            Some(x) => {
-                if settings() {
-                    x.settings_background.clone()
-                } else {
-                    x.background.clone()
-                }
-            },
-            None => default_bg,
-        };
-        
-        let secondary_font = match pages().get(&page()) {
-            Some(x) => x.secondary_font.clone(),
-            None => default_font.clone(),
-        };
-        
-        let primary_font = match pages().get(&page()) {
-            Some(x) => x.primary_font.clone(),
-            None => default_font,
-        };
-        
-        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
-        
-        css
-            .replace("<BG_COLOR>", &bg_color)
-            .replace("<BG_IMAGE>", &bg_image)
-            .replace("<SECONDARY_FONT>", &secondary_font)
-            .replace("<PRIMARY_FONT>", &primary_font)
-    };
-
-    let cfg = config.with(|cfg| cfg.clone());
-    let launcher = match super::get_launcher(&cfg.launcher) {
-        Ok(val) => Some(val),
-        Err(_) => None,
-    };
-
-    let mut modal_context = use_context_provider(|| ModalContext::default());
-    if let Some(e) = err() {
-        modal_context.open("Error", rsx! {
-            p {
-                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
-            }
-            textarea { class: "error-area", readonly: true, "{e}" }
-        }, false, Some(move |_| err.set(None)));
-    }
-
-    // Determine which logo to use - could be made configurable via manifest
-    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
-
-    rsx! {
-        style { "{css_content}" }
-
-        Modal {}
-
-        // Always render AppHeader if we're past the initial launcher selection
-        if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
-            AppHeader {
-                page,
-                pages,
-                settings,
-                logo_url
-            }
-        }
-
-        div { class: "main-container",
-            if settings() {
-                Settings {
-                    config,
-                    settings,
-                    config_path: props.config_path,
-                    error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
-                }
-            } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
-                Launcher {
-                    config,
-                    config_path: props.config_path,
-                    error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
-                }
-            } else if page() == 0 {
-                // Render home page if we're on page 0
-                HomePageTab {
-                    pages,
-                    page
-                }
-            } else {
-                // Find the corresponding branch for the current page
-                // Map page index to branch
-                for (i, branch) in branches.iter().enumerate() {
-                    let branch_idx = i + 1; // Offset by 1 since page 0 is home
-                    if page() == branch_idx {
-                        Version {
-                            modpack_source: props.modpack_source.clone(),
-                            modpack_branch: branch.name.clone(),
-                            launcher: launcher.as_ref().unwrap().clone(),
-                            error: err,
-                            name,
-                            page,
-                            pages
                         }
                     }
                 }
