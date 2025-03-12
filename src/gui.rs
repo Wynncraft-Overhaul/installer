@@ -760,9 +760,8 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
 rsx! {
-    
-        style { "
-        .tooltip {{
+ style { "
+        .tooltip {
             position: relative;
             display: inline-flex;
             align-items: center;
@@ -770,12 +769,12 @@ rsx! {
             cursor: pointer;
             gap: 5px;
             width: 100%;
-        } }
+        }
 
-        .tooltip .tooltiptext {{
+        .tooltip .tooltiptext {
             visibility: hidden;
             opacity: 0;
-            position: absolute; 
+            position: absolute;  
             background-color: rgba(0, 0, 0, 0.9);
             color: white;
             padding: 6px 10px;
@@ -785,47 +784,49 @@ rsx! {
             max-width: 250px;
             text-align: left;
             word-wrap: break-word;
+
+            
             bottom: 100%;  
             left: 50%;
             transform: translateX(-50%);  
             margin-bottom: 10px;  
-        }}
+        }
 
-        .tooltip:hover .tooltiptext {{
+        .tooltip:hover .tooltiptext {
             visibility: visible;
             opacity: 1;
-        }}
+        }
 
         
-        .feature-list input[type="checkbox"] {{
+        .feature-list input[type="checkbox"] {
             flex-shrink: 0;
             width: 18px;
             height: 18px;
-        }}
+        }
 
-        .feature-list label {{
+        .feature-list label {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
             gap: 5px;
             width: 100%;
             line-height: 1.2;
-        }}
+        }
 
-        .feature-list label div {{
+        .feature-list label div {
             flex: 1;
             word-wrap: break-word;
             overflow-wrap: break-word;
-        }}
+        }
 
-        .feature-list {{
+        .feature-list {
             max-height: 200px;
             overflow-y: auto;
             overflow-x: hidden;
             border: 1px solid #ccc;
             padding: 5px;
             position: relative;
-        }}
+        }
     " }
     
     script { 
