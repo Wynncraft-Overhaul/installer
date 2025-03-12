@@ -752,116 +752,154 @@ fn Version(mut props: VersionProps) -> Element {
     });
     
     let movable_profile = installer_profile.clone();
-    let on_submit = move |_| {
-        // Calculate total items to process for progress tracking
-        *install_item_amount.write() = movable_profile.manifest.mods.len()
-            + movable_profile.manifest.resourcepacks.len()
-            + movable_profile.manifest.shaderpacks.len()
-            + movable_profile.manifest.include.len();
-        
-        let movable_profile = movable_profile.clone();
-        let movable_profile2 = movable_profile.clone();
-        
-        async move {
-            let install = move |canceled| {
-                let mut installer_profile = movable_profile.clone();
-                spawn(async move {
-                    if canceled {
-                        return;
-                    }
-                    installing.set(true);
-                    installer_profile.enabled_features = enabled_features.read().clone();
-                    installer_profile.manifest.enabled_features = enabled_features.read().clone();
-                    local_features.set(Some(enabled_features.read().clone()));
+let on_submit = move |_| {
+    // Calculate total items to process for progress tracking
+    *install_item_amount.write() = movable_profile.manifest.mods.len()
+        + movable_profile.manifest.resourcepacks.len()
+        + movable_profile.manifest.shaderpacks.len()
+        + movable_profile.manifest.include.len();
+    
+    let movable_profile = movable_profile.clone();
+    let movable_profile2 = movable_profile.clone();
+    
+    async move {
+        let install = move |canceled| {
+            let mut installer_profile = movable_profile.clone();
+            spawn(async move {
+                if canceled {
+                    return;
+                }
+                installing.set(true);
+                installer_profile.enabled_features = enabled_features.read().clone();
+                installer_profile.manifest.enabled_features = enabled_features.read().clone();
+                local_features.set(Some(enabled_features.read().clone()));
 
-                    if !*installed.read() {
-                        progress_status.set("Installing");
-                        match super::install(&installer_profile, move || {
-                            install_progress.with_mut(|x| *x += 1);
-                        })
-                        .await
-                        {
-                            Ok(_) => {
-                                let _ = isahc::post(
-                                    "https://tracking.commander07.workers.dev/track",
-                                    format!(
-                                        "{{
-                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                    \"dataSourceId\": \"{}\",
-                                    \"userAction\": \"update\",
-                                    \"additionalData\": {{
-                                        \"old_version\": \"{}\",
-                                        \"new_version\": \"{}\"
-                                    }}
-                                }}",
-                                        installer_profile.manifest.uuid,
-                                        installer_profile.local_manifest.as_ref().unwrap().modpack_version,
-                                        installer_profile.manifest.modpack_version
-                                    ),
-                                );
-                                update_available.set(false);
-                            }
-                            Err(e) => {
-                                props.error.set(Some(
-                                    format!("{:#?}", e) + " (Failed to update modpack!)",
-                                ));
-                                installing.set(false);
-                                return;
-                            }
+                if !*installed.read() {
+                    progress_status.set("Installing");
+                    match super::install(&installer_profile, move || {
+                        install_progress.with_mut(|x| *x += 1);
+                    })
+                    .await
+                    {
+                        Ok(_) => {
+                            let _ = isahc::post(
+                                "https://tracking.commander07.workers.dev/track",
+                                format!(
+                                    "{{
+                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                \"dataSourceId\": \"{}\",
+                                \"userAction\": \"install\",
+                                \"additionalData\": {{
+                                    \"features\": {:?},
+                                    \"version\": \"{}\",
+                                    \"launcher\": \"{}\"
+                                }}
+                            }}",
+                                    installer_profile.manifest.uuid,
+                                    installer_profile.manifest.enabled_features,
+                                    installer_profile.manifest.modpack_version,
+                                    installer_profile.launcher.unwrap(),
+                                ),
+                            );
+                            
+                            installed.set(true);
                         }
-                    } else if *modify.read() {
-                        progress_status.set("Modifying");
-                        match super::update(&installer_profile, move || {
-                            *install_progress.write() += 1
-                        })
-                        .await
-                        {
-                            Ok(_) => {
-                                let _ = isahc::post(
-                                    "https://tracking.commander07.workers.dev/track",
-                                    format!(
-                                        "{{
-                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                    \"dataSourceId\": \"{}\",
-                                    \"userAction\": \"modify\",
-                                    \"additionalData\": {{
-                                        \"features\": {:?}
-                                    }}
-                                }}",
-                                        installer_profile.manifest.uuid,
-                                        installer_profile.manifest.enabled_features
-                                    ),
-                                );
-                                modify.with_mut(|x| *x = false);
-                                modify_count.with_mut(|x| *x = 0);
-                            }
-                            Err(e) => {
-                                props.error.set(Some(
-                                    format!("{:#?}", e) + " (Failed to modify modpack!)",
-                                ));
-                                installing.set(false);
-                                return;
-                            }
+                        Err(e) => {
+                            props.error.set(Some(
+                                format!("{:#?}", e) + " (Failed to install modpack!)",
+                            ));
+                            installing.set(false);
+                            return;
                         }
                     }
-                    installing.set(false);
-                });
-            };
+                } else if *update_available.read() {
+                    progress_status.set("Updating");
+                    match super::update(&installer_profile, move || {
+                        install_progress.with_mut(|x| *x += 1);
+                    })
+                    .await
+                    {
+                        Ok(_) => {
+                            let _ = isahc::post(
+                                "https://tracking.commander07.workers.dev/track",
+                                format!(
+                                    "{{
+                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                \"dataSourceId\": \"{}\",
+                                \"userAction\": \"update\",
+                                \"additionalData\": {{
+                                    \"old_version\": \"{}\",
+                                    \"new_version\": \"{}\"
+                                }}
+                            }}",
+                                    installer_profile.manifest.uuid,
+                                    installer_profile.local_manifest.as_ref().unwrap().modpack_version,
+                                    installer_profile.manifest.modpack_version
+                                ),
+                            );
+                            update_available.set(false);
+                        }
+                        Err(e) => {
+                            props.error.set(Some(
+                                format!("{:#?}", e) + " (Failed to update modpack!)",
+                            ));
+                            installing.set(false);
+                            return;
+                        }
+                    }
+                } else if *modify.read() {
+                    progress_status.set("Modifying");
+                    match super::update(&installer_profile, move || {
+                        *install_progress.write() += 1
+                    })
+                    .await
+                    {
+                        Ok(_) => {
+                            let _ = isahc::post(
+                                "https://tracking.commander07.workers.dev/track",
+                                format!(
+                                    "{{
+                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                \"dataSourceId\": \"{}\",
+                                \"userAction\": \"modify\",
+                                \"additionalData\": {{
+                                    \"features\": {:?}
+                                }}
+                            }}",
+                                    installer_profile.manifest.uuid,
+                                    installer_profile.manifest.enabled_features
+                                ),
+                            );
+                            modify.with_mut(|x| *x = false);
+                            modify_count.with_mut(|x| *x = 0);
+                        }
+                        Err(e) => {
+                            props.error.set(Some(
+                                format!("{:#?}", e) + " (Failed to modify modpack!)",
+                            ));
+                            installing.set(false);
+                            return;
+                        }
+                    }
+                }
+                installing.set(false);
+            });
+        };
 
-            if let Some(contents) = movable_profile2.manifest.popup_contents {
-                use_context::<ModalContext>().open(
-                    movable_profile2.manifest.popup_title.unwrap_or_default(),
-                    rsx!(div {
-                        dangerous_inner_html: "{contents}",
-                    }),
-                    true,
-                    Some(install),
-                )
-            } else {
-                install(false);
-            }
+        if let Some(contents) = movable_profile2.manifest.popup_contents {
+            use_context::<ModalContext>().open(
+                movable_profile2.manifest.popup_title.unwrap_or_default(),
+                rsx!(div {
+                    dangerous_inner_html: "{contents}",
+                }),
+                true,
+                Some(install),
+            )
+        } else {
+            install(false);
         }
-    };
+    }
+};
 
     let install_disable = if *installed.read() && !*update_available.read() && !*modify.read() {
         Some("true")
