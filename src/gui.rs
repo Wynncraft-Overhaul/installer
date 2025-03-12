@@ -920,11 +920,30 @@ rsx! {
                                                     "{desc}",
                                                 }),
                                                 None => rsx!("")
+                                                }
+ 
+
+ 
                                             }
+ 
+
+ 
                                         }
+ 
+
+ 
                                     }
+ 
+
+ 
                                 }
+ 
+
+ 
                             }
+ 
+
+ 
                         }
                         input {
                             r#type: "submit",
@@ -936,12 +955,30 @@ rsx! {
                             class: "install-button",
                             disabled: install_disable
                         }
+ 
+
+ 
                     }
+ 
+
+ 
                 }
+ 
+
+ 
             }
+ 
+
+ 
         }
+ 
+
+ 
     }
-}  // Properly closed rsx! block
+ 
+
+ 
+}
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
