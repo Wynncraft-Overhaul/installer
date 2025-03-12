@@ -17,7 +17,7 @@ use isahc::config::RedirectPolicy;
 use isahc::http::{HeaderMap, HeaderValue, StatusCode};
 use isahc::prelude::Configurable;
 use isahc::{AsyncBody, AsyncReadResponseExt, HttpClient, ReadResponseExt, Request, Response};
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use platform_info::{PlatformInfo, PlatformInfoAPI, UNameAPI};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -1804,19 +1804,44 @@ async fn init(
     modpack_branch: String,
     launcher: Launcher,
 ) -> Result<InstallerProfile, String> {
+    debug!("Initializing with:");
+    debug!("  Source: {}", modpack_source);
+    debug!("  Branch: {}", modpack_branch);
+    debug!("  Launcher: {:?}", launcher);
+
     let http_client = CachedHttpClient::new();
-    let mut manifest_resp = match http_client
-        .get_async(GH_RAW.to_owned() + &modpack_source + &modpack_branch + "/manifest.json")
-        .await
-    {
+    
+    // Construct full URL
+    let full_url = format!("{}{}{}/manifest.json", GH_RAW, modpack_source, modpack_branch);
+    debug!("Fetching manifest from URL: {}", full_url);
+
+    let mut manifest_resp = match http_client.get_async(full_url.clone()).await {
         Ok(val) => val,
-        Err(e) => return Err(e.to_string()),
+        Err(e) => {
+            error!("Failed to fetch manifest. Error: {:?}", e);
+            return Err(e.to_string());
+        }
     };
-    let manifest: Manifest =
-        match serde_json::from_str(manifest_resp.text().await.unwrap().as_str()) {
-            Ok(val) => val,
-            Err(e) => return Err(e.to_string()),
-        };
+
+    let manifest_text = match manifest_resp.text().await {
+        Ok(text) => {
+            debug!("Received manifest text:");
+            debug!("{}", text);
+            text
+        },
+        Err(e) => {
+            error!("Failed to get manifest text. Error: {:?}", e);
+            return Err(e.to_string());
+        }
+    };
+
+    let manifest: Manifest = match serde_json::from_str(&manifest_text) {
+        Ok(val) => val,
+        Err(e) => {
+            error!("Failed to parse manifest. Error: {:?}", e);
+            return Err(e.to_string());
+        }
+    };
 
     // Its not guaranteed that a manifest with a different version manages to parse however we handle parsing failures and therefore we should be fine to just return an error here
     if CURRENT_MANIFEST_VERSION != manifest.manifest_version {

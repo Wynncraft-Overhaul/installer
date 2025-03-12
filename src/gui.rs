@@ -13,7 +13,7 @@ mod modal;
 #[derive(Clone)]
 struct TabInfo {
     color: String,
-    title: String,
+    title: String, 
     background: String,
     settings_background: String,
     primary_font: String,
@@ -52,6 +52,8 @@ fn HomePage(
         }
     }
 }
+// Special value for home page
+const HOME_PAGE: usize = usize::MAX;
 
 #[component]
 fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
@@ -322,7 +324,6 @@ fn Settings(mut props: SettingsProps) -> Element {
         }
     }
 }
-
 #[derive(PartialEq, Props, Clone)]
 struct LauncherProps {
     config: Signal<super::Config>,
@@ -659,14 +660,14 @@ async fn init_branch(source: String, branch: String, launcher: Launcher, mut pag
 #[component]
 fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -> Element {
     info!("Rendering Version component for source: {}, branch: {}",
-              installer_profile.modpack_source, installer_profile.modpack_branch);
+              installer_profile.modpack_source, installer_profile.modpack_branch);  
 
     let mut installing = use_signal(|| false);
     let mut progress_status = use_signal(|| "");
     let mut install_progress = use_signal(|| 0);
     let mut modify = use_signal(|| false);
     let mut modify_count = use_signal(|| 0);
-    
+
     // Fix: Initialize enabled_features properly
     let enabled_features = use_signal(|| {
         let mut features = vec!["default".to_string()];
@@ -681,18 +682,20 @@ fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -
                 }
             }
         }
-        
+
         info!("Initial enabled features: {:?}", features);
         features
     });
-    
+
     let mut install_item_amount = use_signal(|| 0);
     let mut credits = use_signal(|| false);
     let installed = use_signal(|| installer_profile.installed);
     let mut update_available = use_signal(|| installer_profile.update_available);
+    
+    // Clone local_manifest to prevent ownership issues
     let mut local_features = use_signal(|| {
-        if let Some(manifest) = installer_profile.local_manifest.clone() {
-            Some(manifest.enabled_features)
+        if let Some(ref manifest) = installer_profile.local_manifest {
+            Some(manifest.enabled_features.clone())
         } else {
             None
         }
@@ -816,7 +819,7 @@ fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -
     } else {
         None
     };
-    
+
     rsx! {
         if *installing.read() {
             ProgressView {
@@ -854,13 +857,12 @@ fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -
                                 },
                                 "View Credits"
                             }
-                        }
+                        };
                     }
                     
                     // Features heading
                     h2 { "Optional Features" }
                     
-                    // Log feature information
                     {
                         info!("Rendering {} features for manifest",
                                   installer_profile.manifest.features.len());
@@ -923,22 +925,50 @@ fn AppHeader(
     logo_url: Option<String>
 ) -> Element {
     // Log what tabs we have available
-    info!("Rendering AppHeader with {} tabs", pages.read().len());
+
+    info!("Rendering AppHeader with {} tabs", pages().len());
     for (index, info) in pages().iter() {
         info!("  Tab {}: title={}", index, info.title);
     }
-    
+  
     rsx!(
         header { class: "app-header",
-            // Logo (if available)
+            // Logo (if available) serves as home button
             if let Some(url) = logo_url {
-                img { class: "app-logo", src: "{url}", alt: "Logo" }
+                img { 
+                    class: "app-logo", 
+                    src: "{url}", 
+                    alt: "Logo",
+                    onclick: move |_| {
+                        page.set(HOME_PAGE);
+                        info!("Navigating to home page via logo");
+                    },
+                    style: "cursor: pointer;"
+                }
             }
             
-            h1 { class: "app-title", "Modpack Installer" }
+            h1 { 
+                class: "app-title", 
+                onclick: move |_| {
+                    page.set(HOME_PAGE);
+                    info!("Navigating to home page via title");
+                },
+                style: "cursor: pointer;",
+                "Modpack Installer" 
+            }
             
             // Tabs from pages - show only if we have pages
             div { class: "header-tabs",
+                // Home tab
+                button {
+                    class: if page() == HOME_PAGE { "header-tab-button active" } else { "header-tab-button" },
+                    onclick: move |_| {
+                        page.set(HOME_PAGE);
+                        info!("Navigating to home page via tab");
+                    },
+                    "Home"
+                }
+
                 if !pages().is_empty() {
                     for (index, info) in pages() {
                         button {
@@ -953,6 +983,7 @@ fn AppHeader(
                 } else {
                     // If no tabs, show a message for debugging purposes
                     span { style: "color: #888; font-style: italic;", "Loading tabs..." }
+
                 }
             }
             
@@ -984,14 +1015,20 @@ pub(crate) fn app() -> Element {
     let config = use_signal(|| props.config);
     let settings = use_signal(|| false);
     let mut err: Signal<Option<String>> = use_signal(|| None);
-    
+
     let page = use_signal(|| usize::MAX);
     let pages = use_signal(BTreeMap::<usize, TabInfo>::new);
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
-        Ok(val) => Some(val),
-        Err(_) => None,
+        Ok(val) => {
+            log::info!("Successfully loaded launcher: {}", cfg.launcher);
+            Some(val)
+        },
+        Err(e) => {
+            log::error!("Failed to load launcher: {} - {}", cfg.launcher, e);
+            None
+        },
     };
 
     let packs: Resource<()> = {
@@ -1065,7 +1102,7 @@ pub(crate) fn app() -> Element {
         }, false, Some(move |_| err.set(None)));
     }
 
-    // Determine which logo to use - could be made configurable via manifest
+    // Determine which logo to use
     let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/icon.png".to_string());
 
     rsx! {
@@ -1088,14 +1125,14 @@ pub(crate) fn app() -> Element {
                 Settings {
                     config,
                     settings,
-                    config_path: props.config_path,
+                    config_path: props.config_path.clone(),
                     error: err,
                     b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
             } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
                 Launcher {
                     config,
-                    config_path: props.config_path,
+                    config_path: props.config_path.clone(),
                     error: err,
                     b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
@@ -1106,7 +1143,7 @@ pub(crate) fn app() -> Element {
                         div { class: "loading-text", "Loading modpack information..." }
                     }
                 }
-                if page() == usize::MAX {
+                if page() == HOME_PAGE {
                     HomePage {
                         pages,
                         page

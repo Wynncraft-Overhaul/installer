@@ -62,8 +62,8 @@ a:hover {
     justify-content: space-between;
     align-items: center;
     padding: 10px 20px;
-    background-color: rgba(0, 0, 0, 0.7);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     height: 60px;
 }
 
@@ -76,13 +76,26 @@ a:hover {
 .app-logo {
     height: 40px;
     margin-right: 15px;
+    transition: transform 0.2s ease;
+}
+
+.app-logo:hover {
+    transform: scale(1.1);
+
 }
 
 .app-title {
     font-size: 1.5rem;
     margin: 0;
     font-family: "SECONDARY_FONT";
+    transition: text-shadow 0.2s ease;
 }
+
+
+.app-title:hover {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
 
 .header-tabs {
     display: flex;
@@ -90,6 +103,7 @@ a:hover {
     margin: 0 20px;
     flex-grow: 1;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 .header-tab-button {
@@ -100,27 +114,37 @@ a:hover {
     font-family: "SECONDARY_FONT";
     font-size: 1rem;
     transition: all 0.2s ease;
+    color: #fce8f6;
 }
 
 .header-tab-button:hover {
     background-color: rgba(50, 6, 37, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .header-tab-button.active {
     background-color: var(--bg-color);
     border-color: #fce8f6;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
 }
-
 .settings-button {
     background-color: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     padding: 8px 16px;
     font-family: "SECONDARY_FONT";
+
+    transition: all 0.2s ease;
+    color: #fce8f6;
 }
 
 .settings-button:hover {
     background-color: rgba(50, 6, 37, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Main Container */
@@ -130,41 +154,69 @@ a:hover {
     padding: 20px;
 }
 
-/* Home Page Styles */
+/* Home Container enhancements */
 .home-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    text-align: center;
 }
-
 .home-title {
     font-family: "SECONDARY_FONT";
     text-align: center;
     margin-bottom: 30px;
     font-size: 2.5rem;
+    color: #fce8f6;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+
 }
 
 .home-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
+    gap: 25px;
+    justify-items: center;
 }
 
 .home-pack-card {
     height: 200px;
+    width: 300px;
+
     border-radius: 8px;
     background-size: cover;
     background-position: center;
     position: relative;
     overflow: hidden;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
     cursor: pointer;
+    /* New glow effect */
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            90deg, 
+            transparent, 
+            rgba(255, 255, 255, 0.1), 
+            rgba(255, 255, 255, 0.3), 
+            transparent
+        );
+        transition: left 0.5s ease-in-out;
+    }
+    
+    &:hover::before {
+        left: 100%;
+    }
 }
 
 .home-pack-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7), 0 0 15px rgba(255, 255, 255, 0.3);
+    filter: brightness(1.1);
 }
 
 .home-pack-info {
@@ -175,12 +227,19 @@ a:hover {
     padding: 15px;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
     text-align: center;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.home-pack-card:hover .home-pack-info {
+    transform: translateY(-3px);
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
 }
 
 .home-pack-title {
     font-family: "SECONDARY_FONT";
     margin: 0 0 10px 0;
     font-size: 1.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .home-pack-button {
@@ -189,11 +248,13 @@ a:hover {
     padding: 8px 16px;
     border-radius: 4px;
     font-family: "SECONDARY_FONT";
-    transition: background-color 0.2s ease;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .home-pack-card:hover .home-pack-button {
     background-color: rgba(7, 60, 23, 1);
+    transform: scale(1.05);
 }
 
 /* Version/Details Screen */
@@ -212,6 +273,7 @@ a:hover {
     font-family: "SECONDARY_FONT";
     font-size: 2.2rem;
     margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .content-description {
@@ -220,6 +282,7 @@ a:hover {
     padding: 20px;
     margin-bottom: 30px;
     line-height: 1.6;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .credits-link {
@@ -229,10 +292,12 @@ a:hover {
     color: #fce8f6;
     text-decoration: none;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .credits-link:hover {
     text-decoration: underline;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 /* Feature Cards */
@@ -290,7 +355,7 @@ a:hover {
     font-family: "SECONDARY_FONT";
     text-align: center;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .feature-toggle-button.enabled {
@@ -303,6 +368,7 @@ a:hover {
 
 .feature-toggle-button:hover {
     opacity: 0.9;
+    transform: scale(1.05);
 }
 
 /* Install Button */
@@ -320,11 +386,12 @@ a:hover {
     font-size: 1.5rem;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
+    color: #fce8f6;
 }
 
 .main-install-button:hover:not([disabled]) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 15px rgba(7, 60, 23, 0.4);
     background-color: #0a4d1e;
 }
 
@@ -332,7 +399,6 @@ a:hover {
     background-color: #555;
     cursor: not-allowed;
 }
-
 /* Credits Screen */
 .credits-container {
     max-width: 900px;
@@ -340,6 +406,7 @@ a:hover {
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .credits-header {
@@ -354,6 +421,7 @@ a:hover {
 .credits-header h1 {
     font-family: "SECONDARY_FONT";
     margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .close-button {
@@ -362,6 +430,13 @@ a:hover {
     border-radius: 4px;
     padding: 8px 16px;
     font-family: "SECONDARY_FONT";
+    transition: all 0.2s ease;
+}
+
+.close-button:hover {
+    background-color: #c73c32;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .credits-content {
@@ -378,6 +453,11 @@ a:hover {
     margin-bottom: 15px;
     padding-bottom: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s ease;
+}
+
+.credit-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .credit-name {
@@ -393,6 +473,13 @@ a:hover {
 
 .credit-author {
     color: #fce8f6;
+    transition: all 0.2s ease;
+}
+
+
+.credit-author:hover {
+    color: #fff;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 /* Settings Screen */
@@ -402,12 +489,15 @@ a:hover {
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .settings-title {
     font-family: "SECONDARY_FONT";
     text-align: center;
     margin-bottom: 20px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+
 }
 
 .settings-form {
@@ -433,12 +523,21 @@ a:hover {
     padding: 10px;
     color: #fce8f6;
     width: 100%;
+
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.setting-select:focus {
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+    outline: none;
 }
 
 .settings-buttons {
     display: flex;
     gap: 15px;
     margin-top: 20px;
+
 }
 
 .primary-button, 
@@ -449,19 +548,39 @@ a:hover {
     font-family: "SECONDARY_FONT";
     font-size: 1rem;
     flex: 1;
+    transition: all 0.2s ease;
 }
 
 .primary-button {
     background-color: #073c17;
 }
 
+.primary-button:hover {
+    background-color: #0a4d1e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
 .secondary-button {
     background-color: #d95248;
+}
+
+.secondary-button:hover {
+    background-color: #c73c32;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .custom-multimc-button {
     background-color: #555;
     width: 100%;
+    transition: all 0.2s ease;
+}
+
+.custom-multimc-button:hover {
+    background-color: #666;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Launcher Selection Screen */
@@ -472,6 +591,7 @@ a:hover {
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .launcher-title, 
@@ -479,6 +599,9 @@ a:hover {
     font-family: "SECONDARY_FONT";
     text-align: center;
     margin-bottom: 20px;
+
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+
 }
 
 .launcher-form {
@@ -496,12 +619,14 @@ a:hover {
 .uninstall-list-container {
     max-height: 400px;
     overflow-y: auto;
+
 }
 
 .uninstall-list {
     list-style: none;
     padding: 0;
 }
+
 
 .uninstall-list-item {
     background-color: #d95248;
@@ -511,10 +636,17 @@ a:hover {
     width: 100%;
     text-align: left;
     margin-bottom: 8px;
+
+    transition: all 0.2s ease;
+
 }
 
 .uninstall-list-item:hover {
     background-color: #c73c32;
+
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+
 }
 
 /* Progress Screen */
@@ -525,6 +657,9 @@ a:hover {
     border-radius: 8px;
     padding: 20px;
     text-align: center;
+
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+
 }
 
 .progress-header {
@@ -534,6 +669,9 @@ a:hover {
 .progress-header h1 {
     font-family: "SECONDARY_FONT";
     margin: 0;
+
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+
 }
 
 .progress-content {
@@ -549,6 +687,9 @@ a:hover {
     background-color: #333;
     margin-bottom: 20px;
     overflow: hidden;
+
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+
 }
 
 .progress-bar::-webkit-progress-bar {
@@ -559,6 +700,9 @@ a:hover {
 .progress-bar::-webkit-progress-value {
     background-color: #073c17;
     border-radius: 10px;
+
+    box-shadow: 0 0 5px rgba(7, 60, 23, 0.5);
+
 }
 
 .progress-bar::-moz-progress-bar {
@@ -569,25 +713,35 @@ a:hover {
 .progress-status {
     font-size: 1.2rem;
     margin: 0;
+
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* Loading Screen */
+/* Loading Containers */
+
 .loading-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
+
+    height: 300px;
+    padding: 40px;
+    gap: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    max-width: 500px;
+    margin: 50px auto;
 }
 
 .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid rgba(255, 255, 255, 0.3);
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
-    border-top-color: #fce8f6;
+    border-top-color: #fff;
     animation: spin 1s ease-in-out infinite;
-    margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -595,16 +749,60 @@ a:hover {
 }
 
 .loading-text {
-    font-size: 1.2rem;
+    font-size: 20px;
+    color: white;
     font-family: "SECONDARY_FONT";
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Responsive Adjustments */
+/* Navigation buttons */
+.navigation-buttons {
+    margin-bottom: 20px;
+    padding: 0 20px;
+}
+
+.home-button {
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-family: "SECONDARY_FONT";
+    color: #fce8f6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.home-button:hover {
+    background-color: rgba(50, 6, 37, 0.8);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Error handling */
+.error-area {
+    width: 100%;
+    height: 150px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 10px;
+    color: #fce8f6;
+    font-family: monospace;
+    margin-top: 10px;
+    resize: none;
+}
+
+/* Responsive fixes */
+
 @media (max-width: 768px) {
     .app-header {
         flex-direction: column;
         height: auto;
         padding: 10px;
+
     }
     
     .header-tabs {
@@ -616,6 +814,7 @@ a:hover {
         grid-template-columns: 1fr;
     }
     
+
     .feature-cards-container {
         grid-template-columns: 1fr;
     }
