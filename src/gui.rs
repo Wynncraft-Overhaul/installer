@@ -555,7 +555,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
     let page_count = props.pages.with(|p| p.len());
     log::info!("Rendering Home Page with {} tabs", page_count);
     
-    rsx!(
+    rsx!{
         div { class: "home-container",
             h1 { class: "home-title", "Welcome to the Modpack Installer" }
             
@@ -583,7 +583,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                 }
             }
         }
-    )
+    }
 }
 
 // Ensure HomePageTabProps is defined
