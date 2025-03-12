@@ -77,7 +77,6 @@ fn Credits(mut props: CreditsProps) -> Element {
                                 }
                             }
                         }
-                        // Similar blocks for shaderpacks, resourcepacks, include - keeping structure same
                         for shaderpack in props.manifest.shaderpacks {
                             if props.enabled.contains(&shaderpack.id) {
                                 li { class: "credit-item",
@@ -457,7 +456,7 @@ fn NoLauncherFound(props: LauncherProps) -> Element {
 struct FeatureCardProps {
     feature: super::Feature,
     enabled: bool,
-    on_toggle: EventHandler<Event<FormData>>,
+    on_toggle: EventHandler<FormEvent>,
 }
 
 #[component]
@@ -492,7 +491,7 @@ fn FeatureCard(props: FeatureCardProps) -> Element {
 fn feature_change(
     local_features: Signal<Option<Vec<String>>>,
     mut modify: Signal<bool>,
-    evt: Event<FormData>,
+    evt: FormEvent,
     feat: &super::Feature,
     mut modify_count: Signal<i32>,
     mut enabled_features: Signal<Vec<String>>,
@@ -550,7 +549,7 @@ fn Version(mut props: VersionProps) -> Element {
         async move { super::init(source, branch, launcher).await }
     });
 
-    // When loading profile resources, show a more informative loading indicator
+    // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
         return rsx! {
             div { class: "loading-container", 
@@ -816,7 +815,7 @@ fn Version(mut props: VersionProps) -> Element {
     if (props.page)() != tab_group {
         return None;
     }
-
+    
     rsx! {
         if *installing.read() {
             ProgressView {
@@ -897,6 +896,163 @@ fn Version(mut props: VersionProps) -> Element {
                                 if !*modify.read() { "Update" } else { "Modify" }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// New header component with tabs
+#[component]
+fn AppHeader(
+    page: Signal<usize>, 
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+    settings: Signal<bool>,
+    logo_url: Option<String>
+) -> Element {
+    rsx!(
+        header { class: "app-header",
+            // Logo (if available)
+            if let Some(url) = logo_url {
+                img { class: "app-logo", src: "{url}", alt: "Logo" }
+            }
+            
+            h1 { class: "app-title", "Modpack Installer" }
+            
+            // Tabs from pages
+            div { class: "header-tabs",
+                for (index, info) in pages() {
+                    button {
+                        class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
+                        onclick: move |_| {
+                            page.set(index);
+                        },
+                        "{info.title}"
+                    }
+                }
+            }
+            
+            // Settings button
+            button {
+                class: "settings-button",
+                onclick: move |_| {
+                    settings.set(true);
+                },
+                "Settings"
+            }
+        }
+    )
+}
+
+#[derive(Clone)]
+pub(crate) struct AppProps {
+    pub branches: Vec<super::GithubBranch>,
+    pub modpack_source: String,
+    pub config: super::Config,
+    pub config_path: PathBuf,
+}
+
+pub(crate) fn app() -> Element {
+    let props = use_context::<AppProps>();
+    let css = include_str!("assets/style.css");
+    let branches = props.branches;
+    let config = use_signal(|| props.config);
+    let settings = use_signal(|| false);
+    let mut err: Signal<Option<String>> = use_signal(|| None);
+
+    let name = use_signal(String::default);
+
+    let page = use_signal(|| 0);
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    let css = css
+        .replace(
+            "<BG_COLOR>",
+            match pages().get(&page()) {
+                Some(x) => &x.color,
+                None => "#320625",
+            },
+        )
+        .replace(
+            "<BG_IMAGE>",
+            match pages().get(&page()) {
+                Some(x) => {
+                    if settings() {
+                        &x.settings_background
+                    } else {
+                        &x.background
+                    }
+                },
+                None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png",
+            },
+        ).replace("<SECONDARY_FONT>", match pages().get(&page()) {
+            Some(x) => &x.secondary_font,
+            None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2",
+        }).replace("<PRIMARY_FONT>", match pages().get(&page()) {
+            Some(x) => &x.primary_font,
+            None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2",
+        });
+
+    let cfg = config.with(|cfg| cfg.clone());
+    let launcher = match super::get_launcher(&cfg.launcher) {
+        Ok(val) => Some(val),
+        Err(_) => None,
+    };
+
+    let mut modal_context = use_context_provider(|| ModalContext::default());
+    if let Some(e) = err() {
+        modal_context.open("Error", rsx! {
+            p {
+                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
+            }
+            textarea { class: "error-area", readonly: true, "{e}" }
+        }, false, Some(move |_| err.set(None)));
+    }
+
+    // Determine which logo to use - could be made configurable via manifest
+    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
+
+    rsx! {
+        style { "{css}" }
+
+        Modal {}
+
+        // Always render AppHeader if we're past the initial launcher selection
+        if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
+            AppHeader {
+                page,
+                pages,
+                settings,
+                logo_url
+            }
+        }
+
+        div { class: "main-container",
+            if settings() {
+                Settings {
+                    config,
+                    settings,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                }
+            } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
+                Launcher {
+                    config,
+                    config_path: props.config_path,
+                    error: err,
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                }
+            } else {
+                for i in 0..branches.len() {
+                    Version {
+                        modpack_source: props.modpack_source.clone(),
+                        modpack_branch: branches[i].name.clone(),
+                        launcher: launcher.as_ref().unwrap().clone(),
+                        error: err,
+                        name,
+                        page,
+                        pages
                     }
                 }
             }
