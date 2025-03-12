@@ -2,9 +2,11 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use base64::{engine, Engine};
 use dioxus::prelude::*;
+use futures::StreamExt;
+use log::info;
 use modal::{Modal, ModalContext};
 
-use crate::{get_app_data, get_installed_packs, get_launcher, uninstall, Launcher, PackName};
+use crate::{get_app_data, get_installed_packs, get_launcher, uninstall, InstallerProfile, Launcher, PackName};
 
 mod modal;
 
@@ -16,86 +18,33 @@ struct TabInfo {
     settings_background: String,
     primary_font: String,
     secondary_font: String,
+    modpacks: Vec<InstallerProfile>,
 }
-// Special value for home page
-const HOME_PAGE: usize = usize::MAX;
 
 // Home Page component to display all available modpacks as a grid
 #[component]
 fn HomePage(
     pages: Signal<BTreeMap<usize, TabInfo>>,
-    page: Signal<usize>,
-    branches: Vec<super::GithubBranch>,
-    modpack_source: String,
-    launcher: Option<super::Launcher>
+    page: Signal<usize>
 ) -> Element {
-    log::info!("Rendering HomePage with {} tabs", pages().len());
+    info!("Rendering HomePage with {} tabs", pages().len());
     
-    // Count actual valid modpack tabs (not placeholders)
-    let valid_tabs = pages().iter()
-        .filter(|(_, info)| !info.title.starts_with("Tab "))
-        .count();
-    
-    // If we have no branches or launcher is None, we can't load tabs
-    if branches.is_empty() || launcher.is_none() {
-        return rsx! {
-            div { class: "loading-container", 
-                div { class: "loading-spinner" }
-                div { class: "loading-text", "No modpacks available. Please check your launcher settings." }
-            }
-        };
-    }
-    
-    // If we have branches but no valid tabs yet, show a loading message
-    // But also trigger loading of the modpack information
-    if valid_tabs == 0 {
-        // Create a dummy placeholder to show something is happening
-        let launcher_unwrapped = launcher.unwrap();
-        
-        rsx! {
-            // Load at least one modpack tab
-            for i in 0..branches.len() {
-                Version { 
-                    modpack_source: modpack_source.clone(),
-                    modpack_branch: branches[i].name.clone(),
-                    launcher: launcher_unwrapped.clone(),
-                    error: Signal::new(None),
-                    name: Signal::new(String::default()),
-                    page: Signal::new(HOME_PAGE), // Use HOME_PAGE to prevent rendering
-                    pages: pages
-                }
-            }
+    rsx! {
+        div { class: "home-container",
+            h1 { class: "home-title", "Available Modpacks" }
             
-            div { class: "loading-container", 
-                div { class: "loading-spinner" }
-                div { class: "loading-text", "Loading modpack information..." }
-            }
-        }
-    } else {
-        // We have valid tabs, show them in the grid
-        // Collect real modpacks first into a Vec to avoid lifetime issues
-        let real_modpacks: Vec<(usize, TabInfo)> = pages().iter()
-            .filter(|(_, info)| !info.title.starts_with("Tab "))
-            .map(|(index, info)| (*index, info.clone()))
-            .collect();
-        
-        rsx! {
-            div { class: "home-container", 
-                h1 { class: "home-title", "Available Modpacks" }
-                
-                div { class: "home-grid",
-                    for (index, info) in real_modpacks {
-                        div { 
-                            class: "home-pack-card",
-                            style: "background-image: url('{info.background}'); background-color: {info.color};",
-                            onclick: move |_| {
-                                page.set(index);
-                                log::info!("Navigating to tab {}: {}", index, info.title);
-                            },
-                            div { class: "home-pack-info",
-                                h2 { class: "home-pack-title", "{info.title}" }
-                                div { class: "home-pack-button", "View Modpack" }
-                            }
+            div { class: "home-grid",
+                for (index, info) in pages() {
+                    div { 
+                        class: "home-pack-card",
+                        style: "background-image: url('{info.background}'); background-color: {info.color};",
+                        onclick: move |_| {
+                            page.set(index);
+                            info!("Navigating to tab {}: {}", index, info.title);
+                        },
+                        div { class: "home-pack-info",
+                            h2 { class: "home-pack-title", "{info.title}" }
+                            div { class: "home-pack-button", "View Modpack" }
                         }
                     }
                 }
@@ -103,6 +52,9 @@ fn HomePage(
         }
     }
 }
+// Special value for home page
+const HOME_PAGE: usize = usize::MAX;
+
 #[component]
 fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
     rsx!(
@@ -476,29 +428,26 @@ fn CustomMultiMCButton(mut props: LauncherProps) -> Element {
             .set_title("Pick root directory of desired MultiMC based launcher.")
             .set_directory(get_app_data());
         let directory = directory_dialog.pick_folder();
-        match directory {
-            Some(path) => {
-                if !path.join("instances").is_dir() {
-                    return;
-                }
-                let path = path.to_str();
-                if path.is_none() {
-                    props
-                        .error
-                        .set(Some(String::from("Could not get path to directory!")));
-                }
-                props.config.write().launcher = format!("custom-{}", path.unwrap());
-                props.config.write().first_launch = Some(false);
-                if let Err(e) = std::fs::write(
-                    &props.config_path,
-                    serde_json::to_vec(&*props.config.read()).unwrap(),
-                ) {
-                    props
-                        .error
-                        .set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
-                }
+        if let Some(path) = directory {
+            if !path.join("instances").is_dir() {
+                return;
             }
-            None => {}
+            let path = path.to_str();
+            if path.is_none() {
+                props
+                    .error
+                    .set(Some(String::from("Could not get path to directory!")));
+            }
+            props.config.write().launcher = format!("custom-{}", path.unwrap());
+            props.config.write().first_launch = Some(false);
+            if let Err(e) = std::fs::write(
+                &props.config_path,
+                serde_json::to_vec(&*props.config.read()).unwrap(),
+            ) {
+                props
+                    .error
+                    .set(Some(format!("{:#?}", e) + " (Failed to write config!)"));
+            }
         }
     };
     
@@ -615,186 +564,103 @@ fn feature_change(
     }
 }
 
-#[derive(PartialEq, Props, Clone)]
-struct VersionProps {
-    modpack_source: String,
-    modpack_branch: String,
-    launcher: super::Launcher,
-    error: Signal<Option<String>>,
-    name: Signal<String>,
-    page: Signal<usize>,
-    pages: Signal<BTreeMap<usize, TabInfo>>,
-}
-fn ensure_all_tab_groups(pages: &mut BTreeMap<usize, TabInfo>) {
-    // Default values for tabs that might be missing
-    let default_color = "#320625".to_string();
-    let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
-    let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
-    
-    // Ensure all expected tab groups (0-6) exist in the map
-    // Only add if they don't already exist
-    for i in 0..=6 {
-        if !pages.contains_key(&i) {
-            pages.insert(
-                i,
-                TabInfo {
-                    color: default_color.clone(),
-                    title: format!("Tab {}", i),
-                    background: default_bg.clone(),
-                    settings_background: default_bg.clone(),
-                    primary_font: default_font.clone(),
-                    secondary_font: default_font.clone(),
-                },
-            );
-            log::info!("Added placeholder for missing tab group {}", i);
-        }
-    }
-}
-// Main fix is in this component
-#[component]
-fn Version(mut props: VersionProps) -> Element {
-    // Early return if we're on the HOME_PAGE - this is just to load data
-    if (props.page)() == HOME_PAGE {
-        log::info!("Version component loading data for home page");
-        // We still load the resources for the home page to populate tabs
-    }
-    
-    // Fix: Using logging to debug the profile loading
-    log::info!("Loading Version component for source: {}, branch: {}", 
-              props.modpack_source, props.modpack_branch);
-    
-    let profile = use_resource(move || {
-        let source = props.modpack_source.clone();
-        let branch = props.modpack_branch.clone();
-        let launcher = props.launcher.clone();
-        log::info!("Starting resource load for modpack from source: {}, branch: {}", source, branch);
-        async move { 
-            let result = super::init(source, branch, launcher).await;
-            match &result {
-                Ok(profile) => {
-                    log::info!("Successfully loaded manifest: subtitle={}, has {} features", 
-                        profile.manifest.subtitle,
-                        profile.manifest.features.len());
-                },
-                Err(e) => {
-                    log::error!("Failed to load manifest: {}", e);
-                }
-            }
-            result
-        }
-    });
-
-    // When loading profile resources, show a loading indicator
-    if profile.read().is_none() {
-        log::info!("Profile resource is still loading...");
-        return if (props.page)() == HOME_PAGE {
-            rsx! { "" } // Empty element for HOME_PAGE
-        } else {
-            rsx! {
-                div { class: "loading-container", 
-                    div { class: "loading-spinner" }
-                    div { class: "loading-text", "Loading modpack information..." }
-                }
-            }
-        };
-    }
-
-    let installer_profile = match profile.unwrap() {
-        Ok(v) => v,
-        Err(e) => {
-            if (props.page)() != HOME_PAGE {
-                props.error.set(Some(
-                    format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
-                ));
-            }
-            return None;
-        }
-    };
+async fn init_branch(source: String, branch: String, launcher: Launcher, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Result<(), String> {
+    info!("Initializing modpack from source: {}, branch: {}", source, branch);
+    let profile = crate::init(source.to_owned(), branch.to_owned(), launcher).await?;
 
     // Process manifest data for tab information
-    log::info!("Successfully processed manifest tab information:");
-    log::info!("  subtitle: {}", installer_profile.manifest.subtitle);
-    log::info!("  description length: {}", installer_profile.manifest.description.len());
-    
-    let tab_group = if let Some(tab_group) = installer_profile.manifest.tab_group {
-        log::info!("  tab_group: {}", tab_group);
+    // Extract and log the tab information for debugging
+    info!("Processing manifest tab information:");
+    info!("  subtitle: {}", profile.manifest.subtitle);
+    info!("  description length: {}", profile.manifest.description.len());
+
+    let tab_group = if let Some(tab_group) = profile.manifest.tab_group {
+        info!("  tab_group: {}", tab_group);
         tab_group
     } else {
-        log::info!("  tab_group: None, defaulting to 0");
+        info!("  tab_group: None, defaulting to 0");
         0
     };
-    
-    let tab_title = if let Some(ref tab_title) = installer_profile.manifest.tab_title {
-        log::info!("  tab_title: {}", tab_title);
-        tab_title.clone()
-    } else {
-        log::info!("  tab_title: None, using subtitle");
-        installer_profile.manifest.subtitle.clone()
-    };
-    
-    let tab_color = if let Some(ref tab_color) = installer_profile.manifest.tab_color {
-        log::info!("  tab_color: {}", tab_color);
-        tab_color.clone()
-    } else {
-        log::info!("  tab_color: None, defaulting to '#320625'");
-        String::from("#320625")
-    };
-    
-    let tab_background = if let Some(ref tab_background) = installer_profile.manifest.tab_background {
-        log::info!("  tab_background: {}", tab_background);
-        tab_background.clone()
-    } else {
-        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png";
-        log::info!("  tab_background: None, defaulting to '{}'", default_bg);
-        String::from(default_bg)
-    };
-    
-    let settings_background = if let Some(ref settings_background) = installer_profile.manifest.settings_background {
-        log::info!("  settings_background: {}", settings_background);
-        settings_background.clone()
-    } else {
-        log::info!("  settings_background: None, using tab_background");
-        tab_background.clone()
-    };
-        
-    let tab_secondary_font = if let Some(ref tab_secondary_font) = installer_profile.manifest.tab_secondary_font {
-        log::info!("  tab_secondary_font: {}", tab_secondary_font);
-        tab_secondary_font.clone()
-    } else {
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
-        log::info!("  tab_secondary_font: None, defaulting to '{}'", default_font);
-        String::from(default_font)
-    };
-    
-    let tab_primary_font = if let Some(ref tab_primary_font) = installer_profile.manifest.tab_primary_font {
-        log::info!("  tab_primary_font: {}", tab_primary_font);
-        tab_primary_font.clone()
-    } else {
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
-        log::info!("  tab_primary_font: None, defaulting to '{}'", default_font);
-        String::from(default_font)
-    };
 
-    // Always insert the tab into pages
-    props.pages.with_mut(|x| {
-        log::info!("Inserting tab to page map: group={}, title={}", tab_group, tab_title);
-        x.insert(
-            tab_group,
-            TabInfo {
-                color: tab_color,
-                title: tab_title,
-                background: tab_background,
-                settings_background,
-                primary_font: tab_primary_font,
-                secondary_font: tab_secondary_font,
-            },
-        );
-    });
+    if !pages.read().contains_key(&tab_group) {
+        let tab_title = if let Some(ref tab_title) = profile.manifest.tab_title {
+            info!("  tab_title: {}", tab_title);
+            tab_title.clone()
+        } else {
+            info!("  tab_title: None, using subtitle");
+            profile.manifest.subtitle.clone()
+        };
 
-    // If we're only loading data for the home page, return empty
-    if (props.page)() == HOME_PAGE {
-        return rsx! { "" }; // Empty element
+        let tab_color = if let Some(ref tab_color) = profile.manifest.tab_color {
+            info!("  tab_color: {}", tab_color);
+            tab_color.clone()
+        } else {
+            info!("  tab_color: None, defaulting to '#320625'");
+            String::from("#320625")
+        };
+
+        let tab_background = if let Some(ref tab_background) = profile.manifest.tab_background {
+            info!("  tab_background: {}", tab_background);
+            tab_background.clone()
+        } else {
+            let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png";
+            info!("  tab_background: None, defaulting to '{}'", default_bg);
+            String::from(default_bg)
+        };
+
+        let settings_background = if let Some(ref settings_background) = profile.manifest.settings_background {
+            info!("  settings_background: {}", settings_background);
+            settings_background.clone()
+        } else {
+            info!("  settings_background: None, using tab_background");
+            tab_background.clone()
+        };
+
+        let tab_secondary_font = if let Some(ref tab_secondary_font) = profile.manifest.tab_secondary_font {
+            info!("  tab_secondary_font: {}", tab_secondary_font);
+            tab_secondary_font.clone()
+        } else {
+            let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
+            info!("  tab_secondary_font: None, defaulting to '{}'", default_font);
+            String::from(default_font)
+        };
+
+        let tab_primary_font = if let Some(ref tab_primary_font) = profile.manifest.tab_primary_font {
+            info!("  tab_primary_font: {}", tab_primary_font);
+            tab_primary_font.clone()
+        } else {
+            let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
+            info!("  tab_primary_font: None, defaulting to '{}'", default_font);
+            String::from(default_font)
+        };
+
+        info!("Inserting tab_group {} into pages map", tab_group);
+        let tab_info = TabInfo {
+            color: tab_color,
+            title: tab_title,
+            background: tab_background,
+            settings_background,
+            primary_font: tab_primary_font,
+            secondary_font: tab_secondary_font,
+            modpacks: vec![],
+        };
+        pages.write().insert(tab_group, tab_info);
     }
+
+
+    if pages.read().get(&tab_group).unwrap().modpacks.contains(&profile) {
+        return Ok(());
+    }
+    pages.write().entry(tab_group).and_modify(|x| x.modpacks.push(profile));
+    info!("Inserted {} into tab_group {}", branch, tab_group);
+
+    Ok(())
+}
+
+#[component]
+fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -> Element {
+    info!("Rendering Version component for source: {}, branch: {}",
+              installer_profile.modpack_source, installer_profile.modpack_branch);  
 
     let mut installing = use_signal(|| false);
     let mut progress_status = use_signal(|| "");
@@ -802,35 +668,23 @@ fn Version(mut props: VersionProps) -> Element {
     let mut modify = use_signal(|| false);
     let mut modify_count = use_signal(|| 0);
 
-    // Make a clone of installer_profile for use in effects
-    let installer_profile_features = installer_profile.manifest.features.clone();
-    let installer_profile_installed = installer_profile.installed;
-    let local_manifest_features = if let Some(ref local_manifest) = installer_profile.local_manifest {
-        Some(local_manifest.enabled_features.clone())
-    } else {
-        None
-    };
-
-    // Initialize the enabled_features signal
-    let mut enabled_features = use_signal(|| Vec::<String>::new());
-
-    // Initialize the enabled_features signal with appropriate values
-    use_effect(move || {
+    // Fix: Initialize enabled_features properly
+    let enabled_features = use_signal(|| {
         let mut features = vec!["default".to_string()];
         
-        if installer_profile_installed && local_manifest_features.is_some() {
-            features = local_manifest_features.clone().unwrap();
+        if installer_profile.installed && installer_profile.local_manifest.is_some() {
+            features = installer_profile.local_manifest.as_ref().unwrap().enabled_features.clone();
         } else {
             // Add default features
-            for feat in &installer_profile_features {
+            for feat in &installer_profile.manifest.features {
                 if feat.default {
                     features.push(feat.id.clone());
                 }
             }
         }
-        
-        log::info!("Initial enabled features: {:?}", features);
-        enabled_features.set(features);
+
+        info!("Initial enabled features: {:?}", features);
+        features
     });
 
     let mut install_item_amount = use_signal(|| 0);
@@ -872,7 +726,7 @@ fn Version(mut props: VersionProps) -> Element {
 
                     if !*installed.read() {
                         progress_status.set("Installing");
-                        match super::install(&installer_profile, move || {
+                        match crate::install(&installer_profile, move || {
                             install_progress.with_mut(|x| *x += 1);
                         })
                         .await
@@ -897,7 +751,7 @@ fn Version(mut props: VersionProps) -> Element {
                                 );
                             }
                             Err(e) => {
-                                props.error.set(Some(
+                                error.set(Some(
                                     format!("{:#?}", e) + " (Failed to update modpack!)",
                                 ));
                                 installing.set(false);
@@ -930,7 +784,7 @@ fn Version(mut props: VersionProps) -> Element {
                                 );
                             }
                             Err(e) => {
-                                props.error.set(Some(
+                                error.set(Some(
                                     format!("{:#?}", e) + " (Failed to modify modpack!)",
                                 ));
                                 installing.set(false);
@@ -966,15 +820,6 @@ fn Version(mut props: VersionProps) -> Element {
         None
     };
 
-    if *props.name.read() == String::default() {
-        props.name.set(installer_profile.manifest.name.clone())
-    }
-    
-    if (props.page)() != tab_group {
-        return None;
-    }
-    
-    // Now the actual render of the component
     rsx! {
         if *installing.read() {
             ProgressView {
@@ -1012,18 +857,17 @@ fn Version(mut props: VersionProps) -> Element {
                                 },
                                 "View Credits"
                             }
-                        }
+                        }7);
                     }
                     
                     // Features heading
                     h2 { "Optional Features" }
                     
-                    // Log feature information for debugging
                     {
-                        log::info!("Rendering {} features for manifest", 
+                        info!("Rendering {} features for manifest",
                                   installer_profile.manifest.features.len());
                         for feat in &installer_profile.manifest.features {
-                            log::info!("Feature: id={}, name={}, hidden={}, default={}", 
+                            info!("Feature: id={}, name={}, hidden={}, default={}",
                                       feat.id, feat.name, feat.hidden, feat.default);
                         }
                     }
@@ -1081,18 +925,12 @@ fn AppHeader(
     logo_url: Option<String>
 ) -> Element {
     // Log what tabs we have available
-    log::info!("Rendering AppHeader with {} tabs", pages().len());
+
+    info!("Rendering AppHeader with {} tabs", pages().len());
     for (index, info) in pages().iter() {
-        log::info!("  Tab {}: title={}", index, info.title);
+        info!("  Tab {}: title={}", index, info.title);
     }
-    
-    // Fix: Get the pages data once and collect real tabs to avoid temporary value errors
-    let pages_data = pages();
-    let real_tabs: Vec<(usize, TabInfo)> = pages_data.iter()
-        .filter(|(_, info)| !info.title.starts_with("Tab "))
-        .map(|(index, info)| (*index, info.clone()))
-        .collect();
-    
+  
     rsx!(
         header { class: "app-header",
             // Logo (if available) serves as home button
@@ -1103,7 +941,7 @@ fn AppHeader(
                     alt: "Logo",
                     onclick: move |_| {
                         page.set(HOME_PAGE);
-                        log::info!("Navigating to home page via logo");
+                        info!("Navigating to home page via logo");
                     },
                     style: "cursor: pointer;"
                 }
@@ -1113,7 +951,7 @@ fn AppHeader(
                 class: "app-title", 
                 onclick: move |_| {
                     page.set(HOME_PAGE);
-                    log::info!("Navigating to home page via title");
+                    info!("Navigating to home page via title");
                 },
                 style: "cursor: pointer;",
                 "Modpack Installer" 
@@ -1126,22 +964,26 @@ fn AppHeader(
                     class: if page() == HOME_PAGE { "header-tab-button active" } else { "header-tab-button" },
                     onclick: move |_| {
                         page.set(HOME_PAGE);
-                        log::info!("Navigating to home page via tab");
+                        info!("Navigating to home page via tab");
                     },
                     "Home"
                 }
-                
-                // Only show real modpack tabs, not placeholders
-                // Use the collected real_tabs instead of filtering within RSX
-                for (index, info) in real_tabs {
-                    button {
-                        class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
-                        onclick: move |_| {
-                            page.set(index);
-                            log::info!("Switching to tab {}: {}", index, info.title);
-                        },
-                        "{info.title}"
+
+                if !pages().is_empty() {
+                    for (index, info) in pages() {
+                        button {
+                            class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
+                            onclick: move |_| {
+                                page.set(index);
+                                info!("Switching to tab {}: {}", index, info.title);
+                            },
+                            "{info.title}"
+                        }
                     }
+                } else {
+                    // If no tabs, show a message for debugging purposes
+                    span { style: "color: #888; font-style: italic;", "Loading tabs..." }
+
                 }
             }
             
@@ -1150,7 +992,7 @@ fn AppHeader(
                 class: "settings-button",
                 onclick: move |_| {
                     settings.set(true);
-                    log::info!("Opening settings");
+                    info!("Opening settings");
                 },
                 "Settings"
             }
@@ -1170,86 +1012,12 @@ pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
     let css = include_str!("assets/style.css");
     let branches = props.branches.clone();
-    let modpack_source = props.modpack_source.clone();
     let config = use_signal(|| props.config);
-    let mut settings = use_signal(|| false);
+    let settings = use_signal(|| false);
     let mut err: Signal<Option<String>> = use_signal(|| None);
 
-    let name = use_signal(String::default);
-    
-    // Start with HOME_PAGE as default
-    let mut page = use_signal(|| HOME_PAGE);
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
-    
-    // Tab loading state tracking
-    let mut tabs_loading = use_signal(|| true);
-    
-    // Log the branch information to help with debugging
-    log::info!("App initialized with {} branches", branches.len());
-    for (i, branch) in branches.iter().enumerate() {
-        log::info!("Branch {}: {}", i, branch.name);
-    }
-    
-    // We'll use this effect to detect when tabs are loaded
-    use_effect(move || {
-        // Count valid tabs
-        let valid_tabs = pages().iter()
-            .filter(|(_, info)| !info.title.starts_with("Tab "))
-            .count();
-            
-        if valid_tabs > 0 && tabs_loading() {
-            log::info!("Valid modpack tabs loaded: {}", valid_tabs);
-            for (index, info) in pages().iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
-                log::info!("  Tab {}: {}", index, info.title);
-            }
-            tabs_loading.set(false);
-        }
-    });
-
-    // CSS calculation
-    let css_content = {
-        let page_val = page();
-        let settings_val = settings();
-        let pages_val = pages();
-        
-        let default_color = "#320625".to_string();
-        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
-        
-        let bg_color = match pages_val.get(&page_val) {
-            Some(x) => x.color.clone(),
-            None => default_color,
-        };
-        
-        let bg_image = match pages_val.get(&page_val) {
-            Some(x) => {
-                if settings_val {
-                    x.settings_background.clone()
-                } else {
-                    x.background.clone()
-                }
-            },
-            None => default_bg,
-        };
-        
-        let secondary_font = match pages_val.get(&page_val) {
-            Some(x) => x.secondary_font.clone(),
-            None => default_font.clone(),
-        };
-        
-        let primary_font = match pages_val.get(&page_val) {
-            Some(x) => x.primary_font.clone(),
-            None => default_font,
-        };
-        
-        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
-        
-        css
-            .replace("<BG_COLOR>", &bg_color)
-            .replace("<BG_IMAGE>", &bg_image)
-            .replace("<SECONDARY_FONT>", &secondary_font)
-            .replace("<PRIMARY_FONT>", &primary_font)
-    };
+    let page = use_signal(|| usize::MAX);
+    let pages = use_signal(BTreeMap::<usize, TabInfo>::new);
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
@@ -1263,7 +1031,68 @@ pub(crate) fn app() -> Element {
         },
     };
 
-    let mut modal_context = use_context_provider(|| ModalContext::default());
+    let packs: Resource<()> = {
+        // Log information about the branches we're loading
+        info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
+        let source = props.modpack_source.clone();
+        let branches = branches.clone();
+        let launcher = launcher.clone();
+        use_resource(move || {
+            let source = source.clone();
+            let branches = branches.clone();
+            let launcher = launcher.clone();
+            async move {
+                let source = source.clone();
+                let branches = branches.clone();
+                let launcher = launcher.clone();
+                futures::stream::iter(branches.iter().map(|x| init_branch(source.clone(), x.name.clone(), launcher.clone().unwrap(), pages.clone()))).for_each_concurrent(1, |fut| async move {let _ = fut.await;}).await; // FIXME: handle failed branch init
+            }
+        })
+    };
+
+    
+    // Update CSS whenever relevant values change
+    let css_content = {
+        let default_color = "#320625".to_string();
+        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
+        
+        let bg_color = match pages().get(&page()) {
+            Some(x) => x.color.clone(),
+            None => default_color,
+        };
+        
+        let bg_image = match pages().get(&page()) {
+            Some(x) => {
+                if settings() {
+                    x.settings_background.clone()
+                } else {
+                    x.background.clone()
+                }
+            },
+            None => default_bg,
+        };
+        
+        let secondary_font = match pages().get(&page()) {
+            Some(x) => x.secondary_font.clone(),
+            None => default_font.clone(),
+        };
+        
+        let primary_font = match pages().get(&page()) {
+            Some(x) => x.primary_font.clone(),
+            None => default_font,
+        };
+        
+        info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
+        
+        css
+            .replace("<BG_COLOR>", &bg_color)
+            .replace("<BG_IMAGE>", &bg_image)
+            .replace("<SECONDARY_FONT>", &secondary_font)
+            .replace("<PRIMARY_FONT>", &primary_font)
+    };
+
+    let mut modal_context = use_context_provider(ModalContext::default);
     if let Some(e) = err() {
         modal_context.open("Error", rsx! {
             p {
@@ -1305,33 +1134,29 @@ pub(crate) fn app() -> Element {
                     config,
                     config_path: props.config_path.clone(),
                     error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
             } else {
-                // Content area - no need for back button since we have a Home tab now
+                if packs.read().is_none() {
+                    div { class: "loading-container",
+                        div { class: "loading-spinner" }
+                        div { class: "loading-text", "Loading modpack information..." }
+                    }
+                }
                 if page() == HOME_PAGE {
-                    // Show home page with necessary parameters
-                    HomePage { 
-                        pages, 
-                        page,
-                        branches: branches.clone(),
-                        modpack_source: modpack_source.clone(),
-                        launcher: launcher.clone()
+                    HomePage {
+                        pages,
+                        page
                     }
                 } else {
-                    // Show specific modpack version page
-                    for i in 0..branches.len() {
+                    for installer_profile in pages().get(&page()).cloned().unwrap().modpacks {
                         Version {
-                            modpack_source: props.modpack_source.clone(),
-                            modpack_branch: branches[i].name.clone(),
-                            launcher: launcher.as_ref().unwrap().clone(),
-                            error: err,
-                            name,
-                            page,
-                            pages
+                            installer_profile,
+                            error: err.clone(),
                         }
                     }
                 }
+
             }
         }
     }
