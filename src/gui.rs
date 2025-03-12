@@ -548,7 +548,12 @@ fn feature_change(
         }
     }
 }
-
+// Add this before the HomePageTab function
+#[derive(PartialEq, Props, Clone)]
+struct HomePageTabProps {
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+    page: Signal<usize>,
+}
 
 #[component]
 fn HomePageTab(props: HomePageTabProps) -> Element {
@@ -580,7 +585,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                                         props.page.set(current_index);
                                         log::info!("Clicked tab card: switching to tab {}", current_index);
                                     },
-                                    style: "background-image: url({});", current_background,
+                                    style: format!("background-image: url({});", current_background),
                                     
                                     div { class: "tab-card-content",
                                         h2 { class: "tab-card-title", "{current_title}" }
@@ -601,12 +606,13 @@ fn Version(mut props: VersionProps) -> Element {
     let modpack_branch = props.modpack_branch.clone();
     let launcher = props.launcher.clone();
     
-    // Create a separate variable for error display
-    let error_branch = modpack_branch.clone();
+    // Create separate variables for display and async closure
+    let display_branch = modpack_branch.clone();
+    let async_branch = modpack_branch.clone();
 
     let profile = use_resource(move || {
         let source = modpack_source.clone();
-        let branch = modpack_branch.clone();
+        let branch = async_branch.clone();
         let launcher = launcher.clone();
         log::info!("Loading modpack from source: {}, branch: {}", source, branch);
         async move { 
@@ -633,7 +639,9 @@ fn Version(mut props: VersionProps) -> Element {
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
-                div { class: "loading-text", "Loading modpack information for: {modpack_branch}..." }
+                div { class: "loading-text", 
+                    "Loading modpack information for: {display_branch}..." 
+                }
                 div { class: "loading-details", "This may take a moment. Please wait..." }
             }
         };
@@ -649,7 +657,7 @@ fn Version(mut props: VersionProps) -> Element {
             return rsx! {
                 div { class: "error-container",
                     h2 { "Error Loading Modpack" }
-                    p { "Failed to load manifest for branch: {error_branch}" }
+                    p { "Failed to load manifest for branch: {display_branch}" }
                     p { class: "error-details", "{e}" }
                 }
             };
