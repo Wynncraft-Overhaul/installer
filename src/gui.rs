@@ -550,10 +550,13 @@ fn Version(mut props: VersionProps) -> Element {
         async move { super::init(source, branch, launcher).await }
     });
 
-    // 'use_future's will always be 'None' on components first render
+    // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
         return rsx! {
-            div { class: "loading-container", "Loading..." }
+            div { class: "loading-container", 
+                div { class: "loading-spinner" }
+                div { class: "loading-text", "Loading modpack information..." }
+            }
         };
     }
 
@@ -789,7 +792,7 @@ fn Version(mut props: VersionProps) -> Element {
                 use_context::<ModalContext>().open(
                     movable_profile2.manifest.popup_title.unwrap_or_default(),
                     rsx!(div {
-                        dangerous_inner_html: "{contents}"
+                        dangerous_inner_html: "{contents}",
                     }),
                     true,
                     Some(install),
@@ -851,7 +854,7 @@ fn Version(mut props: VersionProps) -> Element {
             
             .feature-toggle-button {{
                 border: none;
-border-radius: 20px;
+                border-radius: 20px;
                 padding: 8px 16px;
                 font-weight: bold;
                 cursor: pointer;
@@ -888,8 +891,9 @@ border-radius: 20px;
                 display: flex;
                 align-items: center;
                 padding: 16px 24px;
-                background-color: rgba(0, 0, 0, 0.7);
+                background-color: rgba(51, 51, 51, 0.9);
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             }}
             
             .app-logo {{
@@ -901,6 +905,7 @@ border-radius: 20px;
                 color: white;
                 margin: 0;
                 flex-grow: 1;
+                font-size: 20px;
             }}
             
             .header-tabs {{
@@ -1141,7 +1146,7 @@ border-radius: 20px;
             .close-button {{
                 background-color: #f0f0f0;
                 border: none;
-                border-radius:.8px;
+                border-radius: 8px;
                 padding: 8px 16px;
                 cursor: pointer;
             }}
@@ -1202,11 +1207,36 @@ border-radius: 20px;
             /* Loading */
             .loading-container {{
                 display: flex;
+                flex-direction: column;
                 justify-content: center;
                 align-items: center;
-                height: 200px;
+                height: 300px;
+                background-color: rgba(255, 255, 255, 0.8);
+                border-radius: 12px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                padding: 24px;
+                margin: 0 auto;
+                max-width: 600px;
+            }}
+            
+            .loading-text {{
                 font-size: 18px;
-                color: white;
+                color: #333;
+                margin-top: 20px;
+            }}
+            
+            .loading-spinner {{
+                border: 4px solid rgba(0, 0, 0, 0.1);
+                border-left-color: #4a90e2;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+            }}
+            
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
             }}
         " }
 
