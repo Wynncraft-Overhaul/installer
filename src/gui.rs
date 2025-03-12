@@ -1127,7 +1127,7 @@ pub(crate) fn app() -> Element {
                     settings,
                     config_path: props.config_path.clone(),
                     error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
             } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
                 Launcher {
