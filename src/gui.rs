@@ -14,7 +14,7 @@ const HOME_PAGE: usize = usize::MAX;
 #[derive(Clone)]
 struct TabInfo {
     color: String,
-    title: String,
+    title: String, 
     background: String,
     settings_background: String,
     primary_font: String,
@@ -1305,7 +1305,7 @@ pub(crate) fn app() -> Element {
                                 installing.set(false);
                                 return;
                             }
-                        }
+                        
                     } else if *update_available.read() {
                         progress_status.set("Updating");
                         match super::update(&installer_profile, move || {
