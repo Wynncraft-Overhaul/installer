@@ -820,8 +820,8 @@ fn Version(mut props: VersionProps) -> Element {
     // Now add the stylesheet in a separate style tag to avoid issues
     rsx! {
         style { "
-            /* Modern UI Styles */
-            .feature-card {
+            
+            .feature-card {{
                 background-color: rgba(255, 255, 255, 0.9);
                 border-radius: 12px;
                 padding: 16px;
@@ -830,29 +830,29 @@ fn Version(mut props: VersionProps) -> Element {
                 display: flex;
                 flex-direction: column;
                 height: 100%;
-            }
+            }}
             
-            .feature-disabled {
+            .feature-disabled {{
                 opacity: 0.7;
-            }
+            }}
             
-            .feature-card-title {
+            .feature-card-title {{
                 margin-top: 0;
                 margin-bottom: 8px;
                 font-size: 18px;
                 font-weight: 600;
                 color: #333;
-            }
+            }}
             
-            .feature-card-description {
+            .feature-card-description {{
                 flex-grow: 1;
                 margin-bottom: 16px;
                 font-size: 14px;
                 color: #555;
                 line-height: 1.4;
-            }
+            }}
             
-            .feature-toggle-button {
+            .feature-toggle-button {{
                 border: none;
 border-radius: 20px;
                 padding: 8px 16px;
@@ -862,20 +862,20 @@ border-radius: 20px;
                 width: 100%;
                 display: block;
                 text-align: center;
-            }
+            }}
             
-            .feature-toggle-button.enabled {
+            .feature-toggle-button.enabled {{
                 background-color: #4caf50;
                 color: white;
-            }
+            }}
             
-            .feature-toggle-button.disabled {
+            .feature-toggle-button.disabled {{
                 background-color: #f44336;
                 color: white;
-            }
+            }}
             
             /* Feature Cards Grid */
-            .feature-cards-container {
+            .feature-cards-container {{
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
                 gap: 16px;
@@ -884,35 +884,35 @@ border-radius: 20px;
                 max-height: 500px;
                 overflow-y: auto;
                 margin-bottom: 24px;
-            }
+            }}
             
             /* Main Layout */
-            .app-header {
+            .app-header {{
                 display: flex;
                 align-items: center;
                 padding: 16px 24px;
                 background-color: rgba(0, 0, 0, 0.7);
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
+            }}
             
-            .app-logo {
+            .app-logo {{
                 height: 40px;
                 margin-right: 16px;
-            }
+            }}
             
-            .app-title {
+            .app-title {{
                 color: white;
                 margin: 0;
                 flex-grow: 1;
-            }
+            }}
             
-            .header-tabs {
+            .header-tabs {{
                 display: flex;
                 gap: 8px;
                 margin-right: 16px;
-            }
+            }}
             
-            .header-tab-button {
+            .header-tab-button {{
                 background-color: transparent;
                 color: white;
                 border: none;
@@ -920,17 +920,17 @@ border-radius: 20px;
                 border-radius: 20px;
                 cursor: pointer;
                 transition: background-color 0.3s ease;
-            }
+            }}
             
-            .header-tab-button:hover {
+            .header-tab-button:hover {{
                 background-color: rgba(255, 255, 255, 0.1);
-            }
+            }}
             
-            .header-tab-button.active {
+            .header-tab-button.active {{
                 background-color: #4a90e2;
-            }
+            }}
             
-            .settings-button {
+            .settings-button {{
                 background-color: transparent;
                 color: white;
                 border: none;
@@ -938,59 +938,59 @@ border-radius: 20px;
                 border-radius: 20px;
                 cursor: pointer;
                 font-weight: 500;
-            }
+            }}
             
-            .settings-button:hover {
+            .settings-button:hover {{
                 background-color: rgba(255, 255, 255, 0.1);
-            }
+            }}
             
             /* Container styles */
-            .main-container {
+            .main-container {{
                 max-width: 1200px;
                 margin: 0 auto;
                 padding: 24px;
-            }
+            }}
             
-            .version-container {
+            .version-container {{
                 background-color: rgba(255, 255, 255, 0.8);
                 border-radius: 12px;
                 padding: 24px;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            }
+            }}
             
-            .content-header {
+            .content-header {{
                 margin-bottom: 24px;
                 border-bottom: 1px solid #eee;
                 padding-bottom: 16px;
-            }
+            }}
             
-            .content-header h1 {
+            .content-header h1 {{
                 margin-top: 0;
                 color: #333;
-            }
+            }}
             
-            .content-description {
+            .content-description {{
                 margin-bottom: 24px;
                 line-height: 1.6;
                 color: #444;
-            }
+            }}
             
-            .credits-link {
+            .credits-link {{
                 display: inline-block;
                 color: #4a90e2;
                 margin-bottom: 16px;
                 font-weight: 500;
                 cursor: pointer;
                 text-decoration: underline;
-            }
+            }}
             
-            .install-button-container {
+            .install-button-container {{
                 display: flex;
                 justify-content: center;
                 margin-top: 24px;
-            }
+            }}
             
-            .main-install-button {
+            .main-install-button {{
                 background-color: #4a90e2;
                 color: white;
                 border: none;
@@ -1001,193 +1001,193 @@ border-radius: 20px;
                 cursor: pointer;
                 transition: background-color 0.3s ease, transform 0.2s ease;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            }
+            }}
             
-            .main-install-button:hover {
+            .main-install-button:hover {{
                 background-color: #3a7bc8;
                 transform: translateY(-2px);
-            }
+            }}
             
-            .main-install-button:disabled {
+            .main-install-button:disabled {{
                 background-color: #9e9e9e;
                 cursor: not-allowed;
                 transform: none;
                 box-shadow: none;
-            }
+            }}
             
             /* Progress View */
-            .progress-container {
+            .progress-container {{
                 background-color: rgba(255, 255, 255, 0.8);
                 border-radius: 12px;
                 padding: 24px;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
                 text-align: center;
-            }
+            }}
             
-            .progress-header h1 {
+            .progress-header h1 {{
                 margin-top: 0;
                 color: #333;
-            }
+            }}
             
-            .progress-bar {
+            .progress-bar {{
                 width: 100%;
                 height: 24px;
                 border-radius: 12px;
                 margin-bottom: 16px;
-            }
+            }}
             
-            .progress-status {
+            .progress-status {{
                 font-size: 18px;
                 color: #555;
-            }
+            }}
             
             /* Settings */
             .settings-container, 
             .launcher-container,
-            .no-launcher-container {
+            .no-launcher-container {{
                 background-color: rgba(255, 255, 255, 0.8);
                 border-radius: 12px;
                 padding: 24px;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
                 max-width: 600px;
                 margin: 0 auto;
-            }
+            }}
             
             .settings-title,
             .launcher-title,
-            .no-launcher-title {
+            .no-launcher-title {{
                 margin-top: 0;
                 margin-bottom: 24px;
                 color: #333;
                 text-align: center;
-            }
+            }}
             
             .settings-form,
-            .launcher-form {
+            .launcher-form {{
                 display: flex;
                 flex-direction: column;
                 gap: 16px;
-            }
+            }}
             
-            .setting-group {
+            .setting-group {{
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
-            }
+            }}
             
-            .setting-label {
+            .setting-label {{
                 font-weight: 500;
                 color: #555;
-            }
+            }}
             
-            .setting-select {
+            .setting-select {{
                 padding: 10px;
                 border-radius: 8px;
                 border: 1px solid #ccc;
                 background-color: white;
-            }
+            }}
             
-            .settings-buttons {
+            .settings-buttons {{
                 display: flex;
                 gap: 16px;
                 margin-top: 16px;
-            }
+            }}
             
             .primary-button,
-            .secondary-button {
+            .secondary-button {{
                 padding: 10px 20px;
                 border-radius: 8px;
                 border: none;
                 font-weight: 500;
                 cursor: pointer;
                 transition: background-color 0.3s ease;
-            }
+            }}
             
-            .primary-button {
+            .primary-button {{
                 background-color: #4a90e2;
                 color: white;
                 flex: 1;
-            }
+            }}
             
-            .secondary-button {
+            .secondary-button {{
                 background-color: #f0f0f0;
                 color: #333;
                 flex: 1;
-            }
+            }}
             
-            .custom-multimc-button {
+            .custom-multimc-button {{
                 margin-bottom: 8px;
-            }
+            }}
             
             /* Credits */
-            .credits-container {
+            .credits-container {{
                 background-color: rgba(255, 255, 255, 0.8);
                 border-radius: 12px;
                 padding: 24px;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            }
+            }}
             
-            .credits-header {
+            .credits-header {{
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 margin-bottom: 24px;
                 border-bottom: 1px solid #eee;
                 padding-bottom: 16px;
-            }
+            }}
             
-            .credits-header h1 {
+            .credits-header h1 {{
                 margin: 0;
                 color: #333;
-            }
+            }}
             
-            .close-button {
+            .close-button {{
                 background-color: #f0f0f0;
                 border: none;
                 border-radius:.8px;
                 padding: 8px 16px;
                 cursor: pointer;
-            }
+            }}
             
-            .credits-list {
+            .credits-list {{
                 max-height: 500px;
                 overflow-y: auto;
-            }
+            }}
             
-            .credit-item {
+            .credit-item {{
                 margin-bottom: 16px;
                 padding-bottom: 16px;
                 border-bottom: 1px solid #eee;
                 list-style-type: none;
-            }
+            }}
             
-            .credit-name {
+            .credit-name {{
                 font-weight: 600;
                 margin-bottom: 4px;
-            }
+            }}
             
-            .credit-author {
+            .credit-author {{
                 color: #4a90e2;
                 text-decoration: none;
-            }
+            }}
             
-            .credit-author:hover {
+            .credit-author:hover {{
                 text-decoration: underline;
-            }
+            }}
             
             /* Uninstall list */
-            .uninstall-list-container {
+            .uninstall-list-container {{
                 max-height: 400px;
                 overflow-y: auto;
-            }
+            }}
             
-            .uninstall-list {
+            .uninstall-list {{
                 list-style-type: none;
                 padding: 0;
                 margin: 0;
-            }
+            }}
             
-            .uninstall-list-item {
+            .uninstall-list-item {{
                 padding: 10px 16px;
                 margin-bottom: 8px;
                 background-color: #f0f0f0;
@@ -1196,21 +1196,21 @@ border-radius: 20px;
                 width: 100%;
                 text-align: left;
                 cursor: pointer;
-            }
+            }}
             
-            .uninstall-list-item:hover {
+            .uninstall-list-item:hover {{
                 background-color: #e0e0e0;
-            }
+            }}
             
             /* Loading */
-            .loading-container {
+            .loading-container {{
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 height: 200px;
                 font-size: 18px;
                 color: white;
-            }
+            }}
         " }
 
         if *installing.read() {
