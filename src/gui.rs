@@ -555,7 +555,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
     let page_count = props.pages.with(|p| p.len());
     log::info!("Rendering Home Page with {} tabs", page_count);
     
-    rsx!{
+    rsx! {
         div { class: "home-container",
             h1 { class: "home-title", "Welcome to the Modpack Installer" }
             
@@ -564,13 +564,15 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
             }
             
             div { class: "tab-card-container",
-                for (index, info) in props.pages.with(|p| p.clone()) {
-                    // Skip the home page tab itself
-                    if index != 0 {
+                {props.pages.with(|p| 
+                    p.iter()
+                     .filter(|&(index, _)| *index != 0)
+                     .map(|(index, info)| rsx!(
                         div {
+                            key: "{index}",
                             class: "tab-card",
                             onclick: move |_| {
-                                props.page.set(index);
+                                props.page.set(*index);
                                 log::info!("Clicked tab card: switching to tab {}", index);
                             },
                             style: "background-image: url({});", info.background,
@@ -579,8 +581,9 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                                 h2 { class: "tab-card-title", "{info.title}" }
                             }
                         }
-                    }
-                }
+                    ))
+                    .collect::<Vec<_>>()
+                )}
             }
         }
     }
@@ -595,10 +598,14 @@ struct HomePageTabProps {
 
 #[component]
 fn Version(mut props: VersionProps) -> Element {
+    let modpack_source = props.modpack_source.clone();
+    let modpack_branch = props.modpack_branch.clone();
+    let launcher = props.launcher.clone();
+
     let profile = use_resource(move || {
-        let source = props.modpack_source.clone();
-        let branch = props.modpack_branch.clone();
-        let launcher = props.launcher.clone();
+        let source = modpack_source.clone();
+        let branch = modpack_branch.clone();
+        let launcher = launcher.clone();
         log::info!("Loading modpack from source: {}, branch: {}", source, branch);
         async move { 
             log::info!("Starting fetch for manifest from {}{}/manifest.json", super::GH_RAW, &(source.clone() + &branch));
@@ -624,11 +631,12 @@ fn Version(mut props: VersionProps) -> Element {
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
-                div { class: "loading-text", "Loading modpack information for: {props.modpack_branch}..." }
+                div { class: "loading-text", "Loading modpack information for: {modpack_branch}..." }
                 div { class: "loading-details", "This may take a moment. Please wait..." }
             }
         };
     }
+
 
     // Handle error case more gracefully
     let installer_profile = match profile.unwrap() {
@@ -636,18 +644,16 @@ fn Version(mut props: VersionProps) -> Element {
         Err(e) => {
             let error_msg = format!("{:#?}", e) + " (Failed to retrieve installer profile!)";
             log::error!("Error loading profile: {}", error_msg);
-            let branch_clone = props.modpack_branch.clone();
             props.error.set(Some(error_msg));
             return rsx! {
                 div { class: "error-container",
                     h2 { "Error Loading Modpack" }
-                    p { "Failed to load manifest for branch: {branch_clone}" }
+                    p { "Failed to load manifest for branch: {modpack_branch}" }
                     p { class: "error-details", "{e}" }
                 }
             };
         }
     };
-
     // Process manifest data for tab information
     // Extract and log the tab information for debugging
     log::info!("Processing manifest tab information:");
