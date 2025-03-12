@@ -763,29 +763,29 @@ rsx! {
     style { "
         
         .tooltip {{
-            position: relative; 
-            display: inline-block;
+            position: relative;
+            display: inline-flex; 
+            align-items: center;
+            flex-wrap: wrap; 
             cursor: pointer;
+            gap: 5px; 
+            width: 100%;
         }}
 
         
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
-            position: absolute; 
-            background-color: rgba(0, 0, 0, 0.7);
+            position: fixed; 
+            background-color: rgba(0, 0, 0, 0.9);
             color: white;
-            padding: 5px;
-            border-radius: 3px;
-            z-index: 9999;
-            transition: opacity 0.3s ease-in-out;
-            white-space: nowrap;
-            max-width: 250px; 
-            width: auto;
+            padding: 5px 8px;
+            border-radius: 5px;
+            z-index: 10000;
+            white-space: normal; 
+            max-width: 250px;
             text-align: left;
-            top: -35px; 
-            left: 50%;
-            transform: translateX(-50%); 
+            word-wrap: break-word;
         }}
 
         
@@ -795,39 +795,37 @@ rsx! {
         }}
 
         
+        .feature-list input[type=\"checkbox\"] {{
+            flex-shrink: 0; 
+            width: 18px;
+            height: 18px;
+        }}
+
+        
         .feature-list label {{
             display: flex;
             align-items: center;
-            margin-bottom: 10px;
-            white-space: nowrap; 
-            width: 100%; 
             flex-wrap: wrap; 
+            gap: 5px;
+            width: 100%;
+            line-height: 1.2; 
         }}
 
         
-        .feature-list input[type="checkbox"] {{
-            margin-right: 10px; 
-            width: 20px; 
-            height: 20px;
+        .feature-list label div {{
+            flex: 1;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }}
 
-        
+       
         .feature-list {{
-            position: relative; 
-            max-height: 200px; 
-            overflow-y: auto; 
-            overflow-x: hidden; 
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
             border: 1px solid #ccc;
             padding: 5px;
-            position: relative; 
-            word-wrap: break-word; 
-        }}
-
-        
-        .feature-list .tooltiptext {{
-            width: auto;
-            max-width: 250px;
-            word-wrap: break-word;
+            position: relative;
         }}
     " }
 
@@ -874,7 +872,7 @@ rsx! {
                                 for feat in installer_profile.manifest.features {
                                     if !feat.hidden {
                                         label { class: "tooltip",
-                                               style: "display: flex; align-items: center; position: relative; cursor: pointer;",
+                                               style: "display: flex; align-items: center; flex-wrap: wrap; cursor: pointer;",
                                             input {
                                                 checked: if installer_profile.installed {
                                                     if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
@@ -895,7 +893,7 @@ rsx! {
                                                 r#type: "checkbox"
                                             }
 
-                                            div { style: "flex-grow: 1;", "{feat.name}" }
+                                            div { "{feat.name}" }
 
                                             match feat.description {
                                                 Some(ref desc) => rsx!(span {
