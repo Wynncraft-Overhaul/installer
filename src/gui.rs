@@ -331,7 +331,6 @@ fn Settings(mut props: SettingsProps) -> Element {
         }
     }
 }
-
 #[derive(PartialEq, Props, Clone)]
 struct LauncherProps {
     config: Signal<super::Config>,
@@ -752,80 +751,40 @@ fn Version(mut props: VersionProps) -> Element {
     });
     
     let movable_profile = installer_profile.clone();
-// The rest of the file remains the same, but I'll replace the problematic section in the Version component
-
-let on_submit = move |_| {
-    // Calculate total items to process for progress tracking
-    *install_item_amount.write() = movable_profile.manifest.mods.len()
-        + movable_profile.manifest.resourcepacks.len()
-        + movable_profile.manifest.shaderpacks.len()
-        + movable_profile.manifest.include.len();
-    
-    let movable_profile = movable_profile.clone();
-    let movable_profile2 = movable_profile.clone();
-    
-    async move {
-        let install = move |canceled| {
-            let mut installer_profile = movable_profile.clone();
-            spawn(async move {
-                if canceled {
-                    return;
-                }
-                installing.set(true);
-                installer_profile.enabled_features = enabled_features.read().clone();
-                installer_profile.manifest.enabled_features = enabled_features.read().clone();
-                local_features.set(Some(enabled_features.read().clone()));
-
-                if !*installed.read() {
-                    progress_status.set("Installing");
-                    match super::install(&installer_profile, move || {
-                        install_progress.with_mut(|x| *x += 1);
-                    })
-                    .await
-                    {
-                        Ok(_) => {
-                            let _ = isahc::post(
-                                "https://tracking.commander07.workers.dev/track",
-                                format!(
-                                    "{{
-                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                    \"dataSourceId\": \"{}\",
-                                    \"userAction\": \"install\",
-                                    \"additionalData\": {{
-                                        \"features\": {:?},
-                                        \"version\": \"{}\",
-                                        \"launcher\": \"{}\"
-                                    }}
-                                }}",
-                                    installer_profile.manifest.uuid,
-                                    installer_profile.manifest.enabled_features,
-                                    installer_profile.manifest.modpack_version,
-                                    installer_profile.launcher.unwrap(),
-                                ),
-                            );
-                            
-                            installed.set(true);
-                        }
-                        Err(e) => {
-                            props.error.set(Some(
-                                format!("{:#?}", e) + " (Failed to install modpack!)",
-                            ));
-                            installing.set(false);
-                            return;
-                        }
+    let on_submit = move |_| {
+        // Calculate total items to process for progress tracking
+        *install_item_amount.write() = movable_profile.manifest.mods.len()
+            + movable_profile.manifest.resourcepacks.len()
+            + movable_profile.manifest.shaderpacks.len()
+            + movable_profile.manifest.include.len();
+        
+        let movable_profile = movable_profile.clone();
+        let movable_profile2 = movable_profile.clone();
+        
+        async move {
+            let install = move |canceled| {
+                let mut installer_profile = movable_profile.clone();
+                spawn(async move {
+                    if canceled {
+                        return;
                     }
-                } else if *update_available.read() {
-                    progress_status.set("Updating");
-                    match super::update(&installer_profile, move || {
-                        install_progress.with_mut(|x| *x += 1);
-                    })
-                    .await
-                    {
-                        Ok(_) => {
-                            let _ = isahc::post(
-                                "https://tracking.commander07.workers.dev/track",
-                                format!(
-                                    "{{
+                    installing.set(true);
+                    installer_profile.enabled_features = enabled_features.read().clone();
+                    installer_profile.manifest.enabled_features = enabled_features.read().clone();
+                    local_features.set(Some(enabled_features.read().clone()));
+
+                    if !*installed.read() {
+                        progress_status.set("Installing");
+                        match super::install(&installer_profile, move || {
+                            install_progress.with_mut(|x| *x += 1);
+                        })
+                        .await
+                        {
+                            Ok(_) => {
+                                let _ = isahc::post(
+                                    "https://tracking.commander07.workers.dev/track",
+                                    format!(
+                                        "{{
                                     \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
                                     \"dataSourceId\": \"{}\",
                                     \"userAction\": \"update\",
@@ -834,484 +793,25 @@ let on_submit = move |_| {
                                         \"new_version\": \"{}\"
                                     }}
                                 }}",
-                                    installer_profile.manifest.uuid,
-                                    installer_profile.local_manifest.as_ref().unwrap().modpack_version,
-                                    installer_profile.manifest.modpack_version
-                                ),
-                            );
-                            update_available.set(false);
-                        }
-                        Err(e) => {
-                            props.error.set(Some(
-                                format!("{:#?}", e) + " (Failed to update modpack!)",
-                            ));
-                            installing.set(false);
-                            return;
-                        }
-                    }
-                } else if *modify.read() {
-                    progress_status.set("Modifying");
-                    match super::update(&installer_profile, move || {
-                        *install_progress.write() += 1
-                    })
-                    .await
-                    {
-                        Ok(_) => {
-                            let _ = isahc::post(
-                                "https://tracking.commander07.workers.dev/track",
-                                format!(
-                                    "{{
-                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                    \"dataSourceId\": \"{}\",
-                                    \"userAction\": \"modify\",
-                                    \"additionalData\": {{
-                                        \"features\": {:?}
-                                    }}
-                                }}",
-                                    installer_profile.manifest.uuid,
-                                    installer_profile.manifest.enabled_features
-                                ),
-                            );
-                            modify.with_mut(|x| *x = false);
-                            modify_count.with_mut(|x| *x = 0);
-                        }
-                        Err(e) => {
-                            props.error.set(Some(
-                                format!("{:#?}", e) + " (Failed to modify modpack!)",
-                            ));
-                            installing.set(false);
-                            return;
-                        }
-                    }
-                }
-                installing.set(false);
-            });
-        };
-
-        if let Some(contents) = movable_profile2.manifest.popup_contents {
-            use_context::<ModalContext>().open(
-                movable_profile2.manifest.popup_title.unwrap_or_default(),
-                rsx!(div {
-                    dangerous_inner_html: "{contents}",
-                }),
-                true,
-                Some(install),
-            )
-        } else {
-            install(false);
-        }
-    }
-};
-
-    let install_disable = if *installed.read() && !*update_available.read() && !*modify.read() {
-        Some("true")
-    } else {
-        None
-    };
-
-    if *props.name.read() == String::default() {
-        props.name.set(installer_profile.manifest.name.clone())
-    }
-    
-    if (props.page)() != tab_group {
-        return None;
-    }
-    
-    // Log feature information to help debug
-    log::info!("Rendering {} features for manifest", 
-              installer_profile.manifest.features.len());
-    
-    for feat in &installer_profile.manifest.features {
-        log::info!("Feature: id={}, name={}, hidden={}, default={}", 
-                  feat.id, feat.name, feat.hidden, feat.default);
-        
-        if let Some(desc) = &feat.description {
-            log::info!("Feature description: {}", desc);
-        }
-    }
-    
-    rsx! {
-        if *installing.read() {
-            ProgressView {
-                value: install_progress(),
-                max: install_item_amount() as i64,
-                title: installer_profile.manifest.subtitle,
-                status: progress_status.to_string()
-            }
-        } else if *credits.read() {
-            Credits {
-                manifest: installer_profile.manifest,
-                enabled: installer_profile.enabled_features,
-                credits
-            }
-        } else {
-            div { class: "version-container",
-                form { onsubmit: on_submit,
-                    // Header section with title and subtitle (using manifest data)
-                    div { class: "content-header",
-                        h1 { "{installer_profile.manifest.subtitle}" }
-                    }
-                    
-                    // Description section (using manifest data)
-                    div { class: "content-description",
-                        // The 'dangerous_inner_html' directive renders HTML content safely
-                        dangerous_inner_html: "{installer_profile.manifest.description}",
-                        
-                        // Credits link
-                        div {
-                            a {
-                                class: "credits-link",
-                                onclick: move |evt| {
-                                    credits.set(true);
-                                    evt.stop_propagation();
-                                },
-                                "View Credits"
-                            }
-                        }
-                    }
-                    
-                    // Features heading
-                    h2 { "Optional Features" }
-                                        
-                    // Feature cards in a responsive grid
-                    div { class: "feature-cards-container",
-                        for feat in installer_profile.manifest.features.clone() {
-                            if !feat.hidden {
-                                FeatureCard {
-                                    feature: feat.clone(),
-                                    enabled: if installer_profile.installed {
-                                        enabled_features.with(|x| x.contains(&feat.id))
-                                    } else {
-                                        feat.default
-                                    },
-                                    on_toggle: move |evt| {
-                                        feature_change(
-                                            local_features,
-                                            modify,
-                                            evt,
-                                            &feat,
-                                            modify_count,
-                                            enabled_features,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Install/Update/Modify button at the bottom
-                    div { class: "install-button-container",
-                        button {
-                            r#type: "submit",
-                            class: "main-install-button",
-                            disabled: install_disable,
-                            if !installer_profile.installed {
-                                "Install"
-                            } else if *update_available.read() {
-                                "Update"
-                            } else if *modify.read() {
-                                "Modify"
-                            } else {
-                                "Installed"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Improved header component with tabs and home button
-#[component]
-fn AppHeader(
-    page: Signal<usize>, 
-    pages: Signal<BTreeMap<usize, TabInfo>>,
-    settings: Signal<bool>,
-    logo_url: Option<String>
-) -> Element {
-    // Log what tabs we have available
-    log::info!("Rendering AppHeader with {} tabs", pages().len());
-    for (index, info) in pages().iter() {
-        log::info!("  Tab {}: title={}", index, info.title);
-    }
-    
-    rsx!(
-        header { class: "app-header",
-            // Logo and home button
-            div { class: "app-header-left",
-                if let Some(url) = logo_url {
-                    img { 
-                        class: "app-logo", 
-                        src: "{url}", 
-                        alt: "Logo",
-                        onclick: move |_| {
-                            // Go to home view
-                            page.set(HOME_PAGE);
-                            log::info!("Navigating to home page from logo");
-                        }
-                    }
-                }
-                
-                h1 { 
-                    class: "app-title", 
-                    onclick: move |_| {
-                        // Go to home view
-                        page.set(HOME_PAGE);
-                        log::info!("Navigating to home page from title");
-                    },
-                    "Modpack Installer" 
-                }
-            }
-            
-            // Tab navigation
-            div { class: "header-tabs",
-                if !pages().is_empty() {
-                    // Home tab
-                    button {
-                        class: if page() == HOME_PAGE { "header-tab-button active" } else { "header-tab-button" },
-                        onclick: move |_| {
-                            page.set(HOME_PAGE);
-                            log::info!("Navigating to home page from tab");
-                        },
-                        "Home"
-                    }
-                    
-                    // Modpack tabs
-                    for (index, info) in pages() {
-                        button {
-                            class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
-                            onclick: move |_| {
-                                page.set(index);
-                                log::info!("Switching to tab {}: {}", index, info.title);
-                            },
-                            "{info.title}"
-                        }
-                    }
-                }
-            }
-            
-            // Settings button
-            button {
-                class: "settings-button",
-                onclick: move |_| {
-                    settings.set(true);
-                    log::info!("Opening settings");
-                },
-                "Settings"
-            }
-        }
-    )
-}
-
-#[derive(Clone)]
-pub(crate) struct AppProps {
-    pub branches: Vec<super::GithubBranch>,
-    pub modpack_source: String,
-    pub config: super::Config,
-    pub config_path: PathBuf,
-}
-
-pub(crate) fn app() -> Element {
-    let props = use_context::<AppProps>();
-    let css = include_str!("assets/style.css");
-    let branches = props.branches.clone();
-    let config = use_signal(|| props.config);
-    let settings = use_signal(|| false);
-    let mut err: Signal<Option<String>> = use_signal(|| None);
-    let name = use_signal(String::default);
-
-    // Start on home page by default
-    let page = use_signal(|| HOME_PAGE); 
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
-    
-    // Log information about the branches we're loading
-    log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
-    for (i, branch) in branches.iter().enumerate() {
-        log::info!("  Branch {}: name={}", i, branch.name);
-    }
-    
-    // Update CSS whenever relevant values change
-    let css_content = {
-        let page = page.clone();
-        let settings = settings.clone();
-        let pages = pages.clone();
-        
-        let default_color = "#320625".to_string();
-        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
-        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
-        
-        // For home page or when no matching page is found
-        if page() == HOME_PAGE || !pages().contains_key(&page()) {
-            log::info!("Using default CSS for home/unknown page");
-            let css_with_defaults = css
-                .replace("<BG_COLOR>", &default_color)
-                .replace("<BG_IMAGE>", &default_bg)
-                .replace("<SECONDARY_FONT>", &default_font)
-                .replace("<PRIMARY_FONT>", &default_font);
-            
-            return css_with_defaults;
-        }
-        
-        let bg_color = match pages().get(&page()) {
-            Some(x) => x.color.clone(),
-            None => default_color,
-        };
-        
-        let bg_image = match pages().get(&page()) {
-            Some(x) => {
-                if settings() {
-                    x.settings_background.clone()
-                } else {
-                    x.background.clone()
-                }
-            },
-            None => default_bg,
-        };
-        
-        let secondary_font = match pages().get(&page()) {
-            Some(x) => x.secondary_font.clone(),
-            None => default_font.clone(),
-        };
-        
-        let primary_font = match pages().get(&page()) {
-            Some(x) => x.primary_font.clone(),
-            None => default_font,
-        };
-        
-        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
-        
-        css
-            .replace("<BG_COLOR>", &bg_color)
-            .replace("<BG_IMAGE>", &bg_image)
-            .replace("<SECONDARY_FONT>", &secondary_font)
-            .replace("<PRIMARY_FONT>", &primary_font)
-    };
-
-    let cfg = config.with(|cfg| cfg.clone());
-    let launcher = match super::get_launcher(&cfg.launcher) {
-        Ok(val) => Some(val),
-        Err(_) => None,
-    };
-
-    let mut modal_context = use_context_provider(|| ModalContext::default());
-    if let Some(e) = err() {
-        modal_context.open("Error", rsx! {
-            p {
-                "The installer encountered an error if the problem does not resolve itself please open a thread in #📂modpack-issues on the discord."
-            }
-            textarea { class: "error-area", readonly: true, "{e}" }
-        }, false, Some(move |_| err.set(None)));
-    }
-
-    // Determine which logo to use - could be made configurable via manifest
-    let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
-
-    // Preload all branches to populate the pages map
-    for i in 0..branches.len() {
-        // We don't actually render the component here, just load the data to update the pages map
-        use_future(move || {
-            let source = props.modpack_source.clone();
-            let branch = branches[i].name.clone();
-            let launcher_clone = launcher.clone();
-            
-            async move {
-                if let Some(launcher) = launcher_clone {
-                    if let Ok(profile) = super::init(source, branch, launcher).await {
-                        // Just loading the profile will update the pages map through the Version component
-                        log::info!("Preloaded profile for branch: {}", profile.modpack_branch);
-                    }
-                }
-            }
-        });
-    }
-
-    rsx! {
-        style { "{css_content}" }
-
-        Modal {}
-
-        // Always render AppHeader if we're past the initial launcher selection
-        if !config.read().first_launch.unwrap_or(true) && launcher.is_some() {
-            AppHeader {
-                page,
-                pages,
-                settings,
-                logo_url
-            }
-        }
-
-        div { class: "main-container",
-            if settings() {
-                Settings {
-                    config,
-                    settings,
-                    config_path: props.config_path,
-                    error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
-                }
-            } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
-                Launcher {
-                    config,
-                    config_path: props.config_path,
-                    error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
-                }
-            } else if page() == HOME_PAGE {
-                // Render Home Page when page is set to HOME_PAGE
-                HomePage {
-                    pages,
-                    page
-                }
-            } else {
-                // Render the appropriate Version component based on the current page
-                for i in 0..branches.len() {
-                    Version {
-                        modpack_source: props.modpack_source.clone(),
-                        modpack_branch: branches[i].name.clone(),
-                        launcher: launcher.as_ref().unwrap().clone(),
-                        error: err,
-                        name,
-                        page,
-                        pages
-                    }
-                }
-            }
-        }
-    }
-}
-                                    "https://tracking.commander07.workers.dev/track",
-                                    format!(
-                                        "{{
-                                        \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                        \"dataSourceId\": \"{}\",
-                                        \"userAction\": \"install\",
-                                        \"additionalData\": {{
-                                            \"features\": {:?},
-                                            \"version\": \"{}\",
-                                            \"launcher\": \"{}\"
-                                        }}
-                                    }}",
                                         installer_profile.manifest.uuid,
-                                        installer_profile.manifest.enabled_features,
-                                        installer_profile.manifest.modpack_version,
-                                        installer_profile.launcher.unwrap(),
+                                        installer_profile.local_manifest.unwrap().modpack_version,
+                                        installer_profile.manifest.modpack_version
                                     ),
-                                
-                                installed.set(true);
-                            
+                                );
+                            }
                             Err(e) => {
                                 props.error.set(Some(
-                                    format!("{:#?}", e) + " (Failed to install modpack!)",
+                                    format!("{:#?}", e) + " (Failed to update modpack!)",
                                 ));
                                 installing.set(false);
                                 return;
                             }
-                        
-                     else if *update_available.read() {
-                        progress_status.set("Updating");
+                        }
+                        update_available.set(false);
+                    } else if *modify.read() {
+                        progress_status.set("Modifying");
                         match super::update(&installer_profile, move || {
-                            install_progress.with_mut(|x| *x += 1);
+                            *install_progress.write() += 1
                         })
                         .await
                         {
