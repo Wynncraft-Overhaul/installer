@@ -464,15 +464,23 @@ fn FeatureCard(props: FeatureCardProps) -> Element {
     let enabled = props.enabled;
     let feature_id = props.feature.id.clone();
     
+    // Log feature card information for debugging
+    log::info!("Rendering FeatureCard: id={}, name={}, desc={:?}",
+        props.feature.id,
+        props.feature.name,
+        props.feature.description);
+    
     rsx! {
         div { 
             class: if enabled { "feature-card feature-enabled" } else { "feature-card feature-disabled" },
             h3 { class: "feature-card-title", "{props.feature.name}" }
             
+            // Render description if available
             if let Some(description) = &props.feature.description {
                 div { class: "feature-card-description", "{description}" }
             }
             
+            // Toggle button with hidden checkbox
             label {
                 class: if enabled { "feature-toggle-button enabled" } else { "feature-toggle-button disabled" },
                 input {
@@ -546,11 +554,25 @@ fn Version(mut props: VersionProps) -> Element {
         let source = props.modpack_source.clone();
         let branch = props.modpack_branch.clone();
         let launcher = props.launcher.clone();
-        async move { super::init(source, branch, launcher).await }
+        log::info!("Loading modpack from source: {}, branch: {}", source, branch);
+        async move { 
+            let result = super::init(source, branch, launcher).await;
+            if let Ok(ref profile) = result {
+                log::info!("Loaded manifest: subtitle={}, tab_group={:?}, has {} features", 
+                    profile.manifest.subtitle,
+                    profile.manifest.tab_group,
+                    profile.manifest.features.len()
+                );
+            } else if let Err(ref e) = result {
+                log::error!("Failed to load manifest: {}", e);
+            }
+            result
+        }
     });
 
     // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
+        log::info!("Profile resource is still loading...");
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
@@ -569,48 +591,72 @@ fn Version(mut props: VersionProps) -> Element {
         }
     };
 
+    // Process manifest data for tab information
+    // Extract and log the tab information for debugging
+    log::info!("Processing manifest tab information:");
+    log::info!("  subtitle: {}", installer_profile.manifest.subtitle);
+    log::info!("  description length: {}", installer_profile.manifest.description.len());
+    
     let tab_group = if let Some(tab_group) = installer_profile.manifest.tab_group {
+        log::info!("  tab_group: {}", tab_group);
         tab_group
     } else {
+        log::info!("  tab_group: None, defaulting to 0");
         0
     };
     
     let tab_title = if let Some(ref tab_title) = installer_profile.manifest.tab_title {
+        log::info!("  tab_title: {}", tab_title);
         tab_title.clone()
     } else {
+        log::info!("  tab_title: None, defaulting to 'Default'");
         String::from("Default")
     };
     
     let tab_color = if let Some(ref tab_color) = installer_profile.manifest.tab_color {
+        log::info!("  tab_color: {}", tab_color);
         tab_color.clone()
     } else {
+        log::info!("  tab_color: None, defaulting to '#320625'");
         String::from("#320625")
     };
     
     let tab_background = if let Some(ref tab_background) = installer_profile.manifest.tab_background {
+        log::info!("  tab_background: {}", tab_background);
         tab_background.clone()
     } else {
-        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png")
+        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png";
+        log::info!("  tab_background: None, defaulting to '{}'", default_bg);
+        String::from(default_bg)
     };
     
     let settings_background = if let Some(ref settings_background) = installer_profile.manifest.settings_background {
+        log::info!("  settings_background: {}", settings_background);
         settings_background.clone()
     } else {
+        log::info!("  settings_background: None, using tab_background");
         tab_background.clone()
     };
         
     let tab_secondary_font = if let Some(ref tab_secondary_font) = installer_profile.manifest.tab_secondary_font {
+        log::info!("  tab_secondary_font: {}", tab_secondary_font);
         tab_secondary_font.clone()
     } else {
-        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
+        log::info!("  tab_secondary_font: None, defaulting to '{}'", default_font);
+        String::from(default_font)
     };
     
     let tab_primary_font = if let Some(ref tab_primary_font) = installer_profile.manifest.tab_primary_font {
+        log::info!("  tab_primary_font: {}", tab_primary_font);
         tab_primary_font.clone()
     } else {
-        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2";
+        log::info!("  tab_primary_font: None, defaulting to '{}'", default_font);
+        String::from(default_font)
     };
     
+    log::info!("Inserting tab_group {} into pages map", tab_group);
     props.pages.with_mut(|x| {
         x.insert(
             tab_group,
@@ -833,13 +879,14 @@ fn Version(mut props: VersionProps) -> Element {
         } else {
             div { class: "version-container",
                 form { onsubmit: on_submit,
-                    // Header section with title and subtitle
+                    // Header section with title and subtitle (using manifest data)
                     div { class: "content-header",
                         h1 { "{installer_profile.manifest.subtitle}" }
                     }
                     
-                    // Description section
+                    // Description section (using manifest data)
                     div { class: "content-description",
+                        // The 'dangerous_inner_html' directive renders HTML content safely
                         dangerous_inner_html: "{installer_profile.manifest.description}",
                         
                         // Credits link
@@ -857,6 +904,16 @@ fn Version(mut props: VersionProps) -> Element {
                     
                     // Features heading
                     h2 { "Optional Features" }
+                    
+                    // Log feature information
+                    {
+                        log::info!("Rendering {} features for manifest", 
+                                  installer_profile.manifest.features.len());
+                        for feat in &installer_profile.manifest.features {
+                            log::info!("Feature: id={}, name={}, hidden={}, default={}", 
+                                      feat.id, feat.name, feat.hidden, feat.default);
+                        }
+                    }
                     
                     // Feature cards in a responsive grid
                     div { class: "feature-cards-container",
@@ -911,6 +968,12 @@ fn AppHeader(
     settings: Signal<bool>,
     logo_url: Option<String>
 ) -> Element {
+    // Log what tabs we have available
+    log::info!("Rendering AppHeader with {} tabs", pages().len());
+    for (index, info) in pages().iter() {
+        log::info!("  Tab {}: title={}", index, info.title);
+    }
+    
     rsx!(
         header { class: "app-header",
             // Logo (if available)
@@ -920,16 +983,22 @@ fn AppHeader(
             
             h1 { class: "app-title", "Modpack Installer" }
             
-            // Tabs from pages
+            // Tabs from pages - show only if we have pages
             div { class: "header-tabs",
-                for (index, info) in pages() {
-                    button {
-                        class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
-                        onclick: move |_| {
-                            page.set(index);
-                        },
-                        "{info.title}"
+                if !pages().is_empty() {
+                    for (index, info) in pages() {
+                        button {
+                            class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
+                            onclick: move |_| {
+                                page.set(index);
+                                log::info!("Switching to tab {}: {}", index, info.title);
+                            },
+                            "{info.title}"
+                        }
                     }
+                } else {
+                    // If no tabs, show a message for debugging purposes
+                    span { style: "color: #888; font-style: italic;", "Loading tabs..." }
                 }
             }
             
@@ -938,6 +1007,7 @@ fn AppHeader(
                 class: "settings-button",
                 onclick: move |_| {
                     settings.set(true);
+                    log::info!("Opening settings");
                 },
                 "Settings"
             }
@@ -956,7 +1026,7 @@ pub(crate) struct AppProps {
 pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
     let css = include_str!("assets/style.css");
-    let branches = props.branches;
+    let branches = props.branches.clone();
     let config = use_signal(|| props.config);
     let settings = use_signal(|| false);
     let mut err: Signal<Option<String>> = use_signal(|| None);
@@ -965,33 +1035,58 @@ pub(crate) fn app() -> Element {
 
     let page = use_signal(|| 0);
     let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
-    let css = css
-        .replace(
-            "<BG_COLOR>",
-            match pages().get(&page()) {
-                Some(x) => &x.color,
-                None => "#320625",
+    
+    // Make pages a UseRef so we can access it in UseEffect
+    let page = use_signal(|| 0); 
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    
+    // Log information about the branches we're loading
+    log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
+    for (i, branch) in branches.iter().enumerate() {
+        log::info!("  Branch {}: name={}", i, branch.name);
+    }
+    
+    // Update CSS whenever page or settings changes
+    // The .to_string() calls are important to ensure the dynamic CSS works correctly
+    let dynamic_css = use_memo(move || {
+        let default_color = "#320625".to_string();
+        let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
+        let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
+        
+        let bg_color = match pages().get(&page()) {
+            Some(x) => x.color.clone(),
+            None => default_color,
+        };
+        
+        let bg_image = match pages().get(&page()) {
+            Some(x) => {
+                if settings() {
+                    x.settings_background.clone()
+                } else {
+                    x.background.clone()
+                }
             },
-        )
-        .replace(
-            "<BG_IMAGE>",
-            match pages().get(&page()) {
-                Some(x) => {
-                    if settings() {
-                        &x.settings_background
-                    } else {
-                        &x.background
-                    }
-                },
-                None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png",
-            },
-        ).replace("<SECONDARY_FONT>", match pages().get(&page()) {
-            Some(x) => &x.secondary_font,
-            None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2",
-        }).replace("<PRIMARY_FONT>", match pages().get(&page()) {
-            Some(x) => &x.primary_font,
-            None => "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2",
-        });
+            None => default_bg,
+        };
+        
+        let secondary_font = match pages().get(&page()) {
+            Some(x) => x.secondary_font.clone(),
+            None => default_font.clone(),
+        };
+        
+        let primary_font = match pages().get(&page()) {
+            Some(x) => x.primary_font.clone(),
+            None => default_font,
+        };
+        
+        log::info!("Updating CSS with: color={}, bg_image={}", bg_color, bg_image);
+        
+        css
+            .replace("<BG_COLOR>", &bg_color)
+            .replace("<BG_IMAGE>", &bg_image)
+            .replace("<SECONDARY_FONT>", &secondary_font)
+            .replace("<PRIMARY_FONT>", &primary_font)
+    }, (page, settings, pages));
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
@@ -1013,7 +1108,7 @@ pub(crate) fn app() -> Element {
     let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
 
     rsx! {
-        style { "{css}" }
+        style { "{dynamic_css}" }
 
         Modal {}
 
