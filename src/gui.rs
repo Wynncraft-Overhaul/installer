@@ -776,23 +776,23 @@ rsx! {
 .tooltip .tooltiptext {{
     visibility: hidden;
     opacity: 0;
-    position: absolute; 
+    position: fixed; 
     background-color: rgba(0, 0, 0, 0.9);
     color: white;
     padding: 6px 10px;
     border-radius: 5px;
-    z-index: 9999; 
+    z-index: 99999; 
     white-space: normal;
     max-width: 250px;
     text-align: left;
     word-wrap: break-word;
     
     
-    left: 100%; 
-    top: 50%;
-    transform: translateY(-50%); 
+    left: var(--tooltip-x, 50px);
+    top: var(--tooltip-y, 50px);
+    transform: translateX(10px) translateY(-50%);
     
-    
+   
     right: auto;
     bottom: auto;
 }}
