@@ -761,7 +761,6 @@ fn Version(mut props: VersionProps) -> Element {
     }
 rsx! {
     style { "
-        
         .tooltip {{
             position: relative;
             display: inline-flex; 
@@ -772,45 +771,39 @@ rsx! {
             width: 100%;
         }}
 
-        
-.tooltip .tooltiptext {{
-    visibility: hidden;
-    opacity: 0;
-    position: fixed; 
-    background-color: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 6px 10px;
-    border-radius: 5px;
-    z-index: 99999; 
-    white-space: normal;
-    max-width: 250px;
-    text-align: left;
-    word-wrap: break-word;
-    
-    
-    left: var(--tooltip-x, 50px);
-    top: var(--tooltip-y, 50px);
-    transform: translateX(10px) translateY(-50%);
-    
-   
-    right: auto;
-    bottom: auto;
-}}
+        .tooltip .tooltiptext {{
+            visibility: hidden;
+            opacity: 0;
+            position: fixed; 
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 5px;
+            z-index: 99999; 
+            white-space: normal;
+            max-width: 250px;
+            text-align: left;
+            word-wrap: break-word;
+            
+            left: var(--tooltip-x, 50px);
+            top: var(--tooltip-y, 50px);
+            transform: translateX(10px) translateY(-50%);
+           
+            right: auto;
+            bottom: auto;
+        }}
 
+        .tooltip:hover .tooltiptext {{
+            visibility: visible;
+            opacity: 1;
+        }}
 
-.tooltip:hover .tooltiptext {{
-    visibility: visible;
-    opacity: 1;
-}}
-
-        
         .feature-list input[type=\"checkbox\"] {{
             flex-shrink: 0; 
             width: 18px;
             height: 18px;
         }}
 
-        
         .feature-list label {{
             display: flex;
             align-items: center;
@@ -820,14 +813,12 @@ rsx! {
             line-height: 1.2; 
         }}
 
-        
         .feature-list label div {{
             flex: 1;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }}
 
-       
         .feature-list {{
             max-height: 200px;
             overflow-y: auto;
@@ -881,7 +872,7 @@ rsx! {
                                 for feat in installer_profile.manifest.features {
                                     if !feat.hidden {
                                         label { class: "tooltip",
-                                               style: "display: flex; align-items: center; flex-wrap: wrap; cursor: pointer;",
+                                            style: "display: flex; align-items: center; flex-wrap: wrap; cursor: pointer;",
                                             input {
                                                 checked: if installer_profile.installed {
                                                     if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
@@ -910,18 +901,11 @@ rsx! {
                                                     "{desc}",
                                                 }),
                                                 None => rsx!("")
-                                                }
- 
                                             }
- 
                                         }
- 
                                     }
- 
                                 }
- 
                             }
- 
                         }
                         input {
                             r#type: "submit",
@@ -933,36 +917,32 @@ rsx! {
                             class: "install-button",
                             disabled: install_disable
                         }
- 
                     }
- 
                 }
- 
             }
- 
         }
+    }  
 
     
-div {
-    dangerous_inner_html: r#"
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('.tooltip').forEach(el => {
-                    el.addEventListener('mousemove', (e) => {
-                        let tooltip = el.querySelector('.tooltiptext');
-                        if (tooltip) {
-                            tooltip.style.left = `${e.clientX}px`;
-                            tooltip.style.top = `${e.clientY}px`;
-                            tooltip.style.visibility = 'visible';
-                            tooltip.style.opacity = '1';
-                        }
+    div {
+        dangerous_inner_html: r#"
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.querySelectorAll('.tooltip').forEach(el => {
+                        el.addEventListener('mousemove', (e) => {
+                            let tooltip = el.querySelector('.tooltiptext');
+                            if (tooltip) {
+                                tooltip.style.left = `${e.clientX}px`;
+                                tooltip.style.top = `${e.clientY}px`;
+                                tooltip.style.visibility = 'visible';
+                                tooltip.style.opacity = '1';
+                            }
+                        });
                     });
                 });
-            });
-        </script>
-    "#
-}
- 
+            </script>
+        "#
+    }
 }
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
