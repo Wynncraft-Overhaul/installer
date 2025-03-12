@@ -569,13 +569,13 @@ a:hover {
     margin: 0;
 }
 
-/* Loading Screen */
 .loading-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
+    padding: 40px;
     gap: 20px;
 }
 
@@ -595,16 +595,52 @@ a:hover {
 .loading-text {
     font-size: 18px;
     color: white;
+    font-family: "SECONDARY_FONT";
 }
 
+/* Home page card styles */
 .modpack-card {
+    width: 300px;
+    height: 200px;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    background-size: cover;
+    background-position: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;
 }
 
 .modpack-card:hover {
     transform: translateY(-5px);
-    
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Navigation button styles */
+.navigation-buttons {
+    display: flex;
+    margin-bottom: 20px;
+    padding: 0 20px;
+}
+
+.home-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-family: "SECONDARY_FONT";
+    color: #fce8f6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.home-button:hover {
+    background-color: rgba(50, 6, 37, 0.8);
+}
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
