@@ -29,9 +29,7 @@ fn HomePage(
     log::info!("Rendering HomePage with {} tabs", pages().len());
     
     // Count actual valid modpack tabs (not placeholders)
-    // Fix: Clone the pages first to avoid temporary value error
-    let pages_data = pages();
-    let valid_tabs = pages_data.iter()
+    let valid_tabs = pages().iter()
         .filter(|(_, info)| !info.title.starts_with("Tab "))
         .count();
     
@@ -45,15 +43,19 @@ fn HomePage(
         };
     }
     
+    // Collect real modpacks first into a Vec to avoid lifetime issues
+    let real_modpacks: Vec<(usize, &TabInfo)> = pages().iter()
+        .filter(|(_, info)| !info.title.starts_with("Tab "))
+        .collect();
+    
     rsx! {
         div { class: "version-container", 
             div { class: "subtitle-container",
                 h1 { "Available Modpacks" }
             }
             div { class: "container", style: "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
-                // Fix: Clone the pages first to avoid temporary value error
-                // Only show real modpacks, not placeholder tabs
-                for (index, info) in pages_data.iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
+                // Use the collected Vec instead of filtering within the RSX macro
+                for (index, info) in real_modpacks {
                     div { 
                         class: "modpack-card",
                         style: "width: 300px; height: 200px; border-radius: 10px; overflow: hidden; cursor: pointer; 
@@ -79,7 +81,6 @@ fn HomePage(
         }
     }
 }
-
 #[component]
 fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
     rsx!(
@@ -1115,14 +1116,12 @@ pub(crate) fn app() -> Element {
     let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new()); // Removed 'mut' as not needed
     
     // Tab loading state tracking - added 'mut' to fix error
-    let mut tabs_loading = use_signal(|| true);
+        let mut tabs_loading = use_signal(|| true);
     
     // We'll use this effect to detect when tabs are loaded
     use_effect(move || {
-        // Clone pages to avoid temporary value issue
-        let pages_data = pages();
-        // After some time, when we have tabs that aren't just placeholders
-        let valid_tabs = pages_data.iter()
+        // Collect results into a Vec to avoid lifetime issues
+        let valid_tabs = pages().iter()
             .filter(|(_, info)| !info.title.starts_with("Tab "))
             .count();
             
