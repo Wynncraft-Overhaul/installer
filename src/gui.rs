@@ -829,6 +829,23 @@ rsx! {
         }}
     " }
 
+        // Script block placed above the content
+    script { r#"
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.tooltip').forEach(el => {
+                el.addEventListener('mousemove', (e) => {
+                    let tooltip = el.querySelector('.tooltiptext');
+                    if (tooltip) {
+                        tooltip.style.left = `${e.clientX}px`;
+                        tooltip.style.top = `${e.clientY}px`;
+                        tooltip.style.visibility = 'visible';
+                        tooltip.style.opacity = '1';
+                    }
+                });
+            });
+        });
+    "# }
+
     if *installing.read() {
         ProgressView {
             value: install_progress(),
@@ -901,49 +918,75 @@ rsx! {
                                                     "{desc}",
                                                 }),
                                                 None => rsx!("")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        input {
-                            r#type: "submit",
-                            value: if !installer_profile.installed {
-                                "Install"
-                            } else {
-                                if !*modify.read() { "Update" } else { "Modify" }
-                            },
-                            class: "install-button",
-                            disabled: install_disable
-                        }
-                    }
-                }
-            }
-        }
-    }
+                                                }
+ 
 
-    // Add the script block at the end of the rsx! block
-    div {
-        dangerous_inner_html: r#"
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    document.querySelectorAll('.tooltip').forEach(el => {
-                        el.addEventListener('mousemove', (e) => {
-                            let tooltip = el.querySelector('.tooltiptext');
-                            if (tooltip) {{
-                                tooltip.style.left = `${e.clientX}px`;
-                                tooltip.style.top = `${e.clientY}px`;
-                                tooltip.style.visibility = 'visible';
-                                tooltip.style.opacity = '1';
-                            }}
-                        });
-                    });
-                });
-            </script>
-        "#
+ 
+                                            }
+ 
+
+ 
+                                        }
+ 
+
+ 
+                                    }
+ 
+
+ 
+                                }
+ 
+
+ 
+                            }
+ 
+
+ 
+                        }
+ 
+                        input {
+ 
+                            r#type: "submit",
+ 
+                            value: if !installer_profile.installed {
+ 
+                                "Install"
+ 
+                            } else {
+ 
+                                if !*modify.read() { "Update" } else { "Modify" }
+ 
+                            },
+ 
+                            class: "install-button",
+ 
+                            disabled: install_disable
+ 
+                        }
+ 
+
+ 
+                    }
+ 
+
+ 
+                }
+ 
+
+ 
+            }
+ 
+
+ 
+        }
+ 
+
+ 
     }
-}  // ✅ Properly closed rsx! block
+ 
+
+ 
+}
 #[component]
 fn Pagination(mut page: Signal<usize>, mut pages: Signal<BTreeMap<usize, TabInfo>>) -> Element {
     rsx!(
