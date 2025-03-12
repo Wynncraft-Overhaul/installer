@@ -804,7 +804,6 @@ fn Version(mut props: VersionProps) -> Element {
                                     for feat in installer_profile.manifest.features {
                                         if !feat.hidden {
                                             label { class: "tooltip",
-                                                   style: "display: flex; align-items: center; position: relative; cursor: pointer;",
                                                 input {
                                                     checked: if installer_profile.installed {
                                                         if enabled_features.with(|x| x.contains(&feat.id)) { Some("true") } else { None }
@@ -829,6 +828,7 @@ fn Version(mut props: VersionProps) -> Element {
                                                 match feat.description {
                                                     Some(ref desc) => rsx!(span {
                                                         class: "tooltiptext",
+                                                        style: "display: flex; align-items: center; position: relative; cursor: pointer;",
                                                         "{desc}",
                                                     }),
                                                     None => rsx!("")
