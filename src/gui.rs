@@ -972,6 +972,48 @@ fn Version(mut props: VersionProps) -> Element {
     }
 }
 
+// New HomePage component for browsing available modpacks
+#[derive(PartialEq, Props)]
+struct HomePageTabProps {
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+    page: Signal<usize>,
+}
+
+#[component]
+fn HomePageTab(props: HomePageTabProps) -> Element {
+    log::info!("Rendering Home Page with {} tabs", props.pages().len());
+    
+    rsx! {
+        div { class: "home-container",
+            h1 { class: "home-title", "Welcome to the Modpack Installer" }
+            
+            p { class: "home-description", 
+                "Select one of the available modpacks below to continue with installation."
+            }
+            
+            div { class: "tab-card-container",
+                for (index, info) in props.pages() {
+                    // Skip the home page tab itself
+                    if index != 0 {
+                        div {
+                            class: "tab-card",
+                            onclick: move |_| {
+                                props.page.set(index);
+                                log::info!("Clicked tab card: switching to tab {}", index);
+                            },
+                            style: "background-image: url({});", info.background,
+                            
+                            div { class: "tab-card-content",
+                                h2 { class: "tab-card-title", "{info.title}" }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // New header component with tabs
 #[component]
 fn AppHeader(
@@ -997,8 +1039,19 @@ fn AppHeader(
             
             // Tabs from pages - show only if we have pages
             div { class: "header-tabs",
-                if !pages().is_empty() {
-                    for (index, info) in pages() {
+                // Always include the home tab first
+                button {
+                    class: if page() == 0 { "header-tab-button active" } else { "header-tab-button" },
+                    onclick: move |_| {
+                        page.set(0);
+                        log::info!("Switching to home tab");
+                    },
+                    "Home"
+                }
+                
+                // Then show other tabs
+                for (index, info) in pages() {
+                    if index != 0 { // Skip home page in this loop since we added it above
                         button {
                             class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
                             onclick: move |_| {
@@ -1008,9 +1061,6 @@ fn AppHeader(
                             "{info.title}"
                         }
                     }
-                } else {
-                    // If no tabs, show a message for debugging purposes
-                    span { style: "color: #888; font-style: italic;", "Loading tabs..." }
                 }
             }
             
@@ -1045,19 +1095,28 @@ pub(crate) fn app() -> Element {
 
     let name = use_signal(String::default);
 
-    let page = use_signal(|| 0);
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
-    
-    // Make pages a UseRef so we can access it in UseEffect
+    // Default to home page (page 0)
     let page = use_signal(|| 0); 
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    let pages = use_signal(|| {
+        // Initialize with home page
+        let mut map = BTreeMap::<usize, TabInfo>::new();
+        map.insert(0, TabInfo {
+            color: "#320625".to_string(),
+            title: "Home".to_string(),
+            background: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string(),
+            settings_background: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string(),
+            primary_font: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string(),
+            secondary_font: "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string(),
+        });
+        map
+    });
     
     // Log information about the branches we're loading
     log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
     for (i, branch) in branches.iter().enumerate() {
         log::info!("  Branch {}: name={}", i, branch.name);
     }
-    
+
     // Update CSS whenever relevant values change
     let css_content = {
         let page = page.clone();
@@ -1153,7 +1212,15 @@ pub(crate) fn app() -> Element {
                     error: err,
                     b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
                 }
+            } else if page() == 0 {
+                // Render home page if we're on page 0
+                HomePageTab {
+                    pages,
+                    page
+                }
             } else {
+                // Otherwise render the specific branch page
+                // We need to map page index to branch index
                 for i in 0..branches.len() {
                     Version {
                         modpack_source: props.modpack_source.clone(),
