@@ -587,30 +587,29 @@ struct VersionProps {
 
 #[component]
 fn Version(mut props: VersionProps) -> Element {
-    // Fix: Using logging to debug the profile loading
-    log::info!("Loading Version component for source: {}, branch: {}", 
-              props.modpack_source, props.modpack_branch);
-    
     let profile = use_resource(move || {
         let source = props.modpack_source.clone();
         let branch = props.modpack_branch.clone();
         let launcher = props.launcher.clone();
-        log::info!("Starting resource load for modpack from source: {}, branch: {}", source, branch);
-        async move { 
-            let result = super::init(source, branch, launcher).await;
-            match &result {
-                Ok(profile) => {
-                    log::info!("Successfully loaded manifest: subtitle={}, has {} features", 
-                        profile.manifest.subtitle,
-                        profile.manifest.features.len());
-                },
-                Err(e) => {
-                    log::error!("Failed to load manifest: {}", e);
-                }
-            }
-            result
-        }
+        async move { super::init(source, branch, launcher).await }
     });
+
+    // 'use_future's will always be 'None' on components first render
+    if profile.read().is_none() {
+        return rsx! {
+            div { class: "container", "Loading..." }
+        };
+    };
+
+    let installer_profile = match profile.unwrap() {
+        Ok(v) => v,
+        Err(e) => {
+            props.error.set(Some(
+                format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
+            ));
+            return None;
+        }
+    };
 
     // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
