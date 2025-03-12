@@ -555,7 +555,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
     let page_count = props.pages.with(|p| p.len());
     log::info!("Rendering Home Page with {} tabs", page_count);
     
-    rsx! {
+    rsx!{
         div { class: "home-container",
             h1 { class: "home-title", "Welcome to the Modpack Installer" }
             
@@ -567,22 +567,24 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                 {props.pages.with(|p| 
                     p.iter()
                      .filter(|&(index, _)| *index != 0)
-                     .map(|(index, info)| rsx!(
-                        div {
-                            key: "{index}",
-                            class: "tab-card",
-                            onclick: move |_| {
-                                props.page.set(*index);
-                                log::info!("Clicked tab card: switching to tab {}", index);
-                            },
-                            style: "background-image: url({});", info.background,
-                            
-                            div { class: "tab-card-content",
-                                h2 { class: "tab-card-title", "{info.title}" }
+                     .map(|(index, info)| {
+                        rsx!(
+                            div {
+                                key: "{index}",
+                                class: "tab-card",
+                                onclick: move |_| {
+                                    props.page.set(*index);
+                                    log::info!("Clicked tab card: switching to tab {}", index);
+                                },
+                                style: "background-image: url({});", info.background,
+                                
+                                div { class: "tab-card-content",
+                                    h2 { class: "tab-card-title", "{info.title}" }
+                                }
                             }
-                        }
-                    ))
-                    .collect::<Vec<_>>()
+                        )
+                     })
+                     .collect::<Vec<_>>()
                 )}
             }
         }
@@ -636,7 +638,6 @@ fn Version(mut props: VersionProps) -> Element {
             }
         };
     }
-
 
     // Handle error case more gracefully
     let installer_profile = match profile.unwrap() {
