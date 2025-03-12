@@ -457,12 +457,13 @@ fn NoLauncherFound(props: LauncherProps) -> Element {
 struct FeatureCardProps {
     feature: super::Feature,
     enabled: bool,
-    on_toggle: EventHandler<FormEvent>,
+    on_toggle: EventHandler<Event<FormData>>,
 }
 
 #[component]
 fn FeatureCard(props: FeatureCardProps) -> Element {
     let enabled = props.enabled;
+    let feature_id = props.feature.id.clone();
     
     rsx! {
         div { 
@@ -473,9 +474,15 @@ fn FeatureCard(props: FeatureCardProps) -> Element {
                 div { class: "feature-card-description", "{description}" }
             }
             
-            button {
+            label {
                 class: if enabled { "feature-toggle-button enabled" } else { "feature-toggle-button disabled" },
-                onclick: move |evt| props.on_toggle.call(evt),
+                input {
+                    r#type: "checkbox",
+                    name: "{feature_id}",
+                    checked: if enabled { Some("true") } else { None },
+                    onchange: move |evt| props.on_toggle.call(evt),
+                    style: "display: none;"
+                }
                 if enabled { "Enabled" } else { "Disabled" }
             }
         }
@@ -484,11 +491,11 @@ fn FeatureCard(props: FeatureCardProps) -> Element {
 
 fn feature_change(
     local_features: Signal<Option<Vec<String>>>,
-    modify: Signal<bool>,
-    evt: FormEvent,
+    mut modify: Signal<bool>,
+    evt: Event<FormData>,
     feat: &super::Feature,
-    modify_count: Signal<i32>,
-    enabled_features: Signal<Vec<String>>,
+    mut modify_count: Signal<i32>,
+    mut enabled_features: Signal<Vec<String>>,
 ) {
     let enabled = match &*evt.data.value() {
         "true" => true,
@@ -810,37 +817,15 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
     
-    // New styles for the redesigned UI
+    // Now add the stylesheet in a separate style tag to avoid issues
     rsx! {
         style { "
-            /* New Modern UI Styles */
-            :root {
-                --primary-color: #4a90e2;
-                --success-color: #4caf50;
-                --error-color: #f44336;
-                --disabled-color: #9e9e9e;
-                --card-bg: rgba(255, 255, 255, 0.9);
-                --border-radius: 12px;
-                --shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            }
-            
-            /* Card Layout */
-            .feature-cards-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                gap: 16px;
-                width: 100%;
-                padding: 16px;
-                max-height: 500px;
-                overflow-y: auto;
-                margin-bottom: 24px;
-            }
-            
+            /* Modern UI Styles */
             .feature-card {
-                background-color: var(--card-bg);
-                border-radius: var(--border-radius);
+                background-color: rgba(255, 255, 255, 0.9);
+                border-radius: 12px;
                 padding: 16px;
-                box-shadow: var(--shadow);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
                 transition: all 0.3s ease;
                 display: flex;
                 flex-direction: column;
@@ -869,22 +854,36 @@ fn Version(mut props: VersionProps) -> Element {
             
             .feature-toggle-button {
                 border: none;
-                border-radius: 20px;
+border-radius: 20px;
                 padding: 8px 16px;
                 font-weight: bold;
                 cursor: pointer;
                 transition: background-color 0.3s ease;
                 width: 100%;
+                display: block;
+                text-align: center;
             }
             
             .feature-toggle-button.enabled {
-                background-color: var(--success-color);
+                background-color: #4caf50;
                 color: white;
             }
             
             .feature-toggle-button.disabled {
-                background-color: var(--error-color);
+                background-color: #f44336;
                 color: white;
+            }
+            
+            /* Feature Cards Grid */
+            .feature-cards-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 16px;
+                width: 100%;
+                padding: 16px;
+                max-height: 500px;
+                overflow-y: auto;
+                margin-bottom: 24px;
             }
             
             /* Main Layout */
@@ -928,7 +927,7 @@ fn Version(mut props: VersionProps) -> Element {
             }
             
             .header-tab-button.active {
-                background-color: var(--primary-color);
+                background-color: #4a90e2;
             }
             
             .settings-button {
@@ -954,9 +953,9 @@ fn Version(mut props: VersionProps) -> Element {
             
             .version-container {
                 background-color: rgba(255, 255, 255, 0.8);
-                border-radius: var(--border-radius);
+                border-radius: 12px;
                 padding: 24px;
-                box-shadow: var(--shadow);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             }
             
             .content-header {
@@ -978,7 +977,7 @@ fn Version(mut props: VersionProps) -> Element {
             
             .credits-link {
                 display: inline-block;
-                color: var(--primary-color);
+                color: #4a90e2;
                 margin-bottom: 16px;
                 font-weight: 500;
                 cursor: pointer;
@@ -992,7 +991,7 @@ fn Version(mut props: VersionProps) -> Element {
             }
             
             .main-install-button {
-                background-color: var(--primary-color);
+                background-color: #4a90e2;
                 color: white;
                 border: none;
                 border-radius: 24px;
@@ -1010,7 +1009,7 @@ fn Version(mut props: VersionProps) -> Element {
             }
             
             .main-install-button:disabled {
-                background-color: var(--disabled-color);
+                background-color: #9e9e9e;
                 cursor: not-allowed;
                 transform: none;
                 box-shadow: none;
@@ -1019,9 +1018,9 @@ fn Version(mut props: VersionProps) -> Element {
             /* Progress View */
             .progress-container {
                 background-color: rgba(255, 255, 255, 0.8);
-                border-radius: var(--border-radius);
+                border-radius: 12px;
                 padding: 24px;
-                box-shadow: var(--shadow);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
                 text-align: center;
             }
             
@@ -1047,9 +1046,9 @@ fn Version(mut props: VersionProps) -> Element {
             .launcher-container,
             .no-launcher-container {
                 background-color: rgba(255, 255, 255, 0.8);
-                border-radius: var(--border-radius);
+                border-radius: 12px;
                 padding: 24px;
-                box-shadow: var(--shadow);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
                 max-width: 600px;
                 margin: 0 auto;
             }
@@ -1105,7 +1104,7 @@ fn Version(mut props: VersionProps) -> Element {
             }
             
             .primary-button {
-                background-color: var(--primary-color);
+                background-color: #4a90e2;
                 color: white;
                 flex: 1;
             }
@@ -1123,9 +1122,9 @@ fn Version(mut props: VersionProps) -> Element {
             /* Credits */
             .credits-container {
                 background-color: rgba(255, 255, 255, 0.8);
-                border-radius: var(--border-radius);
+                border-radius: 12px;
                 padding: 24px;
-                box-shadow: var(--shadow);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             }
             
             .credits-header {
@@ -1145,7 +1144,7 @@ fn Version(mut props: VersionProps) -> Element {
             .close-button {
                 background-color: #f0f0f0;
                 border: none;
-                border-radius: 8px;
+                border-radius:.8px;
                 padding: 8px 16px;
                 cursor: pointer;
             }
@@ -1168,7 +1167,7 @@ fn Version(mut props: VersionProps) -> Element {
             }
             
             .credit-author {
-                color: var(--primary-color);
+                color: #4a90e2;
                 text-decoration: none;
             }
             
@@ -1355,7 +1354,7 @@ pub(crate) fn app() -> Element {
     let css = include_str!("assets/style.css");
     let branches = props.branches;
     let config = use_signal(|| props.config);
-    let mut settings = use_signal(|| false);
+    let settings = use_signal(|| false);
     let mut err: Signal<Option<String>> = use_signal(|| None);
 
     let name = use_signal(String::default);
@@ -1425,7 +1424,7 @@ pub(crate) fn app() -> Element {
         }
 
         div { class: "main-container",
-            if *settings.read() {
+            if settings() {
                 Settings {
                     config,
                     settings,
