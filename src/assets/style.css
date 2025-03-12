@@ -184,6 +184,27 @@ a:hover {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
     transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
     cursor: pointer;
+    /* New glow effect */
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            90deg, 
+            transparent, 
+            rgba(255, 255, 255, 0.1), 
+            rgba(255, 255, 255, 0.3), 
+            transparent
+        );
+        transition: left 0.5s ease-in-out;
+    }
+    
+    &:hover::before {
+        left: 100%;
+    }
 }
 
 .home-pack-card:hover {
