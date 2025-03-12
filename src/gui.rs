@@ -585,6 +585,7 @@ struct VersionProps {
     pages: Signal<BTreeMap<usize, TabInfo>>,
 }
 
+// Main fix is in this component
 #[component]
 fn Version(mut props: VersionProps) -> Element {
     // Fix: Using logging to debug the profile loading
@@ -698,19 +699,22 @@ fn Version(mut props: VersionProps) -> Element {
         String::from(default_font)
     };
     
-    log::info!("Inserting tab_group {} into pages map", tab_group);
-    props.pages.with_mut(|x| {
-        x.insert(
-            tab_group,
-            TabInfo {
-                color: tab_color,
-                title: tab_title,
-                background: tab_background,
-                settings_background,
-                primary_font: tab_primary_font,
-                secondary_font: tab_secondary_font,
-            },
-        )
+    // FIX 1: Move this signal write to an effect to prevent writing during rendering
+    use_effect(move || {
+        log::info!("Inserting tab_group {} into pages map", tab_group);
+        props.pages.with_mut(|x| {
+            x.insert(
+                tab_group,
+                TabInfo {
+                    color: tab_color,
+                    title: tab_title,
+                    background: tab_background,
+                    settings_background,
+                    primary_font: tab_primary_font,
+                    secondary_font: tab_secondary_font,
+                },
+            )
+        });
     });
 
 let mut installing = use_signal(|| false);
@@ -719,8 +723,12 @@ let mut install_progress = use_signal(|| 0);
 let mut modify = use_signal(|| false);
 let mut modify_count = use_signal(|| 0);
 
-// Compute initial features, but keep as a Signal
-let enabled_features = use_signal(|| {
+// Compute initial features, but extract this logic to avoid signal writes during render
+let mut enabled_features = use_signal(|| Vec::<String>::new());
+
+// FIX 2: Initialize the enabled_features signal with an empty vec first
+// Then update it in an effect to prevent writing during rendering
+use_effect(move || {
     let mut features = vec!["default".to_string()];
     
     if installer_profile.installed && installer_profile.local_manifest.is_some() {
@@ -735,7 +743,7 @@ let enabled_features = use_signal(|| {
     }
     
     log::info!("Initial enabled features: {:?}", features);
-    features
+    enabled_features.set(features);
 });
 
 let mut install_item_amount = use_signal(|| 0);
