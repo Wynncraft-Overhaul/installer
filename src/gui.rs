@@ -649,7 +649,7 @@ fn Version(mut props: VersionProps) -> Element {
         log::info!("  tab_title: {}", tab_title);
         tab_title.clone()
     } else {
-        log::info!("  tab_title: None, defaulting to 'Default'");
+        log::info!("  tab_title: None, using subtitle");
         installer_profile.manifest.subtitle.clone()
     };
     
@@ -716,18 +716,26 @@ fn Version(mut props: VersionProps) -> Element {
     let mut install_progress = use_signal(|| 0);
     let mut modify = use_signal(|| false);
     let mut modify_count = use_signal(|| 0);
+    
+    // Fix: Initialize enabled_features properly
     let enabled_features = use_signal(|| {
-        if installer_profile.installed {
-            installer_profile
-                .local_manifest
-                .as_ref()
-                .unwrap()
-                .enabled_features
-                .clone()
+        let mut features = vec!["default".to_string()];
+        
+        if installer_profile.installed && installer_profile.local_manifest.is_some() {
+            features = installer_profile.local_manifest.as_ref().unwrap().enabled_features.clone();
         } else {
-            installer_profile.enabled_features.clone()
+            // Add default features
+            for feat in &installer_profile.manifest.features {
+                if feat.default {
+                    features.push(feat.id.clone());
+                }
+            }
         }
+        
+        log::info!("Initial enabled features: {:?}", features);
+        features
     });
+    
     let mut install_item_amount = use_signal(|| 0);
     let mut credits = use_signal(|| false);
     let mut installed = use_signal(|| installer_profile.installed);
@@ -747,8 +755,10 @@ fn Version(mut props: VersionProps) -> Element {
             + movable_profile.manifest.resourcepacks.len()
             + movable_profile.manifest.shaderpacks.len()
             + movable_profile.manifest.include.len();
+        
         let movable_profile = movable_profile.clone();
         let movable_profile2 = movable_profile.clone();
+        
         async move {
             let install = move |canceled| {
                 let mut installer_profile = movable_profile.clone();
