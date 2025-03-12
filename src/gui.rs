@@ -829,7 +829,7 @@ rsx! {
             position: relative;
         }}
     " }
-    div {{
+    div {
         dangerous_inner_html: r#"
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
@@ -847,7 +847,7 @@ rsx! {
                 });
             </script>
         "#
-    }}
+    }
     if *installing.read() {
         ProgressView {
             value: install_progress(),
