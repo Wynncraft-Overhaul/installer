@@ -560,7 +560,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
     let page_count = props.pages.with(|p| p.len());
     log::info!("Rendering Home Page with {} tabs", page_count);
     
-    rsx!{
+    rsx! {
         div { class: "home-container",
             h1 { class: "home-title", "Welcome to the Modpack Installer" }
             
@@ -569,7 +569,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
             }
             
             div { class: "tab-card-container",
-                props.pages.with(|pages| 
+                {props.pages.with(|pages| 
                     pages.iter()
                          .filter(|&(index, _)| *index != 0)
                          .map(|(index, info)| {
@@ -585,7 +585,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                                         props.page.set(current_index);
                                         log::info!("Clicked tab card: switching to tab {}", current_index);
                                     },
-                                    style: "background-image: url({current_background});",
+                                    style: format!("background-image: url({});", current_background),
                                     
                                     div { class: "tab-card-content",
                                         h2 { class: "tab-card-title", "{current_title}" }
