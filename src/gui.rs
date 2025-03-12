@@ -830,22 +830,6 @@ rsx! {
         }}
     " }
 
-    // Add script block
-    script { r#"
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.tooltip').forEach(el => {
-                el.addEventListener('mousemove', (e) => {
-                    let tooltip = el.querySelector('.tooltiptext');
-                    if (tooltip) {
-                        tooltip.style.left = `${e.clientX}px`;
-                        tooltip.style.top = `${e.clientY}px`;
-                        tooltip.style.visibility = 'visible';
-                        tooltip.style.opacity = '1';
-                    }
-                });
-            });
-        });
-    "# }
 
     // Rest of your component
     if *installing.read() {
