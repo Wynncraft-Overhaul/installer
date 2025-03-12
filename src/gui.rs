@@ -752,6 +752,8 @@ fn Version(mut props: VersionProps) -> Element {
     });
     
     let movable_profile = installer_profile.clone();
+// The rest of the file remains the same, but I'll replace the problematic section in the Version component
+
 let on_submit = move |_| {
     // Calculate total items to process for progress tracking
     *install_item_amount.write() = movable_profile.manifest.mods.len()
@@ -786,15 +788,15 @@ let on_submit = move |_| {
                                 "https://tracking.commander07.workers.dev/track",
                                 format!(
                                     "{{
-                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                \"dataSourceId\": \"{}\",
-                                \"userAction\": \"install\",
-                                \"additionalData\": {{
-                                    \"features\": {:?},
-                                    \"version\": \"{}\",
-                                    \"launcher\": \"{}\"
-                                }}
-                            }}",
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"install\",
+                                    \"additionalData\": {{
+                                        \"features\": {:?},
+                                        \"version\": \"{}\",
+                                        \"launcher\": \"{}\"
+                                    }}
+                                }}",
                                     installer_profile.manifest.uuid,
                                     installer_profile.manifest.enabled_features,
                                     installer_profile.manifest.modpack_version,
@@ -824,14 +826,14 @@ let on_submit = move |_| {
                                 "https://tracking.commander07.workers.dev/track",
                                 format!(
                                     "{{
-                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                \"dataSourceId\": \"{}\",
-                                \"userAction\": \"update\",
-                                \"additionalData\": {{
-                                    \"old_version\": \"{}\",
-                                    \"new_version\": \"{}\"
-                                }}
-                            }}",
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"update\",
+                                    \"additionalData\": {{
+                                        \"old_version\": \"{}\",
+                                        \"new_version\": \"{}\"
+                                    }}
+                                }}",
                                     installer_profile.manifest.uuid,
                                     installer_profile.local_manifest.as_ref().unwrap().modpack_version,
                                     installer_profile.manifest.modpack_version
@@ -859,13 +861,13 @@ let on_submit = move |_| {
                                 "https://tracking.commander07.workers.dev/track",
                                 format!(
                                     "{{
-                                \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                \"dataSourceId\": \"{}\",
-                                \"userAction\": \"modify\",
-                                \"additionalData\": {{
-                                    \"features\": {:?}
-                                }}
-                            }}",
+                                    \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
+                                    \"dataSourceId\": \"{}\",
+                                    \"userAction\": \"modify\",
+                                    \"additionalData\": {{
+                                        \"features\": {:?}
+                                    }}
+                                }}",
                                     installer_profile.manifest.uuid,
                                     installer_profile.manifest.enabled_features
                                 ),
