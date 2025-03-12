@@ -29,7 +29,18 @@ fn HomePage(
 ) -> Element {
     log::info!("Rendering HomePage with {} tabs", pages().len());
     
-    if pages().is_empty() {
+    // If we have no pages, or if any expected tab is missing, show loading
+    let all_tabs_loaded = {
+        let pages_data = pages();
+        if pages_data.is_empty() {
+            false
+        } else {
+            // Check that at least one tab from 0-6 exists
+            (0..=6).any(|i| pages_data.contains_key(&i))
+        }
+    };
+    
+    if !all_tabs_loaded {
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
@@ -37,6 +48,18 @@ fn HomePage(
             }
         };
     }
+    
+    // If we reach here, we have at least one valid tab
+    // Let's force select a valid tab if the current one is invalid
+    use_effect(move || {
+        if !pages().contains_key(&page()) {
+            // Find the first available tab group
+            if let Some(&first_tab) = pages().keys().min() {
+                log::info!("Automatically selecting first available tab: {}", first_tab);
+                page.set(first_tab);
+            }
+        }
+    });
     
     rsx! {
         div { class: "home-container",
@@ -61,7 +84,6 @@ fn HomePage(
         }
     }
 }
-
 #[component]
 fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
     rsx!(
@@ -584,7 +606,31 @@ struct VersionProps {
     page: Signal<usize>,
     pages: Signal<BTreeMap<usize, TabInfo>>,
 }
-
+fn ensure_all_tab_groups(pages: &mut BTreeMap<usize, TabInfo>) {
+    // Default values for tabs that might be missing
+    let default_color = "#320625".to_string();
+    let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
+    let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
+    
+    // Ensure all expected tab groups (0-6) exist in the map
+    // Only add if they don't already exist
+    for i in 0..=6 {
+        if !pages.contains_key(&i) {
+            pages.insert(
+                i,
+                TabInfo {
+                    color: default_color.clone(),
+                    title: format!("Tab {}", i),
+                    background: default_bg.clone(),
+                    settings_background: default_bg.clone(),
+                    primary_font: default_font.clone(),
+                    secondary_font: default_font.clone(),
+                },
+            );
+            log::info!("Added placeholder for missing tab group {}", i);
+        }
+    }
+}
 // Main fix is in this component
 #[component]
 fn Version(mut props: VersionProps) -> Element {
@@ -700,22 +746,25 @@ fn Version(mut props: VersionProps) -> Element {
     };
     
     // FIX 1: Move this signal write to an effect to prevent writing during rendering
-    use_effect(move || {
-        log::info!("Inserting tab_group {} into pages map", tab_group);
-        props.pages.with_mut(|x| {
-            x.insert(
-                tab_group,
-                TabInfo {
-                    color: tab_color.clone(),
-                    title: tab_title.clone(),
-                    background: tab_background.clone(),
-                    settings_background: settings_background.clone(),
-                    primary_font: tab_primary_font.clone(),
-                    secondary_font: tab_secondary_font.clone(),
-                },
-            )
-        });
+use_effect(move || {
+    log::info!("Inserting tab_group {} into pages map", tab_group);
+    props.pages.with_mut(|x| {
+        x.insert(
+            tab_group,
+            TabInfo {
+                color: tab_color,
+                title: tab_title,
+                background: tab_background,
+                settings_background,
+                primary_font: tab_primary_font,
+                secondary_font: tab_secondary_font,
+            },
+        );
+        
+        // Ensure all tab groups exist
+        ensure_all_tab_groups(x);
     });
+});
 
 let mut installing = use_signal(|| false);
 let mut progress_status = use_signal(|| "");
@@ -1054,38 +1103,45 @@ pub(crate) fn app() -> Element {
     let mut err: Signal<Option<String>> = use_signal(|| None);
 
     let name = use_signal(String::default);
-
-    let page = use_signal(|| 0);
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
     
-    // Make pages a UseRef so we can access it in UseEffect
+    // Single declaration of page and pages signals
     let page = use_signal(|| 0); 
     let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
     
-    // Log information about the branches we're loading
-    log::info!("Loading {} branches from source: {}", branches.len(), props.modpack_source);
+    // Initialize with placeholder tabs for all expected tab groups (0-6)
+    use_effect(move || {
+        pages.with_mut(|x| {
+            ensure_all_tab_groups(x);
+        });
+    });
+    
+    // Branch logging
+    let branch_count = branches.len();
+    let modpack_source = props.modpack_source.clone();
+    log::info!("Loading {} branches from source: {}", branch_count, modpack_source);
+    
     for (i, branch) in branches.iter().enumerate() {
         log::info!("  Branch {}: name={}", i, branch.name);
     }
     
-    // Update CSS whenever relevant values change
-    let css_content = {
-        let page = page.clone();
-        let settings = settings.clone();
-        let pages = pages.clone();
+    // CSS calculation with error handling
+    let css_content = use_memo(move || {
+        let page_val = page.get();
+        let settings_val = settings.get();
+        let pages_val = pages.get();
         
         let default_color = "#320625".to_string();
         let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
         let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
         
-        let bg_color = match pages().get(&page()) {
+        let bg_color = match pages_val.get(&page_val) {
             Some(x) => x.color.clone(),
             None => default_color,
         };
         
-        let bg_image = match pages().get(&page()) {
+        let bg_image = match pages_val.get(&page_val) {
             Some(x) => {
-                if settings() {
+                if settings_val {
                     x.settings_background.clone()
                 } else {
                     x.background.clone()
@@ -1094,12 +1150,12 @@ pub(crate) fn app() -> Element {
             None => default_bg,
         };
         
-        let secondary_font = match pages().get(&page()) {
+        let secondary_font = match pages_val.get(&page_val) {
             Some(x) => x.secondary_font.clone(),
             None => default_font.clone(),
         };
         
-        let primary_font = match pages().get(&page()) {
+        let primary_font = match pages_val.get(&page_val) {
             Some(x) => x.primary_font.clone(),
             None => default_font,
         };
@@ -1111,7 +1167,7 @@ pub(crate) fn app() -> Element {
             .replace("<BG_IMAGE>", &bg_image)
             .replace("<SECONDARY_FONT>", &secondary_font)
             .replace("<PRIMARY_FONT>", &primary_font)
-    };
+    });
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
@@ -1129,7 +1185,7 @@ pub(crate) fn app() -> Element {
         }, false, Some(move |_| err.set(None)));
     }
 
-    // Determine which logo to use - could be made configurable via manifest
+    // Determine which logo to use
     let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/icon.png".to_string());
 
     rsx! {
