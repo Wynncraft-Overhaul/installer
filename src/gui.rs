@@ -1297,7 +1297,7 @@ border-radius: 20px;
             }
         }
     }
-}
+
 
 // New header component with tabs
 #[component]
