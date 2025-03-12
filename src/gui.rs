@@ -18,6 +18,47 @@ struct TabInfo {
     secondary_font: String,
 }
 
+// Home Page component to display all available modpacks as a grid
+#[component]
+fn HomePage(
+    pages: Signal<BTreeMap<usize, TabInfo>>,
+    page: Signal<usize>
+) -> Element {
+    log::info!("Rendering HomePage with {} tabs", pages().len());
+    
+    if pages().is_empty() {
+        return rsx! {
+            div { class: "loading-container", 
+                div { class: "loading-spinner" }
+                div { class: "loading-text", "Loading modpack information..." }
+            }
+        };
+    }
+    
+    rsx! {
+        div { class: "home-container",
+            h1 { class: "home-title", "Available Modpacks" }
+            
+            div { class: "home-grid",
+                for (index, info) in pages() {
+                    div { 
+                        class: "home-pack-card",
+                        style: "background-image: url('{info.background}'); background-color: {info.color};",
+                        onclick: move |_| {
+                            page.set(index);
+                            log::info!("Navigating to tab {}: {}", index, info.title);
+                        },
+                        div { class: "home-pack-info",
+                            h2 { class: "home-pack-title", "{info.title}" }
+                            div { class: "home-pack-button", "View Modpack" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[component]
 fn ProgressView(value: i64, max: i64, status: String, title: String) -> Element {
     rsx!(
@@ -464,12 +505,6 @@ fn FeatureCard(props: FeatureCardProps) -> Element {
     let enabled = props.enabled;
     let feature_id = props.feature.id.clone();
     
-    // Log feature card information for debugging
-    log::info!("Rendering FeatureCard: id={}, name={}, desc={:?}",
-        props.feature.id,
-        props.feature.name,
-        props.feature.description);
-    
     rsx! {
         div { 
             class: if enabled { "feature-card feature-enabled" } else { "feature-card feature-disabled" },
@@ -550,21 +585,26 @@ struct VersionProps {
 
 #[component]
 fn Version(mut props: VersionProps) -> Element {
+    // Fix: Using logging to debug the profile loading
+    log::info!("Loading Version component for source: {}, branch: {}", 
+              props.modpack_source, props.modpack_branch);
+    
     let profile = use_resource(move || {
         let source = props.modpack_source.clone();
         let branch = props.modpack_branch.clone();
         let launcher = props.launcher.clone();
-        log::info!("Loading modpack from source: {}, branch: {}", source, branch);
+        log::info!("Starting resource load for modpack from source: {}, branch: {}", source, branch);
         async move { 
             let result = super::init(source, branch, launcher).await;
-            if let Ok(ref profile) = result {
-                log::info!("Loaded manifest: subtitle={}, tab_group={:?}, has {} features", 
-                    profile.manifest.subtitle,
-                    profile.manifest.tab_group,
-                    profile.manifest.features.len()
-                );
-            } else if let Err(ref e) = result {
-                log::error!("Failed to load manifest: {}", e);
+            match &result {
+                Ok(profile) => {
+                    log::info!("Successfully loaded manifest: subtitle={}, has {} features", 
+                        profile.manifest.subtitle,
+                        profile.manifest.features.len());
+                },
+                Err(e) => {
+                    log::error!("Failed to load manifest: {}", e);
+                }
             }
             result
         }
@@ -610,7 +650,7 @@ fn Version(mut props: VersionProps) -> Element {
         tab_title.clone()
     } else {
         log::info!("  tab_title: None, defaulting to 'Default'");
-        String::from("Default")
+        installer_profile.manifest.subtitle.clone()
     };
     
     let tab_color = if let Some(ref tab_color) = installer_profile.manifest.tab_color {
@@ -702,7 +742,7 @@ fn Version(mut props: VersionProps) -> Element {
     
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
-        // TODO: Don't do naive item amount calculation
+        // Calculate total items to process for progress tracking
         *install_item_amount.write() = movable_profile.manifest.mods.len()
             + movable_profile.manifest.resourcepacks.len()
             + movable_profile.manifest.shaderpacks.len()
@@ -724,43 +764,6 @@ fn Version(mut props: VersionProps) -> Element {
                     if !*installed.read() {
                         progress_status.set("Installing");
                         match super::install(&installer_profile, move || {
-                            install_progress.with_mut(|x| *x += 1);
-                        })
-                        .await
-                        {
-                            Ok(_) => {
-                                let _ = isahc::post(
-                                    "https://tracking.commander07.workers.dev/track",
-                                    format!(
-                                        "{{
-                                        \"projectId\": \"55db8403a4f24f3aa5afd33fd1962888\",
-                                        \"dataSourceId\": \"{}\",
-                                        \"userAction\": \"install\",
-                                        \"additionalData\": {{
-                                            \"features\": {:?},
-                                            \"version\": \"{}\",
-                                            \"launcher\": \"{}\"
-                                        }}
-                                    }}",
-                                        installer_profile.manifest.uuid,
-                                        installer_profile.manifest.enabled_features,
-                                        installer_profile.manifest.modpack_version,
-                                        installer_profile.launcher.unwrap(),
-                                    ),
-                                );
-                            }
-                            Err(e) => {
-                                props.error.set(Some(
-                                    format!("{:#?}", e) + " (Failed to install modpack!)",
-                                ));
-                                installing.set(false);
-                                return;
-                            }
-                        }
-                        installed.set(true);
-                    } else if *update_available.read() {
-                        progress_status.set("Updating");
-                        match super::update(&installer_profile, move || {
                             install_progress.with_mut(|x| *x += 1);
                         })
                         .await
@@ -959,7 +962,6 @@ fn Version(mut props: VersionProps) -> Element {
         }
     }
 }
-
 // New header component with tabs
 #[component]
 fn AppHeader(
