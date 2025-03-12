@@ -1257,7 +1257,7 @@ pub(crate) fn app() -> Element {
                                         installer_profile.manifest.modpack_version,
                                         installer_profile.launcher.unwrap(),
                                     ),
-                                );
+                                
                                 installed.set(true);
                             }
                             Err(e) => {
