@@ -760,38 +760,35 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
 rsx! {
-    // Start the rsx! block and add style
-    style { "
+    
+        style { "
         .tooltip {{
             position: relative;
-            display: inline-flex; 
+            display: inline-flex;
             align-items: center;
-            flex-wrap: wrap; 
+            flex-wrap: wrap;
             cursor: pointer;
-            gap: 5px; 
+            gap: 5px;
             width: 100%;
-        }}
+        } }
 
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
-            position: fixed; 
+            position: absolute; 
             background-color: rgba(0, 0, 0, 0.9);
             color: white;
             padding: 6px 10px;
             border-radius: 5px;
-            z-index: 99999; 
+            z-index: 99999;
             white-space: normal;
             max-width: 250px;
             text-align: left;
             word-wrap: break-word;
-            
-            left: var(--tooltip-x, 50px);
-            top: var(--tooltip-y, 50px);
-            transform: translateX(10px) translateY(-50%);
-           
-            right: auto;
-            bottom: auto;
+            bottom: 100%;  
+            left: 50%;
+            transform: translateX(-50%);  
+            margin-bottom: 10px;  
         }}
 
         .tooltip:hover .tooltiptext {{
@@ -799,8 +796,9 @@ rsx! {
             opacity: 1;
         }}
 
-        .feature-list input[type=\"checkbox\"] {{
-            flex-shrink: 0; 
+        
+        .feature-list input[type="checkbox"] {{
+            flex-shrink: 0;
             width: 18px;
             height: 18px;
         }}
@@ -808,10 +806,10 @@ rsx! {
         .feature-list label {{
             display: flex;
             align-items: center;
-            flex-wrap: wrap; 
+            flex-wrap: wrap;
             gap: 5px;
             width: 100%;
-            line-height: 1.2; 
+            line-height: 1.2;
         }}
 
         .feature-list label div {{
