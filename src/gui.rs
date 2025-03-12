@@ -857,7 +857,7 @@ fn Version(installer_profile: InstallerProfile, error: Signal<Option<String>>) -
                                 },
                                 "View Credits"
                             }
-                        }7);
+                        };
                     }
                     
                     // Features heading
