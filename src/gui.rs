@@ -555,7 +555,7 @@ fn Version(mut props: VersionProps) -> Element {
         return rsx! {
             div { class: "loading-container", "Loading..." }
         };
-    };
+    }
 
     let installer_profile = match profile.unwrap() {
         Ok(v) => v,
@@ -603,12 +603,11 @@ fn Version(mut props: VersionProps) -> Element {
         String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
     };
     
-let tab_primary_font = if let Some(ref tab_primary_font) =
-    installer_profile.manifest.tab_primary_font {
-    tab_primary_font.clone()
-} else {
-    String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
-};
+    let tab_primary_font = if let Some(ref tab_primary_font) = installer_profile.manifest.tab_primary_font {
+        tab_primary_font.clone()
+    } else {
+        String::from("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2")
+    };
     
     props.pages.with_mut(|x| {
         x.insert(
@@ -1295,7 +1294,7 @@ border-radius: 20px;
             }
         }
     }
-
+}
 
 // New header component with tabs
 #[component]
