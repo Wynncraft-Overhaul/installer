@@ -745,67 +745,87 @@ fn Version(mut props: VersionProps) -> Element {
         String::from(default_font)
     };
     
-    // FIX 1: Move this signal write to an effect to prevent writing during rendering
-use_effect(move || {
-    log::info!("Inserting tab_group {} into pages map", tab_group);
-    props.pages.with_mut(|x| {
-        x.insert(
-            tab_group,
-            TabInfo {
-                color: tab_color,
-                title: tab_title,
-                background: tab_background,
-                settings_background,
-                primary_font: tab_primary_font,
-                secondary_font: tab_secondary_font,
-            },
-        );
-        
-        // Ensure all tab groups exist
-        ensure_all_tab_groups(x);
+    // FIX: Clone these values to prevent ownership issues
+    let tab_color_clone = tab_color.clone();
+    let tab_title_clone = tab_title.clone();
+    let tab_background_clone = tab_background.clone();
+    let settings_background_clone = settings_background.clone();
+    let tab_primary_font_clone = tab_primary_font.clone();
+    let tab_secondary_font_clone = tab_secondary_font.clone();
+    let tab_group_clone = tab_group;
+
+    use_effect(move || {
+        log::info!("Inserting tab_group {} into pages map", tab_group_clone);
+        props.pages.with_mut(|x| {
+            x.insert(
+                tab_group_clone,
+                TabInfo {
+                    color: tab_color_clone.clone(),
+                    title: tab_title_clone.clone(),
+                    background: tab_background_clone.clone(),
+                    settings_background: settings_background_clone.clone(),
+                    primary_font: tab_primary_font_clone.clone(),
+                    secondary_font: tab_secondary_font_clone.clone(),
+                },
+            );
+            
+            // Ensure all tab groups exist
+            ensure_all_tab_groups(x);
+        });
     });
-});
 
-let mut installing = use_signal(|| false);
-let mut progress_status = use_signal(|| "");
-let mut install_progress = use_signal(|| 0);
-let mut modify = use_signal(|| false);
-let mut modify_count = use_signal(|| 0);
+    let mut installing = use_signal(|| false);
+    let mut progress_status = use_signal(|| "");
+    let mut install_progress = use_signal(|| 0);
+    let mut modify = use_signal(|| false);
+    let mut modify_count = use_signal(|| 0);
 
-// Compute initial features, but extract this logic to avoid signal writes during render
-let mut enabled_features = use_signal(|| Vec::<String>::new());
-
-// FIX 2: Initialize the enabled_features signal with an empty vec first
-// Then update it in an effect to prevent writing during rendering
-use_effect(move || {
-    let mut features = vec!["default".to_string()];
-    
-    if installer_profile.installed && installer_profile.local_manifest.is_some() {
-        features = installer_profile.local_manifest.as_ref().unwrap().enabled_features.clone();
-    } else {
-        // Add default features
-        for feat in &installer_profile.manifest.features {
-            if feat.default {
-                features.push(feat.id.clone());
-            }
-        }
-    }
-    
-    log::info!("Initial enabled features: {:?}", features);
-    enabled_features.set(features);
-});
-
-let mut install_item_amount = use_signal(|| 0);
-let mut credits = use_signal(|| false);
-let mut installed = use_signal(|| installer_profile.installed);
-let mut update_available = use_signal(|| installer_profile.update_available);
-let mut local_features = use_signal(|| {
-    if let Some(manifest) = installer_profile.local_manifest.clone() {
-        Some(manifest.enabled_features)
+    // Make a clone of installer_profile for use in effects
+    // Make a deep clone of the relevant parts for use in effects
+    let installer_profile_features = installer_profile.manifest.features.clone();
+    let installer_profile_installed = installer_profile.installed;
+    let local_manifest_features = if let Some(ref local_manifest) = installer_profile.local_manifest {
+        Some(local_manifest.enabled_features.clone())
     } else {
         None
-    }
-});
+    };
+
+    // Compute initial features, but extract this logic to avoid signal writes during render
+    let mut enabled_features = use_signal(|| Vec::<String>::new());
+
+    // Initialize the enabled_features signal with an empty vec first
+    // Then update it in an effect to prevent writing during rendering
+    use_effect(move || {
+        let mut features = vec!["default".to_string()];
+        
+        if installer_profile_installed && local_manifest_features.is_some() {
+            features = local_manifest_features.clone().unwrap();
+        } else {
+            // Add default features
+            for feat in &installer_profile_features {
+                if feat.default {
+                    features.push(feat.id.clone());
+                }
+            }
+        }
+        
+        log::info!("Initial enabled features: {:?}", features);
+        enabled_features.set(features);
+    });
+
+    let mut install_item_amount = use_signal(|| 0);
+    let mut credits = use_signal(|| false);
+    let installed = use_signal(|| installer_profile.installed);
+    let update_available = use_signal(|| installer_profile.update_available);
+    
+    // Clone local_manifest to prevent ownership issues
+    let local_features = use_signal(|| {
+        if let Some(ref manifest) = installer_profile.local_manifest {
+            Some(manifest.enabled_features.clone())
+        } else {
+            None
+        }
+    });
     
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
