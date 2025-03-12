@@ -29,7 +29,9 @@ fn HomePage(
     log::info!("Rendering HomePage with {} tabs", pages().len());
     
     // Count actual valid modpack tabs (not placeholders)
-    let valid_tabs = pages().iter()
+    // Fix: Clone the pages first to avoid temporary value error
+    let pages_data = pages();
+    let valid_tabs = pages_data.iter()
         .filter(|(_, info)| !info.title.starts_with("Tab "))
         .count();
     
@@ -49,8 +51,9 @@ fn HomePage(
                 h1 { "Available Modpacks" }
             }
             div { class: "container", style: "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
+                // Fix: Clone the pages first to avoid temporary value error
                 // Only show real modpacks, not placeholder tabs
-                for (index, info) in pages().iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
+                for (index, info) in pages_data.iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
                     div { 
                         class: "modpack-card",
                         style: "width: 300px; height: 200px; border-radius: 10px; overflow: hidden; cursor: pointer; 
@@ -1109,15 +1112,17 @@ pub(crate) fn app() -> Element {
     
     // Start with HOME_PAGE as default
     let mut page = use_signal(|| HOME_PAGE);
-    let mut pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new()); // Removed 'mut' as not needed
     
-    // Tab loading state tracking
-    let tabs_loading = use_signal(|| true);
+    // Tab loading state tracking - added 'mut' to fix error
+    let mut tabs_loading = use_signal(|| true);
     
     // We'll use this effect to detect when tabs are loaded
     use_effect(move || {
+        // Clone pages to avoid temporary value issue
+        let pages_data = pages();
         // After some time, when we have tabs that aren't just placeholders
-        let valid_tabs = pages().iter()
+        let valid_tabs = pages_data.iter()
             .filter(|(_, info)| !info.title.starts_with("Tab "))
             .count();
             
