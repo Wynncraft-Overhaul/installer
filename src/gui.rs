@@ -816,7 +816,7 @@ fn Version(mut props: VersionProps) -> Element {
     let mut install_item_amount = use_signal(|| 0);
     let mut credits = use_signal(|| false);
     let installed = use_signal(|| installer_profile.installed);
-    let update_available = use_signal(|| installer_profile.update_available);
+    let mut update_available = use_signal(|| installer_profile.update_available);
     
     // Clone local_manifest to prevent ownership issues
 let mut local_features = use_signal(|| {
