@@ -25,9 +25,9 @@ const HOME_PAGE: usize = usize::MAX;
 fn HomePage(
     pages: Signal<BTreeMap<usize, TabInfo>>,
     page: Signal<usize>,
-    branches: Vec<super::GithubBranch>, // Add branches parameter
-    modpack_source: String, // Add modpack source parameter
-    launcher: Option<super::Launcher> // Add launcher parameter
+    branches: Vec<super::GithubBranch>,
+    modpack_source: String,
+    launcher: Option<super::Launcher>
 ) -> Element {
     log::info!("Rendering HomePage with {} tabs", pages().len());
     
@@ -80,30 +80,21 @@ fn HomePage(
             .collect();
         
         rsx! {
-            div { class: "version-container", 
-                div { class: "subtitle-container",
-                    h1 { "Available Modpacks" }
-                }
-                div { class: "container", style: "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
+            div { class: "home-container", 
+                h1 { class: "home-title", "Available Modpacks" }
+                
+                div { class: "home-grid",
                     for (index, info) in real_modpacks {
                         div { 
-                            class: "modpack-card",
-                            style: "width: 300px; height: 200px; border-radius: 10px; overflow: hidden; cursor: pointer; 
-                                   position: relative; background-color: {info.color}; 
-                                   background-image: url('{info.background}'); background-size: cover; background-position: center;",
+                            class: "home-pack-card",
+                            style: "background-image: url('{info.background}'); background-color: {info.color};",
                             onclick: move |_| {
                                 page.set(index);
                                 log::info!("Navigating to tab {}: {}", index, info.title);
                             },
-                            div { 
-                                style: "position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); 
-                                       color: white; padding: 10px; text-align: center;",
-                                h2 { style: "margin: 0; font-size: 1.2em;", "{info.title}" }
-                                div { 
-                                    style: "margin-top: 5px; background: #4caf50; display: inline-block; 
-                                           padding: 5px 15px; border-radius: 5px; font-weight: bold;",
-                                    "View Modpack" 
-                                }
+                            div { class: "home-pack-info",
+                                h2 { class: "home-pack-title", "{info.title}" }
+                                div { class: "home-pack-button", "View Modpack" }
                             }
                         }
                     }
@@ -721,7 +712,6 @@ fn Version(mut props: VersionProps) -> Element {
     };
 
     // Process manifest data for tab information
-    // Extract and log the tab information for debugging
     log::info!("Successfully processed manifest tab information:");
     log::info!("  subtitle: {}", installer_profile.manifest.subtitle);
     log::info!("  description length: {}", installer_profile.manifest.description.len());
@@ -813,7 +803,6 @@ fn Version(mut props: VersionProps) -> Element {
     let mut modify_count = use_signal(|| 0);
 
     // Make a clone of installer_profile for use in effects
-    // Make a deep clone of the relevant parts for use in effects
     let installer_profile_features = installer_profile.manifest.features.clone();
     let installer_profile_installed = installer_profile.installed;
     let local_manifest_features = if let Some(ref local_manifest) = installer_profile.local_manifest {
@@ -822,11 +811,10 @@ fn Version(mut props: VersionProps) -> Element {
         None
     };
 
-    // Compute initial features, but extract this logic to avoid signal writes during render
+    // Initialize the enabled_features signal
     let mut enabled_features = use_signal(|| Vec::<String>::new());
 
-    // Initialize the enabled_features signal with an empty vec first
-    // Then update it in an effect to prevent writing during rendering
+    // Initialize the enabled_features signal with appropriate values
     use_effect(move || {
         let mut features = vec!["default".to_string()];
         
@@ -986,6 +974,7 @@ fn Version(mut props: VersionProps) -> Element {
         return None;
     }
     
+    // Now the actual render of the component
     rsx! {
         if *installing.read() {
             ProgressView {
@@ -1029,7 +1018,7 @@ fn Version(mut props: VersionProps) -> Element {
                     // Features heading
                     h2 { "Optional Features" }
                     
-                    // Log feature information
+                    // Log feature information for debugging
                     {
                         log::info!("Rendering {} features for manifest", 
                                   installer_profile.manifest.features.len());
@@ -1099,29 +1088,52 @@ fn AppHeader(
     
     rsx!(
         header { class: "app-header",
-            // Logo (if available)
+            // Logo (if available) serves as home button
             if let Some(url) = logo_url {
-                img { class: "app-logo", src: "{url}", alt: "Logo" }
+                img { 
+                    class: "app-logo", 
+                    src: "{url}", 
+                    alt: "Logo",
+                    onclick: move |_| {
+                        page.set(HOME_PAGE);
+                        log::info!("Navigating to home page via logo");
+                    },
+                    style: "cursor: pointer;"
+                }
             }
             
-            h1 { class: "app-title", "Modpack Installer" }
+            h1 { 
+                class: "app-title", 
+                onclick: move |_| {
+                    page.set(HOME_PAGE);
+                    log::info!("Navigating to home page via title");
+                },
+                style: "cursor: pointer;",
+                "Modpack Installer" 
+            }
             
             // Tabs from pages - show only if we have pages
             div { class: "header-tabs",
-                if !pages().is_empty() {
-                    for (index, info) in pages() {
-                        button {
-                            class: if page() == index { "header-tab-button active" } else { "header-tab-button" },
-                            onclick: move |_| {
-                                page.set(index);
-                                log::info!("Switching to tab {}: {}", index, info.title);
-                            },
-                            "{info.title}"
-                        }
+                // Home tab
+                button {
+                    class: if page() == HOME_PAGE { "header-tab-button active" } else { "header-tab-button" },
+                    onclick: move |_| {
+                        page.set(HOME_PAGE);
+                        log::info!("Navigating to home page via tab");
+                    },
+                    "Home"
+                }
+                
+                // Only show real modpack tabs, not placeholders
+                for (index, info) in pages().iter().filter(|(_, info)| !info.title.starts_with("Tab ")) {
+                    button {
+                        class: if page() == *index { "header-tab-button active" } else { "header-tab-button" },
+                        onclick: move |_| {
+                            page.set(*index);
+                            log::info!("Switching to tab {}: {}", index, info.title);
+                        },
+                        "{info.title}"
                     }
-                } else {
-                    // If no tabs, show a message for debugging purposes
-                    span { style: "color: #888; font-style: italic;", "Loading tabs..." }
                 }
             }
             
