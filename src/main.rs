@@ -11,7 +11,7 @@ use dioxus::desktop::tao::window::Icon;
 use dioxus::prelude::LaunchBuilder;
 use dioxus::desktop::{Config as DioxusConfig, LogicalSize, WindowBuilder};
 use futures::StreamExt;
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use image::{DynamicImage, ImageFormat};
 use isahc::config::RedirectPolicy;
 use isahc::http::{HeaderMap, HeaderValue, StatusCode};
