@@ -713,42 +713,42 @@ fn Version(mut props: VersionProps) -> Element {
         )
     });
 
-    let mut installing = use_signal(|| false);
-    let mut progress_status = use_signal(|| "");
-    let mut install_progress = use_signal(|| 0);
-    let mut modify = use_signal(|| false);
-    let mut modify_count = use_signal(|| 0);
+let mut installing = use_signal(|| false);
+let mut progress_status = use_signal(|| "");
+let mut install_progress = use_signal(|| 0);
+let mut modify = use_signal(|| false);
+let mut modify_count = use_signal(|| 0);
+
+// Use use_memo to compute initial features
+let enabled_features = use_memo(move || {
+    let mut features = vec!["default".to_string()];
     
-    // Fix: Initialize enabled_features properly
-    let enabled_features = use_signal(|| {
-        let mut features = vec!["default".to_string()];
-        
-        if installer_profile.installed && installer_profile.local_manifest.is_some() {
-            features = installer_profile.local_manifest.as_ref().unwrap().enabled_features.clone();
-        } else {
-            // Add default features
-            for feat in &installer_profile.manifest.features {
-                if feat.default {
-                    features.push(feat.id.clone());
-                }
+    if installer_profile.installed && installer_profile.local_manifest.is_some() {
+        features = installer_profile.local_manifest.as_ref().unwrap().enabled_features.clone();
+    } else {
+        // Add default features
+        for feat in &installer_profile.manifest.features {
+            if feat.default {
+                features.push(feat.id.clone());
             }
         }
-        
-        log::info!("Initial enabled features: {:?}", features);
-        features
-    });
+    }
     
-    let mut install_item_amount = use_signal(|| 0);
-    let mut credits = use_signal(|| false);
-    let mut installed = use_signal(|| installer_profile.installed);
-    let mut update_available = use_signal(|| installer_profile.update_available);
-    let mut local_features = use_signal(|| {
-        if let Some(manifest) = installer_profile.local_manifest.clone() {
-            Some(manifest.enabled_features)
-        } else {
-            None
-        }
-    });
+    log::info!("Initial enabled features: {:?}", features);
+    features
+});
+
+let mut install_item_amount = use_signal(|| 0);
+let mut credits = use_signal(|| false);
+let mut installed = use_signal(|| installer_profile.installed);
+let mut update_available = use_signal(|| installer_profile.update_available);
+let mut local_features = use_memo(move || {
+    if let Some(manifest) = installer_profile.local_manifest.clone() {
+        Some(manifest.enabled_features)
+    } else {
+        None
+    }
+});
     
     let movable_profile = installer_profile.clone();
     let on_submit = move |_| {
