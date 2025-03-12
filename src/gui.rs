@@ -548,7 +548,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
     let page_count = props.pages.with(|p| p.len());
     log::info!("Rendering Home Page with {} tabs", page_count);
     
-    rsx! {
+    Some(rsx!(
         div { class: "home-container",
             h1 { class: "home-title", "Welcome to the Modpack Installer" }
             
@@ -576,18 +576,7 @@ fn HomePageTab(props: HomePageTabProps) -> Element {
                 }
             }
         }
-    }
-}
-
-#[derive(PartialEq, Props, Clone)]
-struct VersionProps {
-    modpack_source: String,
-    modpack_branch: String,
-    launcher: Launcher,
-    error: Signal<Option<String>>,
-    name: Signal<String>,
-    page: Signal<usize>,
-    pages: Signal<BTreeMap<usize, TabInfo>>,
+    ))
 }
 
 #[component]
@@ -618,7 +607,6 @@ fn Version(mut props: VersionProps) -> Element {
 
     // When loading profile resources, show a loading indicator with more info
     if profile.read().is_none() {
-        log::info!("Profile resource is still loading for branch: {}", props.modpack_branch);
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
@@ -634,11 +622,12 @@ fn Version(mut props: VersionProps) -> Element {
         Err(e) => {
             let error_msg = format!("{:#?}", e) + " (Failed to retrieve installer profile!)";
             log::error!("Error loading profile: {}", error_msg);
+            let branch_clone = props.modpack_branch.clone();
             props.error.set(Some(error_msg));
             return rsx! {
                 div { class: "error-container",
                     h2 { "Error Loading Modpack" }
-                    p { "Failed to load manifest for branch: {props.modpack_branch.clone()}" }
+                    p { "Failed to load manifest for branch: {branch_clone}" }
                     p { class: "error-details", "{e}" }
                 }
             };
