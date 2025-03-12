@@ -761,14 +761,14 @@ fn Version(mut props: VersionProps) -> Element {
     }
 rsx! {
     style { "
-        
+       
         .tooltip {{
-            position: relative;
+            position: relative;  
             display: inline-block;
             cursor: pointer;
         }}
 
-        
+       
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
@@ -788,7 +788,7 @@ rsx! {
             transform: translateX(-50%); 
         }}
 
-        
+       
         .tooltip:hover .tooltiptext {{
             visibility: visible;
             opacity: 1;
@@ -806,7 +806,18 @@ rsx! {
             margin-right: 10px; 
             width: 20px; 
             height: 20px;
-         }}
+        }}
+
+        
+        .feature-list {{
+            position: relative;  
+            max-height: 200px; 
+            overflow-y: auto; 
+            overflow-x: hidden; 
+            border: 1px solid #ccc; 
+            padding: 5px;
+            position: relative;  
+        }}
     " }
 
     if *installing.read() {
@@ -849,7 +860,6 @@ rsx! {
                                 "Optional features:"
                             }
                             div { class: "feature-list",
-                                style: "max-height: 200px; overflow-y: auto; overflow-x: hidden; border: 1px solid #ccc; padding: 5px; position: relative;",
                                 for feat in installer_profile.manifest.features {
                                     if !feat.hidden {
                                         label { class: "tooltip",
@@ -873,8 +883,9 @@ rsx! {
                                                 },
                                                 r#type: "checkbox"
                                             }
+                                            
+                                            div { style: "flex-grow: 1;", "{feat.name}" }
 
-                                            "{feat.name}"
                                             match feat.description {
                                                 Some(ref desc) => rsx!(span {
                                                     class: "tooltiptext",
