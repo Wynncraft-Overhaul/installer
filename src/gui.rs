@@ -706,12 +706,12 @@ fn Version(mut props: VersionProps) -> Element {
             x.insert(
                 tab_group,
                 TabInfo {
-                    color: tab_color,
-                    title: tab_title,
-                    background: tab_background,
-                    settings_background,
-                    primary_font: tab_primary_font,
-                    secondary_font: tab_secondary_font,
+                    color: tab_color.clone(),
+                    title: tab_title.clone(),
+                    background: tab_background.clone(),
+                    settings_background: settings_background.clone(),
+                    primary_font: tab_primary_font.clone(),
+                    secondary_font: tab_secondary_font.clone(),
                 },
             )
         });
