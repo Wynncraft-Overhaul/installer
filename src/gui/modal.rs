@@ -10,7 +10,7 @@ struct ModalInfo {
     contents: Element,
     open: bool,
     cancelable: bool,
-    callback: Option<CopyValue<Box<dyn FnMut(bool) -> ()>>>,
+    callback: Option<CopyValue<Box<dyn FnMut(bool)>>>,
 }
 
 #[derive(Clone, Default)]
@@ -20,7 +20,7 @@ pub struct ModalContext {
 }
 
 impl ModalContext {
-    pub fn open<F: FnMut(bool) -> () + 'static, T: Into<String>>(
+    pub fn open<F: FnMut(bool) + 'static, T: Into<String>>(
         &mut self,
         title: T,
         contents: Element,

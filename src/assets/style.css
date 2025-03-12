@@ -18,6 +18,8 @@ body {
     padding: 0;
     font-size: 16px;
     user-select: none;
+    -webkit-user-select: none; /* Linux */
+    cursor: default;
     overflow-wrap: break-word;
     --bg-color: <BG_COLOR>;
     --bg-image: url(<BG_IMAGE>);

@@ -160,7 +160,7 @@ impl CachedHttpClient {
     ) -> Result<Response<AsyncBody>, isahc::Error> {
         self.http_client
             .send_async(
-                add_headers!(Request::get(url.into()), headers.into_iter())
+                add_headers!(Request::get(url.into()), headers.iter())
                     .body(())
                     .unwrap(),
             )
@@ -983,7 +983,7 @@ fn create_launcher_profile(
                 jvm_args += "XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M";
             }
             if let Some(x) = &manifest.java_args {
-                jvm_args += &x
+                jvm_args += x
             }
             if let Some(x) = manifest.max_mem {
                 jvm_args += &format!(" -Xmx{}M", x)
@@ -1215,7 +1215,7 @@ fn uninstall(launcher: &Launcher, uuid: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-async fn download_helper<T: Downloadable + Debug, F: FnMut() -> () + Clone>(
+async fn download_helper<T: Downloadable + Debug, F: FnMut() + Clone>(
     items: Vec<T>,
     enabled_features: &Vec<String>,
     modpack_root: &Path,
@@ -1333,7 +1333,7 @@ async fn download_zip(name: &str, http_client: &CachedHttpClient, url: &str, pat
     Ok(files)
 }
 
-async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile, mut progress_callback: F) -> Result<(), String> {
+async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut progress_callback: F) -> Result<(), String> {
     info!("Installing modpack");
     info!("installer_profile = {installer_profile:#?}");
     let modpack_root = &get_modpack_root(
@@ -1395,10 +1395,7 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
     };
     let mut included_files: HashMap<String, Included> = HashMap::new();
     let inc_files = match installer_profile.local_manifest.clone() {
-        Some(local_manifest) => match local_manifest.included_files {
-            Some(files) => files,
-            None => HashMap::new(),
-        },
+        Some(local_manifest) => local_manifest.included_files.unwrap_or_default(),
         None => HashMap::new(),
     };
     for inc in &inc_files {
@@ -1431,7 +1428,7 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
         )
         .expect("Failed to parse release response!");
         let hash_pairs: HashMap<String, String> = serde_json::from_str(
-            &release
+            release
                 .body
                 .as_ref()
                 .expect("Missing body on modpack release!"),
@@ -1449,24 +1446,21 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
                         .get(&inc_zip_name)
                         .expect("Asset does not have hash in release body")
                         .to_owned();
-                    match inc_files.get(&inc_zip_name) {
-                        Some(local_inc) => {
-                            if local_inc.md5 == md5 {
-                                included_files.insert(inc_zip_name, local_inc.to_owned());
-                                info!("Skipping '{}' as it is already downloaded", asset.name);
-                                break 'a;
-                            } else {
-                                for file in &local_inc.files {
-                                    let path = Path::new(file);
-                                    assert!(
-                                        path.starts_with(modpack_root),
-                                        "Local include path was not located in modpack root!"
-                                    );
-                                    let _ = fs::remove_file(path);
-                                }
+                    if let Some(local_inc) = inc_files.get(&inc_zip_name) {
+                        if local_inc.md5 == md5 {
+                            included_files.insert(inc_zip_name, local_inc.to_owned());
+                            info!("Skipping '{}' as it is already downloaded", asset.name);
+                            break 'a;
+                        } else {
+                            for file in &local_inc.files {
+                                let path = Path::new(file);
+                                assert!(
+                                    path.starts_with(modpack_root),
+                                    "Local include path was not located in modpack root!"
+                                );
+                                let _ = fs::remove_file(path);
                             }
                         }
-                        None => (),
                     }
                     let files = match download_zip(&asset.name, http_client, &format!(
                         "{}{}releases/assets/{}",
@@ -1495,24 +1489,21 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
                 } else {
                     modpack_root.to_owned()
                 };
-                match inc_files.get(&include.location) {
-                    Some(local_inc) => {
-                        if local_inc.md5 == include.version {
-                            included_files.insert(include.location, local_inc.to_owned());
-                            info!("Skipping '{}' as it is already downloaded", name);
-                            continue;
-                        } else {
-                            for file in &local_inc.files {
-                                let path = Path::new(file);
-                                assert!(
-                                    path.starts_with(&outpath),
-                                    "Local include path was not located in modpack root!"
-                                );
-                                let _ = fs::remove_file(path);
-                            }
+                if let Some(local_inc) = inc_files.get(&include.location) {
+                    if local_inc.md5 == include.version {
+                        included_files.insert(include.location, local_inc.to_owned());
+                        info!("Skipping '{}' as it is already downloaded", name);
+                        continue;
+                    } else {
+                        for file in &local_inc.files {
+                            let path = Path::new(file);
+                            assert!(
+                                path.starts_with(&outpath),
+                                "Local include path was not located in modpack root!"
+                            );
+                            let _ = fs::remove_file(path);
                         }
                     }
-                    None => (),
                 };
                 let files = match download_zip(&name, http_client, &include.location, &outpath).await {
                     Ok(v) => v,
@@ -1575,7 +1566,7 @@ async fn install<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile,
     } else {
         None
     };
-    match create_launcher_profile(&installer_profile, icon_img) {
+    match create_launcher_profile(installer_profile, icon_img) {
         Ok(_) => {}
         Err(e) => return Err(e.to_string()),
     };
@@ -1629,7 +1620,7 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone + Debug>(
 
 // Why haven't I split this into multiple files? That's a good question. I forgot, and I can't be bothered to do it now.
 // TODO(Split project into multiple files to improve maintainability)
-async fn update<F: FnMut() -> () + Clone>(installer_profile: &InstallerProfile, progress_callback: F)-> Result<(), String> {
+async fn update<F: FnMut() + Clone>(installer_profile: &InstallerProfile, progress_callback: F)-> Result<(), String> {
     info!("Updating modpack");
     info!("installer_profile = {installer_profile:#?}");
     let local_manifest: Manifest = match fs::read_to_string(
@@ -1719,9 +1710,9 @@ fn main() {
     .unwrap();
     panic::set_hook(Box::new(|info| {
         let payload = if let Some(string) = info.payload().downcast_ref::<String>() {
-            format!("{string}")
+            string.to_string()
         } else if let Some(str) = info.payload().downcast_ref::<&'static str>() {
-            format!("{str}")
+            str.to_string()
         } else {
             format!("{:?}", info.payload())
         };
@@ -1774,7 +1765,7 @@ fn main() {
         }).launch(gui::app);
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum Launcher {
     Vanilla(PathBuf),
     MultiMC(PathBuf),
@@ -1800,6 +1791,12 @@ struct InstallerProfile {
     enabled_features: Vec<String>,
     launcher: Option<Launcher>,
     local_manifest: Option<Manifest>,
+}
+
+impl PartialEq for InstallerProfile {
+    fn eq(&self, other: &Self) -> bool {
+        self.manifest == other.manifest && self.installed == other.installed && self.update_available == other.update_available && self.modpack_source == other.modpack_source && self.modpack_branch == other.modpack_branch && self.enabled_features == other.enabled_features && self.launcher == other.launcher && self.local_manifest == other.local_manifest
+    }
 }
 
 async fn init(

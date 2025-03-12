@@ -1,4 +1,4 @@
-name: Rust
+name: Rust-test
 
 on:
   push:
@@ -13,7 +13,7 @@ env:
 
 jobs:
   build:
-  
+
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-2022, macos-12]
@@ -35,13 +35,13 @@ jobs:
       run: strip target/release/installer
     - name: capture build artifacts windows
       if: ${{ matrix.os == 'windows-2022' }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.os }}
         path: target/release/installer.exe
     - name: capture build artifacts
       if: ${{ matrix.os != 'windows-2022' }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.os }}
         path: target/release/installer
