@@ -24,7 +24,10 @@ const HOME_PAGE: usize = usize::MAX;
 #[component]
 fn HomePage(
     pages: Signal<BTreeMap<usize, TabInfo>>,
-    page: Signal<usize>
+    page: Signal<usize>,
+    branches: Vec<super::GithubBranch>, // Add branches parameter
+    modpack_source: String, // Add modpack source parameter
+    launcher: Option<super::Launcher> // Add launcher parameter
 ) -> Element {
     log::info!("Rendering HomePage with {} tabs", pages().len());
     
@@ -33,49 +36,73 @@ fn HomePage(
         .filter(|(_, info)| !info.title.starts_with("Tab "))
         .count();
     
-    // If we have no real tabs yet, show loading
-    if valid_tabs == 0 {
+    // If we have no branches or launcher is None, we can't load tabs
+    if branches.is_empty() || launcher.is_none() {
         return rsx! {
             div { class: "loading-container", 
                 div { class: "loading-spinner" }
-                div { class: "loading-text", "Loading modpack information..." }
+                div { class: "loading-text", "No modpacks available. Please check your launcher settings." }
             }
         };
     }
     
-    // Collect real modpacks first into a Vec to avoid lifetime issues
-    // Fix: Clone to convert &usize to usize for collection
-    let real_modpacks: Vec<(usize, TabInfo)> = pages().iter()
-        .filter(|(_, info)| !info.title.starts_with("Tab "))
-        .map(|(index, info)| (*index, info.clone())) // Clone and dereference
-        .collect();
-    
-    rsx! {
-        div { class: "version-container", 
-            div { class: "subtitle-container",
-                h1 { "Available Modpacks" }
+    // If we have branches but no valid tabs yet, show a loading message
+    // But also trigger loading of the modpack information
+    if valid_tabs == 0 {
+        // Create a dummy placeholder to show something is happening
+        let launcher_unwrapped = launcher.unwrap();
+        
+        rsx! {
+            // Load at least one modpack tab
+            for i in 0..branches.len() {
+                Version { 
+                    modpack_source: modpack_source.clone(),
+                    modpack_branch: branches[i].name.clone(),
+                    launcher: launcher_unwrapped.clone(),
+                    error: Signal::new(None),
+                    name: Signal::new(String::default()),
+                    page: Signal::new(HOME_PAGE), // Use HOME_PAGE to prevent rendering
+                    pages: pages
+                }
             }
-            div { class: "container", style: "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
-                // Use the collected Vec instead of filtering within the RSX macro
-                for (index, info) in real_modpacks {
-                    div { 
-                        class: "modpack-card",
-                        style: "width: 300px; height: 200px; border-radius: 10px; overflow: hidden; cursor: pointer; 
-                               position: relative; background-color: {info.color}; 
-                               background-image: url('{info.background}'); background-size: cover; background-position: center;",
-                        onclick: move |_| {
-                            // Fix: No need to dereference index now as it's already a usize
-                            page.set(index);
-                            log::info!("Navigating to tab {}: {}", index, info.title);
-                        },
+            
+            div { class: "loading-container", 
+                div { class: "loading-spinner" }
+                div { class: "loading-text", "Loading modpack information..." }
+            }
+        }
+    } else {
+        // We have valid tabs, show them in the grid
+        let real_modpacks: Vec<(usize, TabInfo)> = pages().iter()
+            .filter(|(_, info)| !info.title.starts_with("Tab "))
+            .map(|(index, info)| (*index, info.clone()))
+            .collect();
+        
+        rsx! {
+            div { class: "version-container", 
+                div { class: "subtitle-container",
+                    h1 { "Available Modpacks" }
+                }
+                div { class: "container", style: "display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;",
+                    for (index, info) in real_modpacks {
                         div { 
-                            style: "position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); 
-                                   color: white; padding: 10px; text-align: center;",
-                            h2 { style: "margin: 0; font-size: 1.2em;", "{info.title}" }
+                            class: "modpack-card",
+                            style: "width: 300px; height: 200px; border-radius: 10px; overflow: hidden; cursor: pointer; 
+                                   position: relative; background-color: {info.color}; 
+                                   background-image: url('{info.background}'); background-size: cover; background-position: center;",
+                            onclick: move |_| {
+                                page.set(index);
+                                log::info!("Navigating to tab {}: {}", index, info.title);
+                            },
                             div { 
-                                style: "margin-top: 5px; background: #4caf50; display: inline-block; 
-                                       padding: 5px 15px; border-radius: 5px; font-weight: bold;",
-                                "View Modpack" 
+                                style: "position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); 
+                                       color: white; padding: 10px; text-align: center;",
+                                h2 { style: "margin: 0; font-size: 1.2em;", "{info.title}" }
+                                div { 
+                                    style: "margin-top: 5px; background: #4caf50; display: inline-block; 
+                                           padding: 5px 15px; border-radius: 5px; font-weight: bold;",
+                                    "View Modpack" 
+                                }
                             }
                         }
                     }
@@ -634,6 +661,12 @@ fn ensure_all_tab_groups(pages: &mut BTreeMap<usize, TabInfo>) {
 // Main fix is in this component
 #[component]
 fn Version(mut props: VersionProps) -> Element {
+    // Early return if we're on the HOME_PAGE - this is just to load data
+    if props.page() == HOME_PAGE {
+        log::info!("Version component loading data for home page");
+        // We still load the resources for the home page to populate tabs
+    }
+    
     // Fix: Using logging to debug the profile loading
     log::info!("Loading Version component for source: {}, branch: {}", 
               props.modpack_source, props.modpack_branch);
@@ -662,10 +695,14 @@ fn Version(mut props: VersionProps) -> Element {
     // When loading profile resources, show a loading indicator
     if profile.read().is_none() {
         log::info!("Profile resource is still loading...");
-        return rsx! {
-            div { class: "loading-container", 
-                div { class: "loading-spinner" }
-                div { class: "loading-text", "Loading modpack information..." }
+        return if props.page() == HOME_PAGE {
+            rsx! { "" } // Empty element for HOME_PAGE
+        } else {
+            rsx! {
+                div { class: "loading-container", 
+                    div { class: "loading-spinner" }
+                    div { class: "loading-text", "Loading modpack information..." }
+                }
             }
         };
     }
@@ -673,16 +710,18 @@ fn Version(mut props: VersionProps) -> Element {
     let installer_profile = match profile.unwrap() {
         Ok(v) => v,
         Err(e) => {
-            props.error.set(Some(
-                format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
-            ));
+            if props.page() != HOME_PAGE {
+                props.error.set(Some(
+                    format!("{:#?}", e) + " (Failed to retrieve installer profile!)",
+                ));
+            }
             return None;
         }
     };
 
     // Process manifest data for tab information
     // Extract and log the tab information for debugging
-    log::info!("Processing manifest tab information:");
+    log::info!("Successfully processed manifest tab information:");
     log::info!("  subtitle: {}", installer_profile.manifest.subtitle);
     log::info!("  description length: {}", installer_profile.manifest.description.len());
     
@@ -745,24 +784,27 @@ fn Version(mut props: VersionProps) -> Element {
         String::from(default_font)
     };
 
-    // Only insert tab if it has meaningful title
-    if !tab_title.is_empty() && tab_title != "Default" {
-        props.pages.with_mut(|x| {
-            x.insert(
-                tab_group,
-                TabInfo {
-                    color: tab_color,
-                    title: tab_title,
-                    background: tab_background,
-                    settings_background,
-                    primary_font: tab_primary_font,
-                    secondary_font: tab_secondary_font,
-                },
-            );
-            // We no longer need to ensure_all_tab_groups here
-            // Let's only insert real modpack tabs, not placeholders
-        });
+    // Always insert the tab into pages
+    props.pages.with_mut(|x| {
+        log::info!("Inserting tab to page map: group={}, title={}", tab_group, tab_title);
+        x.insert(
+            tab_group,
+            TabInfo {
+                color: tab_color,
+                title: tab_title,
+                background: tab_background,
+                settings_background,
+                primary_font: tab_primary_font,
+                secondary_font: tab_secondary_font,
+            },
+        );
+    });
+
+    // If we're only loading data for the home page, return empty
+    if props.page() == HOME_PAGE {
+        return rsx! { "" }; // Empty element
     }
+    
 
     let mut installing = use_signal(|| false);
     let mut progress_status = use_signal(|| "");
@@ -1108,6 +1150,7 @@ pub(crate) fn app() -> Element {
     let props = use_context::<AppProps>();
     let css = include_str!("assets/style.css");
     let branches = props.branches.clone();
+    let modpack_source = props.modpack_source.clone();
     let config = use_signal(|| props.config);
     let mut settings = use_signal(|| false);
     let mut err: Signal<Option<String>> = use_signal(|| None);
@@ -1116,15 +1159,14 @@ pub(crate) fn app() -> Element {
     
     // Start with HOME_PAGE as default
     let mut page = use_signal(|| HOME_PAGE);
-    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new()); // Removed 'mut' as not needed
+    let pages = use_signal(|| BTreeMap::<usize, TabInfo>::new());
     
-    // Tab loading state tracking - added 'mut' to fix error
-        let mut tabs_loading = use_signal(|| true);
+    // Tab loading state tracking
+    let mut tabs_loading = use_signal(|| true);
     
     // We'll use this effect to detect when tabs are loaded
- use_effect(move || {
-        // Count valid tabs without collecting, since we don't need to
-        // keep references beyond this function
+    use_effect(move || {
+        // Count valid tabs
         let valid_tabs = pages().iter()
             .filter(|(_, info)| !info.title.starts_with("Tab "))
             .count();
@@ -1242,16 +1284,16 @@ pub(crate) fn app() -> Element {
                 Settings {
                     config,
                     settings,
-                    config_path: props.config_path,
+                    config_path: props.config_path.clone(),
                     error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
                 }
             } else if config.read().first_launch.unwrap_or(true) || launcher.is_none() {
                 Launcher {
                     config,
-                    config_path: props.config_path,
+                    config_path: props.config_path.clone(),
                     error: err,
-                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source)
+                    b64_id: engine::general_purpose::URL_SAFE_NO_PAD.encode(props.modpack_source.clone())
                 }
             } else {
                 // Main navigation area
@@ -1272,8 +1314,14 @@ pub(crate) fn app() -> Element {
                 
                     // Content area
                     if page() == HOME_PAGE {
-                        // Show home page
-                        HomePage { pages, page }
+                        // Show home page with necessary parameters
+                        HomePage { 
+                            pages, 
+                            page,
+                            branches: branches.clone(),
+                            modpack_source: modpack_source.clone(),
+                            launcher: launcher.clone()
+                        }
                     } else {
                         // Show specific modpack version page
                         for i in 0..branches.len() {
