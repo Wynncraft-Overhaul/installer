@@ -1046,9 +1046,12 @@ pub(crate) fn app() -> Element {
         log::info!("  Branch {}: name={}", i, branch.name);
     }
     
-    // Update CSS whenever page or settings changes
-    // The .to_string() calls are important to ensure the dynamic CSS works correctly
-    let dynamic_css = use_memo(move || {
+    // Update CSS whenever relevant values change
+    let css_content = {
+        let page = page.clone();
+        let settings = settings.clone();
+        let pages = pages.clone();
+        
         let default_color = "#320625".to_string();
         let default_bg = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/background_installer.png".to_string();
         let default_font = "https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/Wynncraft_Game_Font.woff2".to_string();
@@ -1086,7 +1089,7 @@ pub(crate) fn app() -> Element {
             .replace("<BG_IMAGE>", &bg_image)
             .replace("<SECONDARY_FONT>", &secondary_font)
             .replace("<PRIMARY_FONT>", &primary_font)
-    }, (page, settings, pages));
+    };
 
     let cfg = config.with(|cfg| cfg.clone());
     let launcher = match super::get_launcher(&cfg.launcher) {
@@ -1108,7 +1111,7 @@ pub(crate) fn app() -> Element {
     let logo_url = Some("https://raw.githubusercontent.com/Wynncraft-Overhaul/installer/master/src/assets/logo.png".to_string());
 
     rsx! {
-        style { "{dynamic_css}" }
+        style { "{css_content}" }
 
         Modal {}
 
