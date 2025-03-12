@@ -763,7 +763,7 @@ rsx! {
     style { "
         
         .tooltip {{
-            position: relative;  /* Make sure this container is positioned relative */
+            position: relative;
             display: inline-block;
             cursor: pointer;
         }}
@@ -772,18 +772,20 @@ rsx! {
         .tooltip .tooltiptext {{
             visibility: hidden;
             opacity: 0;
-            position: fixed;  /* Use 'fixed' to place it in relation to the viewport */
+            position: absolute;  
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 5px;
             border-radius: 3px;
-            z-index: 9999;  /* Ensure tooltip is on top */
+            z-index: 9999;
             transition: opacity 0.3s ease-in-out;
-            top: 50%;  /* Position it slightly below the label */
-            left: 50%;
-            transform: translate(-50%, 10px); /* Center horizontally and place below */
             white-space: nowrap;
-            max-width: 250px; /* Prevent the tooltip from becoming too wide */
+            max-width: 250px;  
+            width: auto;
+            text-align: left; 
+            top: -35px; 
+            left: 50%;
+            transform: translateX(-50%); 
         }}
 
         
@@ -791,6 +793,20 @@ rsx! {
             visibility: visible;
             opacity: 1;
         }}
+
+        
+        .feature-list label {{
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            white-space: nowrap; 
+        } }
+
+        .feature-list input[type="checkbox"] {{
+            margin-right: 10px; 
+            width: 20px; 
+            height: 20px;
+         }
     " }
 
     if *installing.read() {
