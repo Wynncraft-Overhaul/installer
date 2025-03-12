@@ -940,20 +940,20 @@ rsx! {
  
             }
  
-        }
+        
 
     }
-    script { "
-        document.querySelectorAll('.tooltip').forEach(el => {
-            el.addEventListener('mousemove', (e) => {
-                let tooltip = el.querySelector('.tooltiptext');
-                if (tooltip) {
-                    tooltip.style.setProperty('--tooltip-x', `${e.clientX}px`);
-                    tooltip.style.setProperty('--tooltip-y', `${e.clientY}px`);
-                }
-            });
+    script { r#"
+    document.querySelectorAll('.tooltip').forEach(el => {
+        el.addEventListener('mousemove', (e) => {
+            let tooltip = el.querySelector('.tooltiptext');
+            if (tooltip) {
+                tooltip.style.setProperty('--tooltip-x', `${e.clientX}px`);
+                tooltip.style.setProperty('--tooltip-y', `${e.clientY}px`);
+            }
         });
-    " }
+    });
+"# }
  
 }
 #[component]
