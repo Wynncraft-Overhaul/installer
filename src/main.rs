@@ -247,7 +247,7 @@ macro_rules! gen_downloadble_impl {
                 loader_type: &str,
                 http_client: &CachedHttpClient,
             ) -> Result<PathBuf, DownloadError> {
-                info!("Downloading: {self:#?}");
+                debug!("Downloading: {self:#?}");
                 let res = match self.source.as_str() {
                     "modrinth" => {
                         download_from_modrinth(self, modpack_root, loader_type, $type, http_client)
@@ -259,7 +259,7 @@ macro_rules! gen_downloadble_impl {
                     }
                     _ => panic!("Unsupported source '{}'!", self.source.as_str()),
                 };
-                info!("Downloaded '{}' with result: {:#?}", self.get_name(), res);
+                debug!("Downloaded '{}' with result: {:#?}", self.get_name(), res);
                 res
             }
 
@@ -722,7 +722,7 @@ async fn download_from_ddl<T: Downloadable + Debug>(
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
     }
     let final_dist = dist.join(filename);
-    info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
+    debug!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
     let contents = match resp.bytes().await {
         Ok(bytes) => bytes,
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
@@ -799,7 +799,7 @@ async fn download_from_modrinth<T: Downloadable + Debug>(
                 Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
             };
             let final_dist = dist.join(Path::new(&_mod.files[0].filename));
-            info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
+            debug!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
             match fs::write(&final_dist, content) {
                 Ok(_) => (),
                 Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
@@ -875,7 +875,7 @@ async fn download_from_mediafire<T: Downloadable + Debug>(
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
     };
     let final_dist = dist.join(filename);
-    info!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
+    debug!("Writing '{}' to '{:#?}'", item.get_name(), final_dist);
     let contents = match resp.bytes().await {
         Ok(bytes) => bytes,
         Err(e) => return Err(DownloadError::IoError(item.get_name().to_string(), e)),
@@ -1242,7 +1242,7 @@ async fn download_helper<T: Downloadable + Debug, F: FnMut() + Clone>(
             let item = validate_item_path!(item, modpack_root);
             let path;
             if !enabled_features.contains(item.get_id()) && item.get_path().is_some() {
-                info!("Removing: '{:#?}'", item.get_path());
+                debug!("Removing: '{:#?}'", item.get_path());
                 let _ = fs::remove_file(item.get_path().as_ref().unwrap());
                 path = None;
             } else {
@@ -1273,7 +1273,7 @@ async fn download_helper<T: Downloadable + Debug, F: FnMut() + Clone>(
 }
 
 async fn download_zip(name: &str, http_client: &CachedHttpClient, url: &str, path: &Path) -> Result<Vec<String>, DownloadError> {
-    info!("Downloading '{}'", name);
+    debug!("Downloading '{}'", name);
     let mut files: Vec<String> = vec![];
     // download and unzip in modpack root
     let mut tries = 0;
@@ -1304,8 +1304,8 @@ async fn download_zip(name: &str, http_client: &CachedHttpClient, url: &str, pat
     let zipfile_path = path.join("tmp_include.zip");
     fs::write(&zipfile_path, content_byte_resp)
         .expect("Failed to write 'tmp_include.zip'!");
-    info!("Downloaded '{}'", name);
-    info!("Unzipping '{}'", name);
+    debug!("Downloaded '{}'", name);
+    debug!("Unzipping '{}'", name);
     let zipfile = fs::File::open(&zipfile_path).unwrap();
     let mut archive = zip::ZipArchive::new(zipfile).unwrap();
     // modified from https://github.com/zip-rs/zip/blob/e32db515a2a4c7d04b0bf5851912a399a4cbff68/examples/extract.rs#L19
@@ -1329,13 +1329,13 @@ async fn download_zip(name: &str, http_client: &CachedHttpClient, url: &str, pat
         }
     }
     fs::remove_file(&zipfile_path).expect("Failed to remove tmp 'tmp_include.zip'!");
-    info!("Unzipped '{}'", name);
+    debug!("Unzipped '{}'", name);
     Ok(files)
 }
 
 async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut progress_callback: F) -> Result<(), String> {
     info!("Installing modpack");
-    info!("installer_profile = {installer_profile:#?}");
+    debug!("installer_profile = {installer_profile:#?}");
     let modpack_root = &get_modpack_root(
         installer_profile
             .launcher
@@ -1404,7 +1404,7 @@ async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut p
             .contains(&inc.0.replace(".zip", ""))
         {
             for file in &inc.1.files {
-                info!("Removing: '{file}'");
+                debug!("Removing: '{file}'");
                 let _ = fs::remove_file(file);
             }
         }
@@ -1449,7 +1449,7 @@ async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut p
                     if let Some(local_inc) = inc_files.get(&inc_zip_name) {
                         if local_inc.md5 == md5 {
                             included_files.insert(inc_zip_name, local_inc.to_owned());
-                            info!("Skipping '{}' as it is already downloaded", asset.name);
+                            debug!("Skipping '{}' as it is already downloaded", asset.name);
                             break 'a;
                         } else {
                             for file in &local_inc.files {
@@ -1470,7 +1470,7 @@ async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut p
                         Err(e) => return Err(format!("Failed to download include: {:#?}", e)),
                     };
                     included_files.insert(inc_zip_name.clone(), Included { md5, files });
-                    info!("'{}' is now installed", asset.name);
+                    debug!("'{}' is now installed", asset.name);
                     progress_callback();
                     downloaded_assets.push(asset.id);
                     break;
@@ -1492,7 +1492,7 @@ async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut p
                 if let Some(local_inc) = inc_files.get(&include.location) {
                     if local_inc.md5 == include.version {
                         included_files.insert(include.location, local_inc.to_owned());
-                        info!("Skipping '{}' as it is already downloaded", name);
+                        debug!("Skipping '{}' as it is already downloaded", name);
                         continue;
                     } else {
                         for file in &local_inc.files {
@@ -1510,7 +1510,7 @@ async fn install<F: FnMut() + Clone>(installer_profile: &InstallerProfile, mut p
                     Err(e) => return Err(format!("Failed to download include: {:#?}", e)),
                 };
                 included_files.insert(name.clone(), Included { md5: include.version, files });
-                info!("'{}' is now installed", name);
+                debug!("'{}' is now installed", name);
                 progress_callback();
             }
         }
@@ -1622,7 +1622,7 @@ fn remove_old_items<T: Downloadable + PartialEq + Clone + Debug>(
 // TODO(Split project into multiple files to improve maintainability)
 async fn update<F: FnMut() + Clone>(installer_profile: &InstallerProfile, progress_callback: F)-> Result<(), String> {
     info!("Updating modpack");
-    info!("installer_profile = {installer_profile:#?}");
+    debug!("installer_profile = {installer_profile:#?}");
     let local_manifest: Manifest = match fs::read_to_string(
         get_modpack_root(
             installer_profile
@@ -1696,8 +1696,8 @@ fn main() {
     fs::create_dir_all(get_app_data().join(".WC_OVHL/")).expect("Failed to create config dir!");
     CombinedLogger::init(vec![
         TermLogger::new(
-            LevelFilter::Info,
-            LogConfig::default(),
+            LevelFilter::Debug,
+            simplelog::ConfigBuilder::new().add_filter_ignore_str("isahc::handler").build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
@@ -1721,7 +1721,17 @@ fn main() {
     }));
     info!("Installer version: {}", env!("CARGO_PKG_VERSION"));
     let platform_info = PlatformInfo::new().expect("Unable to determine platform info");
-    info!("System information:\n\tSysname: {}\n\tRelease: {}\n\tVersion: {}\n\tArchitecture: {}\n\tOsname: {}",platform_info.sysname().to_string_lossy(), platform_info.release().to_string_lossy(), platform_info.version().to_string_lossy(), platform_info.machine().to_string_lossy(), platform_info.osname().to_string_lossy());
+    debug!("System information:\n\tSysname: {}\n\tRelease: {}\n\tVersion: {}\n\tArchitecture: {}\n\tOsname: {}",platform_info.sysname().to_string_lossy(), platform_info.release().to_string_lossy(), platform_info.version().to_string_lossy(), platform_info.machine().to_string_lossy(), platform_info.osname().to_string_lossy());
+    #[cfg(target_os = "linux")]
+    {
+        if std::path::Path::new("/dev/dri").exists() {
+                // SAFETY: There's potential for race conditions in a multi-threaded context.
+                unsafe {
+                    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+                }
+                warn!("Disabled hardware acceleration as a workaround for NVIDIA driver issues")
+            }
+    }
     let icon = image::load_from_memory(include_bytes!("assets/icon.png")).unwrap();
     let branches: Vec<GithubBranch> = serde_json::from_str(
         build_http_client()
@@ -1825,8 +1835,7 @@ async fn init(
 
     let manifest_text = match manifest_resp.text().await {
         Ok(text) => {
-            debug!("Received manifest text:");
-            debug!("{}", text);
+            debug!("Received manifest text");
             text
         },
         Err(e) => {

@@ -8,6 +8,7 @@ pkgs.rustPlatform.buildRustPackage rec {
   cargoLock.lockFile = ./Cargo.lock;
 
   src = pkgs.lib.cleanSource ./.;
+  buildType = "debug";
 
   nativeBuildInputs = [ pkg-config wrapGAppsHook3 ];
   buildInputs = [ openssl glib gtk3 webkitgtk_4_1 xdotool glib-networking ];
